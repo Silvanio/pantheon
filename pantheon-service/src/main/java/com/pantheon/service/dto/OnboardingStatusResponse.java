@@ -1,17 +1,12 @@
 package com.pantheon.service.dto;
 
-import java.util.UUID;
+import java.util.List;
 
 /**
- * {@code expiredProjectId} is only populated when the caller administers an expired project
- * (i.e. can act on it via plan confirmation). A caller who is only a MEMBER of expired
- * projects gets {@code needsPlanSelection = true} with a null {@code expiredProjectId},
- * signalling the frontend to show a "contact your administrator" message instead of the
- * plan selection screen.
+ * Reports, for every company the current user belongs to, its onboarding status
+ * ({@code PLAN_PENDING}/{@code PROFILE_PENDING}/{@code COMPLETE}). {@code hasCompany} is false
+ * only when the user belongs to no company at all, driving the frontend to the
+ * company-creation step instead of any per-company onboarding step.
  */
-public record OnboardingStatusResponse(
-        boolean hasProject,
-        ActiveProjectResponse activeProject,
-        boolean needsPlanSelection,
-        UUID expiredProjectId) {
+public record OnboardingStatusResponse(boolean hasCompany, List<CompanyMembershipResponse> companies) {
 }

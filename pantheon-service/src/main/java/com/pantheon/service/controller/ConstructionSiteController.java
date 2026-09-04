@@ -28,19 +28,19 @@ public class ConstructionSiteController {
         this.constructionSiteService = constructionSiteService;
     }
 
-    @PostMapping("/api/projects/{projectId}/construction-sites")
+    @PostMapping("/api/companies/{companyId}/construction-sites")
     public ResponseEntity<ConstructionSiteResponse> create(
             @AuthenticationPrincipal AppUser user,
-            @PathVariable UUID projectId,
+            @PathVariable UUID companyId,
             @Valid @RequestBody ConstructionSiteRegistrationRequest request) {
-        ConstructionSite site = constructionSiteService.create(projectId, user.getId(), request);
+        ConstructionSite site = constructionSiteService.create(companyId, user.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ConstructionSiteResponse.from(site));
     }
 
-    @GetMapping("/api/projects/{projectId}/construction-sites")
+    @GetMapping("/api/companies/{companyId}/construction-sites")
     public ResponseEntity<List<ConstructionSiteResponse>> list(
-            @AuthenticationPrincipal AppUser user, @PathVariable UUID projectId) {
-        List<ConstructionSiteResponse> sites = constructionSiteService.list(projectId, user.getId()).stream()
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID companyId) {
+        List<ConstructionSiteResponse> sites = constructionSiteService.list(companyId, user.getId()).stream()
                 .map(ConstructionSiteResponse::from)
                 .toList();
         return ResponseEntity.ok(sites);

@@ -1,19 +1,14 @@
 package com.pantheon.service.service;
 
-import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportAttachment;
 import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.entity.MediaType;
-import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
 import com.pantheon.service.exception.InvalidFileException;
-import com.pantheon.service.exception.NotProjectMemberException;
-import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportAttachmentRepository;
 import com.pantheon.service.repository.DailyReportMediaRepository;
 import com.pantheon.service.repository.DailyReportRepository;
-import com.pantheon.service.repository.ProjectMembershipRepository;
 import com.pantheon.service.storage.StorageKeys;
 import com.pantheon.service.storage.StorageService;
 import java.io.IOException;
@@ -33,8 +28,7 @@ public class DailyReportMediaService {
     private final DailyReportMediaRepository mediaRepository;
     private final DailyReportAttachmentRepository attachmentRepository;
     private final DailyReportRepository dailyReportRepository;
-    private final ConstructionSiteRepository siteRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final SiteAccessService siteAccessService;
     private final StorageService storageService;
     private final long maxPhotoBytes;
     private final long maxVideoBytes;
@@ -44,8 +38,7 @@ public class DailyReportMediaService {
             DailyReportMediaRepository mediaRepository,
             DailyReportAttachmentRepository attachmentRepository,
             DailyReportRepository dailyReportRepository,
-            ConstructionSiteRepository siteRepository,
-            ProjectMembershipRepository membershipRepository,
+            SiteAccessService siteAccessService,
             StorageService storageService,
             @Value("${pantheon.storage.max-photo-size-mb}") long maxPhotoSizeMb,
             @Value("${pantheon.storage.max-video-size-mb}") long maxVideoSizeMb,
@@ -53,8 +46,7 @@ public class DailyReportMediaService {
         this.mediaRepository = mediaRepository;
         this.attachmentRepository = attachmentRepository;
         this.dailyReportRepository = dailyReportRepository;
-        this.siteRepository = siteRepository;
-        this.membershipRepository = membershipRepository;
+        this.siteAccessService = siteAccessService;
         this.storageService = storageService;
         this.maxPhotoBytes = maxPhotoSizeMb * 1024 * 1024;
         this.maxVideoBytes = maxVideoSizeMb * 1024 * 1024;
@@ -147,12 +139,7 @@ public class DailyReportMediaService {
     private DailyReport requireReport(UUID reportId, UUID actingUserId) {
         DailyReport report =
                 dailyReportRepository.findById(reportId).orElseThrow(() -> new DailyReportNotFoundException(reportId));
-        ConstructionSite site = siteRepository
-                .findById(report.getConstructionSiteId())
-                .orElseThrow(() -> new ConstructionSiteNotFoundException(report.getConstructionSiteId()));
-        membershipRepository
-                .findByProjectIdAndUserId(site.getProjectId(), actingUserId)
-                .orElseThrow(() -> new NotProjectMemberException(site.getProjectId()));
+        siteAccessService.requireAccess(report.getConstructionSiteId(), actingUserId);
         return report;
     }
 }

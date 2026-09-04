@@ -16,7 +16,6 @@ import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MediaType;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
-import com.pantheon.service.exception.NotProjectMemberException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
 import com.pantheon.service.repository.DailyReportAttachmentRepository;
@@ -29,7 +28,6 @@ import com.pantheon.service.repository.DailyReportSignatureRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
 import com.pantheon.service.repository.EquipmentRepository;
 import com.pantheon.service.repository.MaterialRepository;
-import com.pantheon.service.repository.ProjectMembershipRepository;
 import com.pantheon.service.storage.StorageService;
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
@@ -56,7 +54,7 @@ public class DailyReportPdfService {
     private final DailyReportAttachmentRepository attachmentRepository;
     private final DailyReportSignatureRepository signatureRepository;
     private final ConstructionSiteRepository siteRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final SiteAccessService siteAccessService;
     private final EquipmentRepository equipmentRepository;
     private final MaterialRepository materialRepository;
     private final StorageService storageService;
@@ -72,7 +70,7 @@ public class DailyReportPdfService {
             DailyReportAttachmentRepository attachmentRepository,
             DailyReportSignatureRepository signatureRepository,
             ConstructionSiteRepository siteRepository,
-            ProjectMembershipRepository membershipRepository,
+            SiteAccessService siteAccessService,
             EquipmentRepository equipmentRepository,
             MaterialRepository materialRepository,
             StorageService storageService) {
@@ -86,7 +84,7 @@ public class DailyReportPdfService {
         this.attachmentRepository = attachmentRepository;
         this.signatureRepository = signatureRepository;
         this.siteRepository = siteRepository;
-        this.membershipRepository = membershipRepository;
+        this.siteAccessService = siteAccessService;
         this.equipmentRepository = equipmentRepository;
         this.materialRepository = materialRepository;
         this.storageService = storageService;
@@ -98,9 +96,7 @@ public class DailyReportPdfService {
         ConstructionSite site = siteRepository
                 .findById(report.getConstructionSiteId())
                 .orElseThrow(() -> new ConstructionSiteNotFoundException(report.getConstructionSiteId()));
-        membershipRepository
-                .findByProjectIdAndUserId(site.getProjectId(), actingUserId)
-                .orElseThrow(() -> new NotProjectMemberException(site.getProjectId()));
+        siteAccessService.requireAccess(site.getId(), actingUserId);
 
         String html = buildHtml(report, site);
         return renderPdf(html);

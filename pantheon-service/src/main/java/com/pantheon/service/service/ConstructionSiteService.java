@@ -1,15 +1,15 @@
 package com.pantheon.service.service;
 
 import com.pantheon.service.dto.ConstructionSiteRegistrationRequest;
+import com.pantheon.service.entity.CompanyMembership;
+import com.pantheon.service.entity.CompanyRole;
 import com.pantheon.service.entity.ConstructionSite;
-import com.pantheon.service.entity.ProjectMembership;
-import com.pantheon.service.entity.ProjectRole;
 import com.pantheon.service.entity.SiteStatus;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
-import com.pantheon.service.exception.NotProjectAdminException;
-import com.pantheon.service.exception.NotProjectMemberException;
+import com.pantheon.service.exception.NotCompanyAdminException;
+import com.pantheon.service.exception.NotCompanyMemberException;
+import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
-import com.pantheon.service.repository.ProjectMembershipRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -20,21 +20,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConstructionSiteService {
 
     private final ConstructionSiteRepository siteRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final CompanyMembershipRepository membershipRepository;
+    private final PlanService planService;
 
     public ConstructionSiteService(
-            ConstructionSiteRepository siteRepository, ProjectMembershipRepository membershipRepository) {
+            ConstructionSiteRepository siteRepository,
+            CompanyMembershipRepository membershipRepository,
+            PlanService planService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
+        this.planService = planService;
     }
 
     @Transactional
-    public ConstructionSite create(UUID projectId, UUID actingUserId, ConstructionSiteRegistrationRequest request) {
-        requireAdmin(projectId, actingUserId);
+    public ConstructionSite create(UUID companyId, UUID actingUserId, ConstructionSiteRegistrationRequest request) {
+        requireAdmin(companyId, actingUserId);
+        planService.requireCapacityForNewSite(companyId);
 
         ConstructionSite site = new ConstructionSite(
                 UUID.randomUUID(),
-                projectId,
+                companyId,
                 request.name(),
                 request.address(),
                 request.startDate(),
@@ -48,28 +53,31 @@ public class ConstructionSiteService {
     public ConstructionSite updateStatus(UUID siteId, UUID actingUserId, SiteStatus newStatus) {
         ConstructionSite site =
                 siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
-        requireAdmin(site.getProjectId(), actingUserId);
+        requireAdmin(site.getCompanyId(), actingUserId);
 
         site.updateStatus(newStatus, Instant.now());
         return siteRepository.save(site);
     }
 
-    public List<ConstructionSite> list(UUID projectId, UUID actingUserId) {
-        requireMembership(projectId, actingUserId);
-        return siteRepository.findByProjectId(projectId);
+    public List<ConstructionSite> list(UUID companyId, UUID actingUserId) {
+        requireMembership(companyId, actingUserId);
+        return siteRepository.findByCompanyId(companyId);
     }
 
-    private void requireAdmin(UUID projectId, UUID userId) {
-        ProjectMembership membership = membershipRepository.findByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new NotProjectAdminException(projectId));
-        if (membership.getRole() != ProjectRole.ADMIN) {
-            throw new NotProjectAdminException(projectId);
+    private void requireAdmin(UUID companyId, UUID userId) {
+        CompanyMembership membership = membershipRepository
+                .findByCompanyIdAndUserId(companyId, userId)
+                .filter(CompanyMembership::isActive)
+                .orElseThrow(() -> new NotCompanyAdminException(companyId));
+        if (membership.getRole() != CompanyRole.ADMIN) {
+            throw new NotCompanyAdminException(companyId);
         }
     }
 
-    private void requireMembership(UUID projectId, UUID userId) {
+    private void requireMembership(UUID companyId, UUID userId) {
         membershipRepository
-                .findByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new NotProjectMemberException(projectId));
+                .findByCompanyIdAndUserId(companyId, userId)
+                .filter(CompanyMembership::isActive)
+                .orElseThrow(() -> new NotCompanyMemberException(companyId));
     }
 }

@@ -2,16 +2,19 @@ package com.pantheon.service.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One-to-one with an {@code INVITED} {@link ProjectMembership}. Holds the transient
- * invitation metadata — only a hash of the secret token is stored; the raw token travels
- * solely in the invitation email. {@code requiresRegistration} is true when the invited
- * email had no account and a pre-registration one was created for it.
+ * One-to-one with an {@code INVITED} {@link CompanyMembership} or {@link SiteMembership},
+ * distinguished by {@link #membershipType}. Holds the transient invitation metadata — only a
+ * hash of the secret token is stored; the raw token travels solely in the invitation email.
+ * {@code requiresRegistration} is true when the invited email had no account and a
+ * pre-registration one was created for it.
  */
 @Entity
 @Table(name = "membership_invitation")
@@ -22,6 +25,10 @@ public class MembershipInvitation {
 
     @Column(name = "membership_id", nullable = false)
     private UUID membershipId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "membership_type", nullable = false)
+    private MembershipType membershipType;
 
     @Column(nullable = false)
     private String email;
@@ -51,6 +58,7 @@ public class MembershipInvitation {
     public MembershipInvitation(
             UUID id,
             UUID membershipId,
+            MembershipType membershipType,
             String email,
             String tokenHash,
             UUID invitedBy,
@@ -59,6 +67,7 @@ public class MembershipInvitation {
             Instant expiresAt) {
         this.id = id;
         this.membershipId = membershipId;
+        this.membershipType = membershipType;
         this.email = email;
         this.tokenHash = tokenHash;
         this.invitedBy = invitedBy;
@@ -95,6 +104,10 @@ public class MembershipInvitation {
 
     public UUID getMembershipId() {
         return membershipId;
+    }
+
+    public MembershipType getMembershipType() {
+        return membershipType;
     }
 
     public String getEmail() {

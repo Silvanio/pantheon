@@ -13,8 +13,13 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
-    @ExceptionHandler(NotProjectMemberException.class)
-    public ResponseEntity<String> handleNotProjectMember(NotProjectMemberException e) {
+    @ExceptionHandler(NotSiteMemberException.class)
+    public ResponseEntity<String> handleNotSiteMember(NotSiteMemberException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenCapabilityException.class)
+    public ResponseEntity<String> handleForbiddenCapability(ForbiddenCapabilityException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
     }
 
@@ -23,8 +28,23 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
-    @ExceptionHandler(NotConstructionSiteManagerException.class)
-    public ResponseEntity<String> handleNotConstructionSiteManager(NotConstructionSiteManagerException e) {
+    @ExceptionHandler(SiteDocumentProjectNotFoundException.class)
+    public ResponseEntity<String> handleSiteDocumentProjectNotFound(SiteDocumentProjectNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrcamentoNotFoundException.class)
+    public ResponseEntity<String> handleOrcamentoNotFound(OrcamentoNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrcamentoNotSentException.class)
+    public ResponseEntity<String> handleOrcamentoNotSent(OrcamentoNotSentException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(NotSiteClientException.class)
+    public ResponseEntity<String> handleNotSiteClient(NotSiteClientException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
     }
 }

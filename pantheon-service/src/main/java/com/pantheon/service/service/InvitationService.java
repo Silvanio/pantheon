@@ -3,17 +3,23 @@ package com.pantheon.service.service;
 import com.pantheon.service.dto.AcceptInvitationResponse;
 import com.pantheon.service.dto.InvitationResponse;
 import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.Company;
+import com.pantheon.service.entity.CompanyMembership;
+import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.MembershipInvitation;
-import com.pantheon.service.entity.Project;
-import com.pantheon.service.entity.ProjectMembership;
+import com.pantheon.service.entity.MembershipType;
+import com.pantheon.service.entity.SiteMembership;
+import com.pantheon.service.exception.CompanyNotFoundException;
+import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.InvitationNotFoundException;
 import com.pantheon.service.exception.InvitationNotForCurrentUserException;
-import com.pantheon.service.exception.ProjectNotFoundException;
 import com.pantheon.service.exception.RegistrationNotApplicableException;
 import com.pantheon.service.repository.AppUserRepository;
+import com.pantheon.service.repository.CompanyMembershipRepository;
+import com.pantheon.service.repository.CompanyRepository;
+import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
-import com.pantheon.service.repository.ProjectMembershipRepository;
-import com.pantheon.service.repository.ProjectRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,42 +27,49 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Drives the token side of the invitation lifecycle: looking up an invitation by its
- * secret token, completing a pre-registration account from it, and accepting it. Acceptance
- * is always a distinct step and requires the caller to be authenticated as the invited
- * account — so a forwarded link cannot add the wrong person, and even an existing account
- * must consent before joining.
+ * Drives the token side of the invitation lifecycle for both company-staff and construction-
+ * site-team invitations, branching on {@link MembershipInvitation#getMembershipType()}.
+ * Acceptance is always a distinct step and requires the caller to be authenticated as the
+ * invited account — so a forwarded link cannot add the wrong person, and even an existing
+ * account must consent before joining.
  */
 @Service
 public class InvitationService {
 
     private final MembershipInvitationRepository invitationRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final CompanyMembershipRepository companyMembershipRepository;
+    private final SiteMembershipRepository siteMembershipRepository;
     private final AppUserRepository userRepository;
-    private final ProjectRepository projectRepository;
+    private final CompanyRepository companyRepository;
+    private final ConstructionSiteRepository siteRepository;
     private final PasswordEncoder passwordEncoder;
 
     public InvitationService(
             MembershipInvitationRepository invitationRepository,
-            ProjectMembershipRepository membershipRepository,
+            CompanyMembershipRepository companyMembershipRepository,
+            SiteMembershipRepository siteMembershipRepository,
             AppUserRepository userRepository,
-            ProjectRepository projectRepository,
+            CompanyRepository companyRepository,
+            ConstructionSiteRepository siteRepository,
             PasswordEncoder passwordEncoder) {
         this.invitationRepository = invitationRepository;
-        this.membershipRepository = membershipRepository;
+        this.companyMembershipRepository = companyMembershipRepository;
+        this.siteMembershipRepository = siteMembershipRepository;
         this.userRepository = userRepository;
-        this.projectRepository = projectRepository;
+        this.companyRepository = companyRepository;
+        this.siteRepository = siteRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     public InvitationResponse getByToken(String rawToken) {
         MembershipInvitation invitation = requireValidInvitation(rawToken);
-        Project project = project(invitation);
+        String targetName = targetName(invitation);
         String inviterName = userRepository.findById(invitation.getInvitedBy())
                 .map(AppUser::getDisplayName)
                 .orElse(null);
         return new InvitationResponse(
-                project.getName(),
+                targetName,
+                invitation.getMembershipType().name(),
                 inviterName,
                 invitation.getEmail(),
                 invitation.isRequiresRegistration(),
@@ -71,9 +84,8 @@ public class InvitationService {
     @Transactional
     public AppUser completeRegistration(String rawToken, String rawPassword, String displayName) {
         MembershipInvitation invitation = requireValidInvitation(rawToken);
-        ProjectMembership membership = membership(invitation);
-        AppUser user = userRepository.findById(membership.getUserId())
-                .orElseThrow(InvitationNotFoundException::new);
+        UUID targetUserId = membershipUserId(invitation);
+        AppUser user = userRepository.findById(targetUserId).orElseThrow(InvitationNotFoundException::new);
 
         if (!invitation.isRequiresRegistration() || !user.isPendingRegistration()) {
             throw new RegistrationNotApplicableException();
@@ -90,20 +102,30 @@ public class InvitationService {
     @Transactional
     public AcceptInvitationResponse accept(String rawToken, UUID actingUserId) {
         MembershipInvitation invitation = requireValidInvitation(rawToken);
-        ProjectMembership membership = membership(invitation);
+        UUID targetUserId = membershipUserId(invitation);
 
-        if (!membership.getUserId().equals(actingUserId)) {
+        if (!targetUserId.equals(actingUserId)) {
             throw new InvitationNotForCurrentUserException();
         }
 
-        membership.accept();
-        membershipRepository.save(membership);
+        if (invitation.getMembershipType() == MembershipType.COMPANY) {
+            CompanyMembership membership = companyMembershipRepository
+                    .findById(invitation.getMembershipId())
+                    .orElseThrow(InvitationNotFoundException::new);
+            membership.accept();
+            companyMembershipRepository.save(membership);
+        } else {
+            SiteMembership membership = siteMembershipRepository
+                    .findById(invitation.getMembershipId())
+                    .orElseThrow(InvitationNotFoundException::new);
+            membership.accept();
+            siteMembershipRepository.save(membership);
+        }
+
         invitation.markAccepted(Instant.now());
         invitationRepository.save(invitation);
 
-        Project project = projectRepository.findById(membership.getProjectId())
-                .orElseThrow(() -> new ProjectNotFoundException(membership.getProjectId()));
-        return new AcceptInvitationResponse(project.getId(), project.getName());
+        return new AcceptInvitationResponse(targetId(invitation), targetName(invitation), invitation.getMembershipType().name());
     }
 
     private MembershipInvitation requireValidInvitation(String rawToken) {
@@ -115,14 +137,42 @@ public class InvitationService {
         return invitation;
     }
 
-    private ProjectMembership membership(MembershipInvitation invitation) {
-        return membershipRepository.findById(invitation.getMembershipId())
+    private UUID membershipUserId(MembershipInvitation invitation) {
+        if (invitation.getMembershipType() == MembershipType.COMPANY) {
+            return companyMembershipRepository
+                    .findById(invitation.getMembershipId())
+                    .map(CompanyMembership::getUserId)
+                    .orElseThrow(InvitationNotFoundException::new);
+        }
+        return siteMembershipRepository
+                .findById(invitation.getMembershipId())
+                .map(SiteMembership::getUserId)
                 .orElseThrow(InvitationNotFoundException::new);
     }
 
-    private Project project(MembershipInvitation invitation) {
-        ProjectMembership membership = membership(invitation);
-        return projectRepository.findById(membership.getProjectId())
-                .orElseThrow(() -> new ProjectNotFoundException(membership.getProjectId()));
+    private UUID targetId(MembershipInvitation invitation) {
+        if (invitation.getMembershipType() == MembershipType.COMPANY) {
+            return companyMembershipRepository
+                    .findById(invitation.getMembershipId())
+                    .map(CompanyMembership::getCompanyId)
+                    .orElseThrow(InvitationNotFoundException::new);
+        }
+        return siteMembershipRepository
+                .findById(invitation.getMembershipId())
+                .map(SiteMembership::getConstructionSiteId)
+                .orElseThrow(InvitationNotFoundException::new);
+    }
+
+    private String targetName(MembershipInvitation invitation) {
+        if (invitation.getMembershipType() == MembershipType.COMPANY) {
+            UUID companyId = targetId(invitation);
+            Company company = companyRepository.findById(companyId)
+                    .orElseThrow(() -> new CompanyNotFoundException(companyId));
+            return company.getName();
+        }
+        UUID siteId = targetId(invitation);
+        ConstructionSite site =
+                siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+        return site.getName();
     }
 }

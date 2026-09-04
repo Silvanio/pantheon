@@ -22,4 +22,27 @@ public final class StorageKeys {
         return "construction-sites/%s/daily-reports/%s/attachments/%s.%s"
                 .formatted(constructionSiteId, dailyReportId, attachmentId, extension);
     }
+
+    public static String companyLogoKey(UUID companyId, String extension) {
+        return "companies/%s/logo.%s".formatted(companyId, extension);
+    }
+
+    public static String sitePhotoKey(UUID constructionSiteId, String extension) {
+        return "construction-sites/%s/photo.%s".formatted(constructionSiteId, extension);
+    }
+
+    public static String siteDocumentProjectAttachmentKey(
+            UUID constructionSiteId, UUID documentProjectId, UUID attachmentId, String extension) {
+        return "construction-sites/%s/projects/%s/attachments/%s.%s"
+                .formatted(constructionSiteId, documentProjectId, attachmentId, extension);
+    }
+
+    public static String orcamentoAttachmentKey(UUID materialRequestId, UUID orcamentoId, UUID attachmentId, String extension) {
+        return "material-requests/%s/orcamentos/%s/attachments/%s.%s"
+                .formatted(materialRequestId, orcamentoId, attachmentId, extension);
+    }
+
+    public static String receiptVerificationPhotoKey(UUID materialRequestItemId, UUID photoId, String extension) {
+        return "material-request-items/%s/receipt-photos/%s.%s".formatted(materialRequestItemId, photoId, extension);
+    }
 }

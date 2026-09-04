@@ -18,11 +18,6 @@ public class MaterialRequestExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
-    @ExceptionHandler(NotMaterialRequestApproverException.class)
-    public ResponseEntity<String> handleNotApprover(NotMaterialRequestApproverException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-    }
-
     @ExceptionHandler(MaterialRequestNotPendingException.class)
     public ResponseEntity<String> handleNotPending(MaterialRequestNotPendingException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());

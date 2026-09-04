@@ -8,7 +8,6 @@ import com.pantheon.service.dto.EquipmentUsageRequest;
 import com.pantheon.service.dto.MaterialReceivedRequest;
 import com.pantheon.service.dto.OccurrenceRequest;
 import com.pantheon.service.dto.WorkforceEntryRequest;
-import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportActivity;
@@ -16,12 +15,12 @@ import com.pantheon.service.entity.DailyReportEquipmentUsage;
 import com.pantheon.service.entity.DailyReportMaterialReceived;
 import com.pantheon.service.entity.DailyReportOccurrence;
 import com.pantheon.service.entity.DailyReportWorkforceEntry;
-import com.pantheon.service.entity.ProjectMembership;
+import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DailyReportNotEditableException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
 import com.pantheon.service.exception.DuplicateDailyReportException;
-import com.pantheon.service.exception.NotProjectMemberException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
 import com.pantheon.service.repository.DailyReportEquipmentUsageRepository;
@@ -29,7 +28,7 @@ import com.pantheon.service.repository.DailyReportMaterialReceivedRepository;
 import com.pantheon.service.repository.DailyReportOccurrenceRepository;
 import com.pantheon.service.repository.DailyReportRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
-import com.pantheon.service.repository.ProjectMembershipRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -47,7 +46,9 @@ public class DailyReportService {
     private final DailyReportOccurrenceRepository occurrenceRepository;
     private final DailyReportMaterialReceivedRepository materialReceivedRepository;
     private final ConstructionSiteRepository siteRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final SiteMembershipRepository siteMembershipRepository;
+    private final SiteAccessService siteAccessService;
+    private final SitePermissionService permissionService;
 
     public DailyReportService(
             DailyReportRepository dailyReportRepository,
@@ -57,7 +58,9 @@ public class DailyReportService {
             DailyReportOccurrenceRepository occurrenceRepository,
             DailyReportMaterialReceivedRepository materialReceivedRepository,
             ConstructionSiteRepository siteRepository,
-            ProjectMembershipRepository membershipRepository) {
+            SiteMembershipRepository siteMembershipRepository,
+            SiteAccessService siteAccessService,
+            SitePermissionService permissionService) {
         this.dailyReportRepository = dailyReportRepository;
         this.workforceEntryRepository = workforceEntryRepository;
         this.equipmentUsageRepository = equipmentUsageRepository;
@@ -65,13 +68,15 @@ public class DailyReportService {
         this.occurrenceRepository = occurrenceRepository;
         this.materialReceivedRepository = materialReceivedRepository;
         this.siteRepository = siteRepository;
-        this.membershipRepository = membershipRepository;
+        this.siteMembershipRepository = siteMembershipRepository;
+        this.siteAccessService = siteAccessService;
+        this.permissionService = permissionService;
     }
 
     @Transactional
     public DailyReport create(UUID siteId, UUID actingUserId, LocalDate reportDate) {
-        ConstructionSite site = requireSite(siteId);
-        requireMembership(site.getProjectId(), actingUserId);
+        requireSite(siteId);
+        requireManage(siteId, actingUserId);
 
         if (dailyReportRepository.findByConstructionSiteIdAndReportDate(siteId, reportDate).isPresent()) {
             throw new DuplicateDailyReportException(siteId, reportDate);
@@ -109,7 +114,7 @@ public class DailyReportService {
 
         String roleDescription = request.roleDescription();
         if (request.membershipId() != null && (roleDescription == null || roleDescription.isBlank())) {
-            roleDescription = membershipRepository
+            roleDescription = siteMembershipRepository
                     .findById(request.membershipId())
                     .map(this::describeFunction)
                     .orElse(roleDescription);
@@ -181,8 +186,8 @@ public class DailyReportService {
     }
 
     public List<DailyReport> list(UUID siteId, UUID actingUserId) {
-        ConstructionSite site = requireSite(siteId);
-        requireMembership(site.getProjectId(), actingUserId);
+        requireSite(siteId);
+        siteAccessService.requireAccess(siteId, actingUserId);
         return dailyReportRepository.findByConstructionSiteIdOrderByReportDateDesc(siteId);
     }
 
@@ -207,37 +212,35 @@ public class DailyReportService {
                         .toList());
     }
 
-    private String describeFunction(ProjectMembership membership) {
-        if (membership.getFunction() == ConstructionFunction.SERVICE_PROVIDER && membership.getSpecialty() != null) {
-            return membership.getSpecialty();
+    private String describeFunction(SiteMembership membership) {
+        if (membership.getServiceProviderTrade() != null) {
+            return membership.getServiceProviderTrade();
         }
-        ConstructionFunction function = membership.getFunction() != null ? membership.getFunction() : ConstructionFunction.OTHER;
-        return function.name();
+        return membership.getFunction().name();
     }
 
     private DailyReport requireReport(UUID reportId, UUID actingUserId) {
         DailyReport report =
                 dailyReportRepository.findById(reportId).orElseThrow(() -> new DailyReportNotFoundException(reportId));
-        ConstructionSite site = requireSite(report.getConstructionSiteId());
-        requireMembership(site.getProjectId(), actingUserId);
+        siteAccessService.requireAccess(report.getConstructionSiteId(), actingUserId);
         return report;
     }
 
     private DailyReport requireEditableReport(UUID reportId, UUID actingUserId) {
         DailyReport report = requireReport(reportId, actingUserId);
+        requireManage(report.getConstructionSiteId(), actingUserId);
         if (!report.isEditable()) {
             throw new DailyReportNotEditableException(reportId);
         }
         return report;
     }
 
-    private ConstructionSite requireSite(UUID siteId) {
-        return siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+    private void requireManage(UUID siteId, UUID actingUserId) {
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireManage(siteId, access, PermissionCapability.DAILY_REPORT);
     }
 
-    private void requireMembership(UUID projectId, UUID userId) {
-        membershipRepository
-                .findByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new NotProjectMemberException(projectId));
+    private ConstructionSite requireSite(UUID siteId) {
+        return siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
     }
 }

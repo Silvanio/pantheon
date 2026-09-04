@@ -2,13 +2,10 @@ package com.pantheon.service.service;
 
 import com.pantheon.service.dto.MaterialRequestCreationRequest;
 import com.pantheon.service.dto.MaterialRequestItemCreationRequest;
-import com.pantheon.service.entity.ConstructionFunction;
-import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.MaterialRequest;
 import com.pantheon.service.entity.MaterialRequestItem;
 import com.pantheon.service.entity.MaterialRequestStatus;
-import com.pantheon.service.entity.ProjectMembership;
-import com.pantheon.service.entity.ProjectRole;
+import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.ReceiptVerification;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DuplicateReceiptVerificationException;
@@ -16,17 +13,13 @@ import com.pantheon.service.exception.MaterialRequestItemNotFoundException;
 import com.pantheon.service.exception.MaterialRequestNotApprovedException;
 import com.pantheon.service.exception.MaterialRequestNotFoundException;
 import com.pantheon.service.exception.MaterialRequestNotPendingException;
-import com.pantheon.service.exception.NotMaterialRequestApproverException;
-import com.pantheon.service.exception.NotProjectMemberException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MaterialRequestItemRepository;
 import com.pantheon.service.repository.MaterialRequestRepository;
-import com.pantheon.service.repository.ProjectMembershipRepository;
 import com.pantheon.service.repository.ReceiptVerificationRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,25 +31,28 @@ public class MaterialRequestService {
     private final MaterialRequestItemRepository itemRepository;
     private final ReceiptVerificationRepository verificationRepository;
     private final ConstructionSiteRepository siteRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final SiteAccessService siteAccessService;
+    private final SitePermissionService permissionService;
 
     public MaterialRequestService(
             MaterialRequestRepository requestRepository,
             MaterialRequestItemRepository itemRepository,
             ReceiptVerificationRepository verificationRepository,
             ConstructionSiteRepository siteRepository,
-            ProjectMembershipRepository membershipRepository) {
+            SiteAccessService siteAccessService,
+            SitePermissionService permissionService) {
         this.requestRepository = requestRepository;
         this.itemRepository = itemRepository;
         this.verificationRepository = verificationRepository;
         this.siteRepository = siteRepository;
-        this.membershipRepository = membershipRepository;
+        this.siteAccessService = siteAccessService;
+        this.permissionService = permissionService;
     }
 
     @Transactional
     public MaterialRequest create(UUID siteId, UUID actingUserId, MaterialRequestCreationRequest request) {
-        ConstructionSite site = requireSite(siteId);
-        requireMembership(site.getProjectId(), actingUserId);
+        requireSite(siteId);
+        requireCapability(siteId, actingUserId, PermissionCapability.MATERIAL_REQUEST);
 
         MaterialRequest materialRequest = new MaterialRequest(UUID.randomUUID(), siteId, actingUserId, Instant.now());
         requestRepository.save(materialRequest);
@@ -72,8 +68,7 @@ public class MaterialRequestService {
     @Transactional
     public MaterialRequest approve(UUID requestId, UUID actingUserId) {
         MaterialRequest request = requireRequest(requestId);
-        ConstructionSite site = requireSite(request.getConstructionSiteId());
-        requireApprover(site.getProjectId(), actingUserId);
+        requireCapability(request.getConstructionSiteId(), actingUserId, PermissionCapability.MATERIAL_APPROVAL);
         requirePending(request);
 
         request.approve(actingUserId, Instant.now());
@@ -83,8 +78,7 @@ public class MaterialRequestService {
     @Transactional
     public MaterialRequest reject(UUID requestId, UUID actingUserId, String reason) {
         MaterialRequest request = requireRequest(requestId);
-        ConstructionSite site = requireSite(request.getConstructionSiteId());
-        requireApprover(site.getProjectId(), actingUserId);
+        requireCapability(request.getConstructionSiteId(), actingUserId, PermissionCapability.MATERIAL_APPROVAL);
         requirePending(request);
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("A rejection reason is required");
@@ -98,8 +92,7 @@ public class MaterialRequestService {
     public ReceiptVerification recordVerification(
             UUID requestId, UUID actingUserId, UUID itemId, BigDecimal receivedQuantity, String note) {
         MaterialRequest request = requireRequest(requestId);
-        ConstructionSite site = requireSite(request.getConstructionSiteId());
-        requireMembership(site.getProjectId(), actingUserId);
+        siteAccessService.requireAccess(request.getConstructionSiteId(), actingUserId);
 
         if (request.getStatus() != MaterialRequestStatus.APPROVED
                 && request.getStatus() != MaterialRequestStatus.PARTIALLY_RECEIVED
@@ -131,8 +124,8 @@ public class MaterialRequestService {
     }
 
     public List<MaterialRequest> list(UUID siteId, UUID actingUserId, MaterialRequestStatus statusFilter) {
-        ConstructionSite site = requireSite(siteId);
-        requireMembership(site.getProjectId(), actingUserId);
+        requireSite(siteId);
+        siteAccessService.requireAccess(siteId, actingUserId);
         return statusFilter != null
                 ? requestRepository.findByConstructionSiteIdAndStatusOrderByCreatedAtDesc(siteId, statusFilter)
                 : requestRepository.findByConstructionSiteIdOrderByCreatedAtDesc(siteId);
@@ -140,8 +133,7 @@ public class MaterialRequestService {
 
     public MaterialRequest getRequest(UUID requestId, UUID actingUserId) {
         MaterialRequest request = requireRequest(requestId);
-        ConstructionSite site = requireSite(request.getConstructionSiteId());
-        requireMembership(site.getProjectId(), actingUserId);
+        siteAccessService.requireAccess(request.getConstructionSiteId(), actingUserId);
         return request;
     }
 
@@ -157,25 +149,13 @@ public class MaterialRequestService {
         return requestRepository.findById(requestId).orElseThrow(() -> new MaterialRequestNotFoundException(requestId));
     }
 
-    private ConstructionSite requireSite(UUID siteId) {
-        return siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+    private void requireSite(UUID siteId) {
+        siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
     }
 
-    private void requireMembership(UUID projectId, UUID userId) {
-        membershipRepository
-                .findByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new NotProjectMemberException(projectId));
-    }
-
-    private void requireApprover(UUID projectId, UUID userId) {
-        ProjectMembership membership = membershipRepository
-                .findByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new NotMaterialRequestApproverException(projectId));
-        boolean isApprover =
-                membership.getRole() == ProjectRole.ADMIN || membership.getFunction() == ConstructionFunction.ENGINEER;
-        if (!isApprover) {
-            throw new NotMaterialRequestApproverException(projectId);
-        }
+    private void requireCapability(UUID siteId, UUID userId, PermissionCapability capability) {
+        var access = siteAccessService.requireAccess(siteId, userId);
+        permissionService.requireManage(siteId, access, capability);
     }
 
     private void requirePending(MaterialRequest request) {

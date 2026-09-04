@@ -1,7 +1,7 @@
 package com.pantheon.service.dto;
 
+import com.pantheon.service.entity.PlanCode;
 import jakarta.validation.constraints.NotNull;
 
-import com.pantheon.service.entity.Plan;
-public record PlanSelectionRequest(@NotNull Plan plan) {
+public record PlanSelectionRequest(@NotNull PlanCode planCode) {
 }

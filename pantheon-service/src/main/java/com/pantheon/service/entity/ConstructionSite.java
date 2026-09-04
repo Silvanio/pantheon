@@ -17,8 +17,8 @@ public class ConstructionSite {
     @Id
     private UUID id;
 
-    @Column(name = "project_id", nullable = false)
-    private UUID projectId;
+    @Column(name = "company_id", nullable = false)
+    private UUID companyId;
 
     @Column(nullable = false)
     private String name;
@@ -36,6 +36,9 @@ public class ConstructionSite {
     @Column(name = "expected_end_date")
     private LocalDate expectedEndDate;
 
+    @Column(name = "photo_object_key")
+    private String photoObjectKey;
+
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
 
@@ -51,7 +54,7 @@ public class ConstructionSite {
 
     public ConstructionSite(
             UUID id,
-            UUID projectId,
+            UUID companyId,
             String name,
             String address,
             LocalDate startDate,
@@ -59,7 +62,7 @@ public class ConstructionSite {
             UUID createdBy,
             Instant createdAt) {
         this.id = id;
-        this.projectId = projectId;
+        this.companyId = companyId;
         this.name = name;
         this.address = address;
         this.status = SiteStatus.PLANNING;
@@ -75,12 +78,21 @@ public class ConstructionSite {
         this.updatedAt = now;
     }
 
+    public void updatePhoto(String photoObjectKey, Instant now) {
+        this.photoObjectKey = photoObjectKey;
+        this.updatedAt = now;
+    }
+
     public UUID getId() {
         return id;
     }
 
-    public UUID getProjectId() {
-        return projectId;
+    public UUID getCompanyId() {
+        return companyId;
+    }
+
+    public String getPhotoObjectKey() {
+        return photoObjectKey;
     }
 
     public String getName() {

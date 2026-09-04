@@ -28,17 +28,17 @@ spec:
         - name: pantheon-web
           image: pantheon-web:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 8585
           readinessProbe:
             httpGet:
               path: /
-              port: 8080
+              port: 8585
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
-              port: 8080
+              port: 8585
             initialDelaySeconds: 10
             periodSeconds: 15
 ---
@@ -50,6 +50,6 @@ spec:
   selector:
     app: pantheon-web
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 8585
+      targetPort: 8585
   type: ClusterIP

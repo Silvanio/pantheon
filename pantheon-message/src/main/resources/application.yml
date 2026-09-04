@@ -53,4 +53,4 @@ pantheon:
   mail:
     from: ${PANTHEON_MAIL_FROM:no-reply@pantheon.local}
   web:
-    base-url: ${PANTHEON_WEB_BASE_URL:http://localhost:8080}
+    base-url: ${PANTHEON_WEB_BASE_URL:http://localhost:8585}

@@ -111,7 +111,7 @@ services:
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: 1025
       PANTHEON_MAIL_FROM: ${PANTHEON_MAIL_FROM:-no-reply@pantheon.local}
-      PANTHEON_WEB_BASE_URL: ${PANTHEON_WEB_BASE_URL:-http://localhost:8080}
+      PANTHEON_WEB_BASE_URL: ${PANTHEON_WEB_BASE_URL:-http://localhost:8585}
     depends_on:
       message-db:
         condition: service_healthy
@@ -135,6 +135,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-pantheon}
       PANTHEON_API_TOKEN: ${PANTHEON_API_TOKEN:-dev-shared-api-token}
       PANTHEON_MESSAGE_BASE_URL: http://pantheon-message:8082
+      PANTHEON_WEB_ORIGIN: ${PANTHEON_WEB_ORIGIN:-http://localhost:8585}
       PANTHEON_JWT_SECRET: ${PANTHEON_JWT_SECRET:-dev-jwt-signing-secret-change-me-please-32bytes}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -159,7 +160,7 @@ services:
       args:
         VITE_PANTHEON_SERVICE_URL: ${VITE_PANTHEON_SERVICE_URL:-http://localhost:8081}
     ports:
-      - "${WEB_PORT:-8080}:8080"
+      - "${WEB_PORT:-8585}:8585"
     depends_on:
       - pantheon-service
 

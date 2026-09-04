@@ -11,7 +11,7 @@ deployable monorepo.
 |--------------------|---------------------------------|------|-------------------------------------------------------|
 | `pantheon-service`  | Java / Spring Boot              | 8081 | Core REST API, auth (JWT + Google OAuth2), SSE, domain logic |
 | `pantheon-message`  | Java / Spring Boot              | 8082 | Async messaging worker (RabbitMQ consumer, email notifications) |
-| `pantheon-web`      | Vue 3 + TypeScript + Vite       | 8080 | Frontend SPA                                          |
+| `pantheon-web`      | Vue 3 + TypeScript + Vite       | 8585 | Frontend SPA                                          |
 
 Each service builds and runs independently; `infra/` ties them together for local
 development and Kubernetes.

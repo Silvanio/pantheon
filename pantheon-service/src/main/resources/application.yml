@@ -45,7 +45,7 @@ pantheon:
   message-service:
     base-url: ${PANTHEON_MESSAGE_BASE_URL:http://localhost:8082}
   web:
-    cors-allowed-origin: ${PANTHEON_WEB_ORIGIN:http://localhost:8080}
+    cors-allowed-origin: ${PANTHEON_WEB_ORIGIN:http://localhost:8585}
   # Deliberately outside spring.security.oauth2.client.*: Spring Boot eagerly
   # validates every entry under that namespace at startup (even when unused),
   # so an empty client-id there fails the whole app. Google login is optional

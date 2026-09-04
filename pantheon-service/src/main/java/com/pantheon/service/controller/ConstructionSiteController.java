@@ -57,6 +57,18 @@ public class ConstructionSiteController {
         return ResponseEntity.ok(sites);
     }
 
+    @GetMapping("/api/construction-sites/{id}")
+    public ResponseEntity<ConstructionSiteResponse> get(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        return ResponseEntity.ok(ConstructionSiteResponse.from(constructionSiteService.get(id, user.getId())));
+    }
+
+    @GetMapping("/api/construction-sites/{id}/photo/content")
+    public ResponseEntity<byte[]> getPhotoContent(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        ConstructionSite site = constructionSiteService.get(id, user.getId());
+        byte[] content = storageService.getObject(site.getPhotoObjectKey());
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(content);
+    }
+
     @PatchMapping("/api/construction-sites/{id}/status")
     public ResponseEntity<ConstructionSiteResponse> updateStatus(
             @AuthenticationPrincipal AppUser user,

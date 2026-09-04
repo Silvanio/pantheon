@@ -11,7 +11,8 @@ import {
   type ReportMedia,
   type ReportSignature,
 } from '../composables/useDailyReports'
-import { useProjects, type Equipment, type MaterialItem, type ProjectMember } from '../composables/useProjects'
+import { useEquipmentMaterials, type Equipment, type MaterialItem } from '../composables/useEquipmentMaterials'
+import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,14 +36,14 @@ const {
   signReport,
   getPdf,
 } = useDailyReports()
-const { listEquipment, listMaterials, listMembers } = useProjects()
+const { listEquipment, listMaterials } = useEquipmentMaterials()
+const { listMembers } = useSiteMembers()
 
 const reportId = route.params.id as string
-const projectId = route.query.projectId as string | undefined
 const detail = ref<DailyReportDetail | null>(null)
 const equipmentCatalog = ref<Equipment[]>([])
 const materialCatalog = ref<MaterialItem[]>([])
-const projectMembers = ref<ProjectMember[]>([])
+const siteMembers = ref<SiteMember[]>([])
 const loading = ref(false)
 const loadError = ref('')
 
@@ -124,9 +125,7 @@ async function load() {
       listEquipment(siteId),
       listMaterials(siteId),
     ])
-    if (projectId) {
-      projectMembers.value = await listMembers(projectId)
-    }
+    siteMembers.value = await listMembers(siteId)
 
     media.value = await listMedia(reportId)
     attachments.value = await listAttachments(reportId)
@@ -440,9 +439,9 @@ onMounted(load)
           </li>
         </ul>
         <form v-if="isDraft" class="flex flex-wrap items-end gap-2" @submit.prevent="onAddWorkforce">
-          <select v-if="projectMembers.length > 0" v-model="selectedMembershipId" class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+          <select v-if="siteMembers.length > 0" v-model="selectedMembershipId" class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
             <option value="">{{ t('dailyReports.workforce.noMember') }}</option>
-            <option v-for="member in projectMembers" :key="member.membershipId" :value="member.membershipId">{{ member.displayName }}</option>
+            <option v-for="member in siteMembers" :key="member.membershipId" :value="member.membershipId">{{ member.displayName }}</option>
           </select>
           <input
             v-model="roleDescription"
@@ -592,7 +591,7 @@ onMounted(load)
         <p v-if="signatures.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.signatures.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
           <li v-for="signature in signatures" :key="signature.id" class="flex items-center justify-between rounded-md border border-steel-200 px-3 py-1.5 text-sm dark:border-steel-700">
-            <span class="text-steel-800 dark:text-steel-50">{{ signature.function ? t(`members.function.${signature.function}`) : '—' }}</span>
+            <span class="text-steel-800 dark:text-steel-50">{{ signature.function ? t(`siteTeam.function.${signature.function}`) : '—' }}</span>
             <span class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.signatures.signedAt') }}: {{ signature.signedAt }}</span>
           </li>
         </ul>

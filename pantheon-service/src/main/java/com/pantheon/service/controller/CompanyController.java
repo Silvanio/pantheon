@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,6 +52,11 @@ public class CompanyController {
         return ResponseEntity.status(HttpStatus.CREATED).body(CompanyResponse.from(company));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<CompanyResponse> get(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        return ResponseEntity.ok(CompanyResponse.from(companyService.get(id, user.getId())));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<List<CompanyMembershipResponse>> myCompanies(@AuthenticationPrincipal AppUser user) {
         return ResponseEntity.ok(companyService.listMyCompanies(user.getId()));
@@ -64,13 +70,23 @@ public class CompanyController {
             @RequestParam String tradeName,
             @RequestParam String cnpj,
             @RequestParam String address,
-            @RequestPart MultipartFile logo) {
-        String extension = extensionOf(logo.getOriginalFilename());
-        String key = StorageKeys.companyLogoKey(id, extension);
-        storageService.putObject(key, readBytes(logo), logo.getContentType());
+            @RequestPart(required = false) MultipartFile logo) {
+        String logoKey = null;
+        if (logo != null && !logo.isEmpty()) {
+            String extension = extensionOf(logo.getOriginalFilename());
+            logoKey = StorageKeys.companyLogoKey(id, extension);
+            storageService.putObject(logoKey, readBytes(logo), logo.getContentType());
+        }
 
-        Company company = companyService.completeProfile(id, user.getId(), legalName, tradeName, cnpj, address, key);
+        Company company = companyService.completeProfile(id, user.getId(), legalName, tradeName, cnpj, address, logoKey);
         return ResponseEntity.ok(CompanyResponse.from(company));
+    }
+
+    @GetMapping("/{id}/logo")
+    public ResponseEntity<byte[]> getLogo(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        Company company = companyService.get(id, user.getId());
+        byte[] content = storageService.getObject(company.getLogoObjectKey());
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(content);
     }
 
     @PostMapping("/{id}/staff")

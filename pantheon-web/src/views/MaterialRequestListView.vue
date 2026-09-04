@@ -3,16 +3,15 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useMaterialRequests, type MaterialRequest, type MaterialRequestStatus } from '../composables/useMaterialRequests'
-import { useProjects, type MaterialItem } from '../composables/useProjects'
+import { useEquipmentMaterials, type MaterialItem } from '../composables/useEquipmentMaterials'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { listRequests, createRequest } = useMaterialRequests()
-const { listMaterials } = useProjects()
+const { listMaterials } = useEquipmentMaterials()
 
 const siteId = route.params.siteId as string
-const projectId = route.query.projectId as string | undefined
 
 const requests = ref<MaterialRequest[]>([])
 const materialCatalog = ref<MaterialItem[]>([])
@@ -68,7 +67,7 @@ onMounted(async () => {
   <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
     <header class="border-b border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-800">
       <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.push('/')">
+        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.push(`/sites/${siteId}`)">
           ← {{ t('materialRequests.list.back') }}
         </button>
       </div>
@@ -144,7 +143,7 @@ onMounted(async () => {
       <ul v-else class="space-y-2">
         <li v-for="request in requests" :key="request.id">
           <router-link
-            :to="{ path: `/material-requests/${request.id}`, query: { projectId } }"
+            :to="{ path: `/material-requests/${request.id}` }"
             class="flex items-center justify-between rounded-md border border-steel-200 bg-white px-4 py-3 transition hover:bg-steel-50 dark:border-steel-700 dark:bg-steel-800 dark:hover:bg-steel-700"
           >
             <span class="font-medium text-steel-800 dark:text-steel-50">{{ t('materialRequests.list.requestLabel') }} #{{ request.id.slice(0, 8) }}</span>

@@ -22,14 +22,17 @@ public class ConstructionSiteService {
     private final ConstructionSiteRepository siteRepository;
     private final CompanyMembershipRepository membershipRepository;
     private final PlanService planService;
+    private final SiteAccessService siteAccessService;
 
     public ConstructionSiteService(
             ConstructionSiteRepository siteRepository,
             CompanyMembershipRepository membershipRepository,
-            PlanService planService) {
+            PlanService planService,
+            SiteAccessService siteAccessService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
         this.planService = planService;
+        this.siteAccessService = siteAccessService;
     }
 
     @Transactional
@@ -72,6 +75,13 @@ public class ConstructionSiteService {
     public List<ConstructionSite> list(UUID companyId, UUID actingUserId) {
         requireMembership(companyId, actingUserId);
         return siteRepository.findByCompanyId(companyId);
+    }
+
+    public ConstructionSite get(UUID siteId, UUID actingUserId) {
+        ConstructionSite site =
+                siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+        siteAccessService.requireAccess(siteId, actingUserId);
+        return site;
     }
 
     private void requireAdmin(UUID companyId, UUID userId) {

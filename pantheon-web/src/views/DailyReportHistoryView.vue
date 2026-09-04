@@ -10,7 +10,6 @@ const { t } = useI18n()
 const { listReports, createReport } = useDailyReports()
 
 const siteId = route.params.siteId as string
-const projectId = route.query.projectId as string | undefined
 const reports = ref<DailyReport[]>([])
 const loading = ref(false)
 const showForm = ref(false)
@@ -32,7 +31,7 @@ async function onSubmit() {
   submitting.value = true
   try {
     const report = await createReport(siteId, reportDate.value)
-    router.push({ path: `/daily-reports/${report.id}`, query: { projectId } })
+    router.push({ path: `/daily-reports/${report.id}` })
   } catch {
     errorMessage.value = t('dailyReports.history.form.error')
   } finally {
@@ -47,7 +46,7 @@ onMounted(load)
   <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
     <header class="border-b border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-800">
       <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.push('/')">
+        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.push(`/sites/${siteId}`)">
           ← {{ t('dailyReports.history.back') }}
         </button>
       </div>
@@ -93,7 +92,7 @@ onMounted(load)
       <ul v-else class="space-y-2">
         <li v-for="report in reports" :key="report.id">
           <router-link
-            :to="{ path: `/daily-reports/${report.id}`, query: { projectId } }"
+            :to="{ path: `/daily-reports/${report.id}` }"
             class="flex items-center justify-between rounded-md border border-steel-200 bg-white px-4 py-3 transition hover:bg-steel-50 dark:border-steel-700 dark:bg-steel-800 dark:hover:bg-steel-700"
           >
             <span class="font-medium text-steel-800 dark:text-steel-50">{{ t('dailyReports.history.reportLabel') }} #{{ report.sequenceNo }} — {{ report.reportDate }}</span>

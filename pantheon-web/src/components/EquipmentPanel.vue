@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useProjects, type Equipment, type EquipmentStatus } from '../composables/useProjects'
+import { useEquipmentMaterials, type Equipment, type EquipmentStatus } from '../composables/useEquipmentMaterials'
 
 const props = defineProps<{ siteId: string }>()
 
 const { t } = useI18n()
-const { listEquipment, createEquipment, updateEquipmentStatus } = useProjects()
+const { listEquipment, createEquipment, updateEquipmentStatus } = useEquipmentMaterials()
 
 const items = ref<Equipment[]>([])
 const loading = ref(false)

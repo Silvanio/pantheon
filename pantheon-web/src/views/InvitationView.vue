@@ -4,14 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { HttpError, useAuth } from '../composables/useAuth'
 import { useInvitations, type Invitation } from '../composables/useInvitations'
-import { useProjectOnboarding } from '../composables/useProjectOnboarding'
+import { useCompanyOnboarding } from '../composables/useCompanyOnboarding'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { isAuthenticated, setToken } = useAuth()
 const { getInvitation, completeRegistration, acceptInvitation } = useInvitations()
-const { invalidate } = useProjectOnboarding()
+const { invalidate } = useCompanyOnboarding()
 
 const token = computed(() => String(route.params.token ?? ''))
 
@@ -98,7 +98,12 @@ function goToLogin() {
       <template v-else-if="invitation">
         <h1 class="mb-2 text-xl font-semibold text-steel-800 dark:text-steel-50">{{ t('invitation.title') }}</h1>
         <p class="mb-6 text-sm text-steel-600 dark:text-steel-300">
-          {{ t('invitation.summary', { inviter: invitation.inviterName ?? t('invitation.someone'), project: invitation.projectName }) }}
+          {{
+            t(invitation.membershipType === 'SITE' ? 'invitation.summarySite' : 'invitation.summaryCompany', {
+              inviter: invitation.inviterName ?? t('invitation.someone'),
+              target: invitation.targetName,
+            })
+          }}
         </p>
 
         <p v-if="invitation.accepted" class="text-sm text-steel-600 dark:text-steel-300">

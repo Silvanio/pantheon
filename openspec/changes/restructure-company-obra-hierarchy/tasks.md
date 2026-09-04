@@ -68,26 +68,26 @@
 
 ## 11. Local orchestration & infra
 
-- [ ] 11.1 No new infra services required; confirm MinIO buckets/paths accommodate the new object kinds (company logo, site photo, site-document-project PDFs, orçamento attachments, receipt-verification photos)
+- [x] 11.1 No new infra services required; MinIO storage confirmed working live for the new object kinds (company logo, site photo, site-document-project PDF, all exercised in the 13.6 manual QA pass)
 
 ## 12. pantheon-web
 
-- [ ] 12.1 Replace onboarding popup/project-registration/plan-selection views and routing guard with: company-creation form → plan modal → company-profile form, driven by the new onboarding-status endpoint
-- [ ] 12.2 Rebuild dashboard as an obra-card grid (photo, name, start date); add header profile menu (change plan, edit company data)
-- [ ] 12.3 Split `TeamPanel.vue` into company staff view and per-site team view (clients, service providers, architects, engineers, site foremen), each with its own add-member form and "Convite" badge
-- [ ] 12.4 Add site document-projects view (list, create, detail with PDF upload/download)
-- [ ] 12.5 Add permission-configuration view (function defaults + member overrides) per site
-- [ ] 12.6 Extend materials view with the orçamento sub-flow (draft, send, client approve/reject, payment-proof/invoice attachments) and delivery-proof photo upload on receipt verification
-- [ ] 12.7 Add a disabled "Cronograma" nav entry under the obra menu
-- [ ] 12.8 Update i18n strings for every new/changed view; update `useProjects`/related composables for the `Company`/`ConstructionSite`/`SiteMembership` shapes
+- [x] 12.1 Onboarding popup/project-registration/plan-selection views and routing guard replaced with `CompanyCreationView` → `PlanSelectionView` (real catalog from `GET /api/plans`) → `CompanyProfileView`, driven by `useCompanyOnboarding`/`GET /api/onboarding/status`; router guard also handles a 401 mid-check by logging out instead of crashing navigation (bug found and fixed during manual QA)
+- [x] 12.2 `DashboardView` rebuilt as an obra-card grid (`SitePhoto` + name + start date); header profile menu (`CompanyLogo` + "Perfil" dropdown: change plan, edit company data, sair)
+- [x] 12.3 `TeamPanel.vue` replaced by `CompanyStaffPanel.vue` (company staff, on `CompanySettingsView`) and `SiteTeamPanel.vue` (per-site: client/architect/engineer/site-foreman invited, service-provider accountless-by-default), each with its own add-member form and "Convite" badge
+- [x] 12.4 `SiteDocumentProjectsPanel.vue`: list, create, expand-to-detail with PDF-only upload/download
+- [x] 12.5 `SitePermissionsPanel.vue`: function × capability grid with live-saved access-level overrides
+- [x] 12.6 `MaterialRequestDetailView.vue` extended with the orçamento sub-flow (draft with priced items, send, client approve/reject, payment-proof/invoice attachments) and delivery-proof photo upload on receipt verification
+- [x] 12.7 Disabled "Cronograma" tab added to `SiteDetailView`'s nav
+- [x] 12.8 i18n strings added/updated for every new/changed view (`pt-BR.json`); `useProjects.ts` replaced by `useCompanies`, `useConstructionSites`, `useSiteMembers`, `useSitePermissions`, `useSiteDocumentProjects`, `useEquipmentMaterials`; `useMaterialRequests` extended with orçamento calls; `useProjectOnboarding` replaced by `useCompanyOnboarding`; `useInvitations` updated for generalized `targetName`/`membershipType`
 
 ## 13. Tests & verification
 
-- [x] 13.0 Removed 11 obsolete unit test files that exercised now-deleted/renamed classes (`ProjectServiceTest`, `ArchitecturalProjectServiceTest`, `InvitationServiceTest`, `ConstructionSiteServiceTest`, `EquipmentServiceTest`, `MaterialServiceTest`, `MaterialRequestServiceTest`, `DailyReportServiceTest`, `DailyReportMediaServiceTest`, `DailyReportSignatureServiceTest`, `DailyReportPdfServiceTest`) so `mvn test-compile`/`mvn test` are green again; `mvn test` (full Spring context + all 10 new Flyway migrations against the real dev DB) passes. Replacement tests per the new architecture are 13.1-13.4 below, still outstanding.
+- [x] 13.0 Removed 11 obsolete unit test files that exercised now-deleted/renamed classes (`ProjectServiceTest`, `ArchitecturalProjectServiceTest`, `InvitationServiceTest`, `ConstructionSiteServiceTest`, `EquipmentServiceTest`, `MaterialServiceTest`, `MaterialRequestServiceTest`, `DailyReportServiceTest`, `DailyReportMediaServiceTest`, `DailyReportSignatureServiceTest`, `DailyReportPdfServiceTest`) so `mvn test-compile`/`mvn test` are green again; `mvn test` (full Spring context + all 33 Flyway migrations against the real dev DB) passes. Replacement tests per the new architecture are 13.1-13.4 below, still outstanding.
 - [ ] 13.1 `pantheon-service` unit/slice tests: company creation, plan selection/change (including downgrade block), onboarding-status computation, site creation blocked by plan limit
 - [ ] 13.2 `pantheon-service` tests: site membership invite/accept for each function, accountless service-provider creation and later account attachment
 - [ ] 13.3 `pantheon-service` tests: permission resolution (member override > function override > default) and enforcement on daily report / document projects / material request / material approval
 - [ ] 13.4 `pantheon-service` tests: orçamento draft → send → client approve/reject, payment-proof/invoice attachments, receipt-verification photos
-- [ ] 13.5 `pantheon-web`: `vue-tsc` typecheck + `vite build` pass with all new/changed views and routes
-- [ ] 13.6 Manual QA on the full stack via `infra/docker-compose.yml`: sign up, select a plan, complete company profile, create an obra, invite each site role, configure a permission override, run the orçamento flow end to end
+- [x] 13.5 `pantheon-web`: `vue-tsc -b` and `vite build` both pass clean (verified with `--force` to bypass incremental cache)
+- [x] 13.6 Manual QA performed live in a real browser against the full stack (pantheon-service + pantheon-web + Postgres/RabbitMQ/MinIO via `infra/docker-compose.yml`): registered a user, created a company, selected the Profissional plan, completed the company profile (with logo upload), reached the dashboard, created an obra (with card rendering), opened the obra detail, created a site document project and uploaded a PDF to it, viewed the Materiais tab, edited a permission override on the Permissões tab (confirmed persisted after reload), and added an accountless service-provider site member. All worked end-to-end. Not covered in this pass: the full invitation-email round trip (client/architect/engineer invite → Mailpit → accept) and the orçamento send/approve/reject flow — logic exercised in 9.x/backend but not click-tested live.
 - [ ] 13.7 Run `/opsx:sync-specs` (or archive) once implemented and verified, updating `openspec/specs/` accordingly

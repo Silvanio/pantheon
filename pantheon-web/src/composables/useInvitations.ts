@@ -1,8 +1,11 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 
+export type MembershipType = 'COMPANY' | 'SITE'
+
 export interface Invitation {
-  projectName: string
+  targetName: string
+  membershipType: MembershipType
   inviterName: string | null
   email: string
   requiresRegistration: boolean
@@ -15,8 +18,9 @@ export interface CompleteRegistrationData {
 }
 
 export interface AcceptedInvitation {
-  projectId: string
-  projectName: string
+  targetId: string
+  targetName: string
+  membershipType: MembershipType
 }
 
 async function request<T>(path: string, options: RequestInit = {}, auth = false): Promise<T> {

@@ -70,8 +70,14 @@ public class CompanyService {
         requireAdmin(companyId, actingUserId);
         Company company =
                 companyRepository.findById(companyId).orElseThrow(() -> new CompanyNotFoundException(companyId));
-        company.completeProfile(legalName, tradeName, cnpj, address, logoObjectKey, Instant.now());
+        String resolvedLogoKey = logoObjectKey != null ? logoObjectKey : company.getLogoObjectKey();
+        company.completeProfile(legalName, tradeName, cnpj, address, resolvedLogoKey, Instant.now());
         return companyRepository.save(company);
+    }
+
+    public Company get(UUID companyId, UUID actingUserId) {
+        requireMembership(companyId, actingUserId);
+        return companyRepository.findById(companyId).orElseThrow(() -> new CompanyNotFoundException(companyId));
     }
 
     /**

@@ -1,42 +1,152 @@
 {
-  "constructionSites": {
+  "company": {
+    "creation": {
+      "title": "Criar empresa",
+      "subtitle": "Cadastre o nome da sua empresa para começar.",
+      "name": "Nome da empresa",
+      "submit": "Continuar",
+      "error": "Não foi possível criar a empresa. Tente novamente."
+    },
+    "plan": {
+      "title": "Escolha um plano",
+      "subtitle": "Selecione o plano da sua empresa. Ainda não cobramos por nenhum plano.",
+      "limitedSites": "Até {count} obras ativas",
+      "unlimitedSites": "Obras ativas ilimitadas",
+      "confirm": "Concluído",
+      "error": "Não foi possível confirmar o plano. Tente novamente."
+    },
+    "profile": {
+      "title": "Dados da empresa",
+      "subtitle": "Complete o cadastro da sua empresa para acessar o painel.",
+      "legalName": "Razão Social",
+      "tradeName": "Nome Fantasia",
+      "cnpj": "CNPJ",
+      "address": "Endereço",
+      "logo": "Logo da empresa",
+      "submit": "Concluir cadastro",
+      "error": "Não foi possível salvar os dados da empresa. Verifique e tente novamente."
+    },
+    "settings": {
+      "title": "Configurações da empresa",
+      "back": "Voltar",
+      "newLogo": "Nova logo (opcional)",
+      "saved": "Dados salvos com sucesso.",
+      "changePlan": "Alterar plano"
+    },
+    "staff": {
+      "title": "Equipe da empresa",
+      "subtitle": "Funcionários com acesso a todas as obras da empresa.",
+      "empty": "Nenhum funcionário cadastrado ainda.",
+      "newButton": "Adicionar funcionário",
+      "form": {
+        "email": "E-mail",
+        "submit": "Adicionar",
+        "cancel": "Cancelar",
+        "error": "Não foi possível adicionar o funcionário. Verifique os dados e tente novamente.",
+        "alreadyMember": "Este e-mail já é um funcionário ativo desta empresa.",
+        "invited": "Convite enviado para {email}. A pessoa aparecerá como \"Convite\" até aceitar."
+      }
+    }
+  },
+  "dashboard": {
     "title": "Obras",
-    "subtitle": "Canteiros de obra deste projeto.",
-    "empty": "Nenhuma obra cadastrada ainda.",
-    "newButton": "Nova obra",
+    "subtitle": "Obras da sua empresa.",
+    "newSiteButton": "Nova obra",
     "form": {
-      "title": "Nova obra",
+      "error": "Não foi possível criar a obra. Verifique os dados e tente novamente."
+    },
+    "profileMenu": {
+      "toggle": "Perfil",
+      "changePlan": "Alterar plano",
+      "editCompany": "Editar dados da empresa",
+      "logout": "Sair"
+    }
+  },
+  "constructionSites": {
+    "empty": "Nenhuma obra cadastrada ainda.",
+    "form": {
       "name": "Nome",
       "address": "Endereço",
       "startDate": "Data de início",
       "expectedEndDate": "Previsão de término",
       "submit": "Criar obra",
-      "cancel": "Cancelar",
-      "error": "Não foi possível criar a obra. Verifique os dados e tente novamente."
-    },
-    "status": {
-      "PLANNING": "Planejamento",
-      "IN_PROGRESS": "Em andamento",
-      "PAUSED": "Paralisada",
-      "COMPLETED": "Concluída",
-      "updateLabel": "Status",
-      "updateError": "Não foi possível atualizar o status da obra."
+      "cancel": "Cancelar"
     }
   },
-  "architecturalProjects": {
-    "title": "Projetos arquitetônicos",
-    "subtitle": "Registros de projeto/planta deste projeto.",
-    "empty": "Nenhum projeto arquitetônico cadastrado ainda.",
-    "newButton": "Novo projeto arquitetônico",
+  "siteDetail": {
+    "back": "Voltar ao painel",
+    "changePhoto": "Alterar foto",
+    "tabs": {
+      "team": "Equipe",
+      "dailyReport": "Diário de Obra",
+      "projects": "Projetos",
+      "materials": "Materiais",
+      "schedule": "Cronograma",
+      "scheduleDisabled": "Em breve",
+      "permissions": "Permissões"
+    }
+  },
+  "siteTeam": {
+    "title": "Equipe da obra",
+    "subtitle": "Clientes, prestadores de serviço, arquitetos, engenheiros e mestres de obra.",
+    "empty": "Nenhum membro cadastrado ainda.",
+    "newButton": "Adicionar membro",
     "form": {
-      "title": "Novo projeto arquitetônico",
-      "name": "Nome",
-      "description": "Descrição",
-      "constructionSite": "Obra vinculada",
-      "constructionSiteNone": "Nenhuma",
-      "submit": "Registrar",
+      "email": "E-mail",
+      "cpf": "CPF",
+      "displayName": "Nome",
+      "trade": "Especialidade",
+      "tradePlaceholder": "Ex: Pedreiro, Encanador, Eletricista",
+      "contactEmail": "E-mail de contato (opcional)",
+      "submit": "Adicionar",
       "cancel": "Cancelar",
-      "error": "Não foi possível registrar o projeto arquitetônico. Verifique os dados e tente novamente."
+      "added": "Membro adicionado.",
+      "invited": "Convite enviado para {email}.",
+      "alreadyMember": "Este e-mail já é um membro ativo desta obra.",
+      "error": "Não foi possível adicionar o membro. Verifique os dados e tente novamente."
+    },
+    "function": {
+      "label": "Função na obra",
+      "CLIENT": "Cliente",
+      "ARCHITECT": "Arquiteto",
+      "ENGINEER": "Engenheiro",
+      "SITE_FOREMAN": "Mestre de Obra",
+      "SERVICE_PROVIDER": "Prestador de Serviço"
+    }
+  },
+  "siteDocumentProjects": {
+    "title": "Projetos",
+    "subtitle": "Projetos e documentos desta obra.",
+    "empty": "Nenhum projeto cadastrado ainda.",
+    "newButton": "Novo projeto",
+    "form": {
+      "name": "Nome",
+      "submit": "Criar",
+      "cancel": "Cancelar",
+      "error": "Não foi possível criar o projeto. Verifique os dados e tente novamente."
+    },
+    "attachments": {
+      "empty": "Nenhum arquivo anexado ainda.",
+      "uploadButton": "Anexar PDF",
+      "error": "Não foi possível enviar o arquivo. Apenas PDF é aceito."
+    }
+  },
+  "sitePermissions": {
+    "title": "Permissões da obra",
+    "subtitle": "Configure o que cada função pode fazer nesta obra.",
+    "function": "Função",
+    "default": "Padrão",
+    "error": "Não foi possível salvar a permissão. Tente novamente.",
+    "capability": {
+      "DOCUMENT_PROJECTS": "Projetos",
+      "DAILY_REPORT": "Diário de obra",
+      "EQUIPMENT_MATERIAL": "Equipamentos e materiais",
+      "MATERIAL_REQUEST": "Pedido de orçamento",
+      "MATERIAL_APPROVAL": "Aprovação de orçamento"
+    },
+    "accessLevel": {
+      "VIEW": "Apenas ver",
+      "MANAGE": "Gerenciar"
     }
   },
   "equipment": {
@@ -77,38 +187,16 @@
     }
   },
   "members": {
-    "title": "Equipe",
-    "subtitle": "Membros deste projeto e sua função na obra.",
-    "empty": "Nenhum membro cadastrado ainda.",
-    "newButton": "Adicionar membro",
-    "form": {
-      "email": "E-mail",
-      "submit": "Adicionar",
-      "cancel": "Cancelar",
-      "error": "Não foi possível adicionar o membro. Verifique os dados e tente novamente.",
-      "alreadyMember": "Este e-mail já é um membro ativo deste projeto.",
-      "invited": "Convite enviado para {email}. A pessoa aparecerá como \"Convite\" até aceitar."
-    },
     "badge": {
       "invited": "Convite"
-    },
-    "function": {
-      "label": "Função na obra",
-      "specialtyLabel": "Especialidade",
-      "specialtyPlaceholder": "Ex: Pintor, Pedreiro, Ajudante",
-      "CLIENT": "Cliente",
-      "ENGINEER": "Engenheiro",
-      "ARCHITECT": "Arquiteto",
-      "SITE_FOREMAN": "Mestre de Obra",
-      "SERVICE_PROVIDER": "Prestador de Serviço",
-      "OTHER": "Outro"
     }
   },
   "invitation": {
     "loading": "Carregando convite...",
     "notFound": "Convite não encontrado ou expirado.",
     "title": "Convite para a equipe",
-    "summary": "{inviter} convidou você para participar da obra \"{project}\" no Pantheon.",
+    "summaryCompany": "{inviter} convidou você para participar da empresa \"{target}\" no Pantheon.",
+    "summarySite": "{inviter} convidou você para participar da obra \"{target}\" no Pantheon.",
     "someone": "Alguém",
     "registerPrompt": "Conclua seu cadastro para o e-mail {email} e depois aceite o convite.",
     "loginPrompt": "Entre na sua conta ({email}) para aceitar este convite.",
@@ -287,7 +375,37 @@
       "verificationNotePlaceholder": "Motivo da divergência, se houver",
       "divergent": "Divergência",
       "verificationError": "Não foi possível registrar a conferência.",
-      "alreadyVerified": "Já conferido"
+      "alreadyVerified": "Já conferido",
+      "uploadPhoto": "Anexar foto de entrega"
+    }
+  },
+  "orcamento": {
+    "title": "Orçamentos",
+    "label": "Orçamento",
+    "newButton": "Novo orçamento",
+    "empty": "Nenhum orçamento criado ainda.",
+    "error": "Não foi possível concluir a ação. Tente novamente.",
+    "sendButton": "Enviar ao cliente",
+    "approveButton": "Aprovar",
+    "rejectButton": "Rejeitar",
+    "rejectReasonPlaceholder": "Motivo da rejeição",
+    "rejectionReason": "Motivo da rejeição",
+    "uploadPaymentProof": "Anexar comprovante de pagamento",
+    "uploadInvoice": "Anexar nota fiscal",
+    "form": {
+      "unitPrice": "Preço unitário",
+      "submit": "Criar orçamento",
+      "error": "Não foi possível criar o orçamento. Verifique os preços informados."
+    },
+    "status": {
+      "DRAFT": "Rascunho",
+      "SENT": "Enviado",
+      "APPROVED": "Aprovado",
+      "REJECTED": "Rejeitado"
+    },
+    "attachmentKind": {
+      "PAYMENT_PROOF": "Comprovante de pagamento",
+      "INVOICE": "Nota fiscal"
     }
   }
 }

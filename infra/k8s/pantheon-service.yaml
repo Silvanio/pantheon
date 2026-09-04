@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantheon-service-config
+data:
+  SPRING_RABBITMQ_HOST: "rabbitmq"
+  SPRING_RABBITMQ_USERNAME: "pantheon"
+  PANTHEON_MESSAGE_BASE_URL: "http://pantheon-message:8082"
+  PANTHEON_WEB_ORIGIN: "https://web.pantheon.example"
+  PANTHEON_STORAGE_ENDPOINT: "http://minio:9000"
+  PANTHEON_STORAGE_REGION: "us-east-1"
+  PANTHEON_STORAGE_BUCKET: "pantheon"
+---
+# Baseline only: real deployments must populate this Secret via a secret manager
+# (Vault, cloud KMS, sealed-secrets, ...), never commit real values to git.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pantheon-service-secrets
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://service-db:5432/pantheon_service"
+  SPRING_DATASOURCE_USERNAME: "pantheon"
+  SPRING_DATASOURCE_PASSWORD: "CHANGE_ME"
+  SPRING_RABBITMQ_PASSWORD: "CHANGE_ME"
+  PANTHEON_API_TOKEN: "CHANGE_ME"
+  PANTHEON_JWT_SECRET: "CHANGE_ME"
+  GOOGLE_CLIENT_ID: "CHANGE_ME"
+  GOOGLE_CLIENT_SECRET: "CHANGE_ME"
+  PANTHEON_STORAGE_ACCESS_KEY: "CHANGE_ME"
+  PANTHEON_STORAGE_SECRET_KEY: "CHANGE_ME"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pantheon-service
+  labels:
+    app: pantheon-service
+spec:
+  # Kept at 1 replica: SSE emitter state is per-pod (see design.md "Risks / Trade-offs").
+  # Scaling beyond 1 needs a fan-out backplane (RabbitMQ/Redis pub-sub) first.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pantheon-service
+  template:
+    metadata:
+      labels:
+        app: pantheon-service
+    spec:
+      containers:
+        - name: pantheon-service
+          image: pantheon-service:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: pantheon-service-config
+            - secretRef:
+                name: pantheon-service-secrets
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pantheon-service
+spec:
+  selector:
+    app: pantheon-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+  type: ClusterIP

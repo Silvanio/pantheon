@@ -1,0 +1,169 @@
+name: pantheon
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-pantheon}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-pantheon}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  service-db:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${SERVICE_DB_NAME:-pantheon_service}
+      POSTGRES_USER: ${SERVICE_DB_USER:-pantheon}
+      POSTGRES_PASSWORD: ${SERVICE_DB_PASSWORD:-pantheon}
+    volumes:
+      - service-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_DB_USER:-pantheon}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  message-db:
+    image: postgres:16-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: ${MESSAGE_DB_NAME:-pantheon_message}
+      POSTGRES_USER: ${MESSAGE_DB_USER:-pantheon}
+      POSTGRES_PASSWORD: ${MESSAGE_DB_PASSWORD:-pantheon}
+    volumes:
+      - message-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MESSAGE_DB_USER:-pantheon}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ROOT_USER:-pantheon}
+      MINIO_ROOT_PASSWORD: ${STORAGE_ROOT_PASSWORD:-pantheon-secret}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      STORAGE_BUCKET: ${PANTHEON_STORAGE_BUCKET:-pantheon}
+      STORAGE_ROOT_USER: ${STORAGE_ROOT_USER:-pantheon}
+      STORAGE_ROOT_PASSWORD: ${STORAGE_ROOT_PASSWORD:-pantheon-secret}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$STORAGE_ROOT_USER $$STORAGE_ROOT_PASSWORD &&
+      mc mb -p local/$$STORAGE_BUCKET &&
+      exit 0
+      "
+
+  pantheon-message:
+    build:
+      context: ..
+      dockerfile: pantheon-message/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://message-db:5432/${MESSAGE_DB_NAME:-pantheon_message}
+      SPRING_DATASOURCE_USERNAME: ${MESSAGE_DB_USER:-pantheon}
+      SPRING_DATASOURCE_PASSWORD: ${MESSAGE_DB_PASSWORD:-pantheon}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-pantheon}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-pantheon}
+      PANTHEON_API_TOKEN: ${PANTHEON_API_TOKEN:-dev-shared-api-token}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      PANTHEON_MAIL_FROM: ${PANTHEON_MAIL_FROM:-no-reply@pantheon.local}
+      PANTHEON_WEB_BASE_URL: ${PANTHEON_WEB_BASE_URL:-http://localhost:8080}
+    depends_on:
+      message-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+
+  pantheon-service:
+    build:
+      context: ..
+      dockerfile: pantheon-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://service-db:5432/${SERVICE_DB_NAME:-pantheon_service}
+      SPRING_DATASOURCE_USERNAME: ${SERVICE_DB_USER:-pantheon}
+      SPRING_DATASOURCE_PASSWORD: ${SERVICE_DB_PASSWORD:-pantheon}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-pantheon}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-pantheon}
+      PANTHEON_API_TOKEN: ${PANTHEON_API_TOKEN:-dev-shared-api-token}
+      PANTHEON_MESSAGE_BASE_URL: http://pantheon-message:8082
+      PANTHEON_JWT_SECRET: ${PANTHEON_JWT_SECRET:-dev-jwt-signing-secret-change-me-please-32bytes}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      PANTHEON_STORAGE_ENDPOINT: http://minio:9000
+      PANTHEON_STORAGE_REGION: ${PANTHEON_STORAGE_REGION:-us-east-1}
+      PANTHEON_STORAGE_BUCKET: ${PANTHEON_STORAGE_BUCKET:-pantheon}
+      PANTHEON_STORAGE_ACCESS_KEY: ${PANTHEON_STORAGE_ACCESS_KEY:-pantheon}
+      PANTHEON_STORAGE_SECRET_KEY: ${PANTHEON_STORAGE_SECRET_KEY:-pantheon-secret}
+    depends_on:
+      service-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      pantheon-message:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+
+  pantheon-web:
+    build:
+      context: ../pantheon-web
+      args:
+        VITE_PANTHEON_SERVICE_URL: ${VITE_PANTHEON_SERVICE_URL:-http://localhost:8081}
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      - pantheon-service
+
+volumes:
+  service-db-data:
+  message-db-data:
+  minio-data:

@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantheon-message-config
+data:
+  SPRING_RABBITMQ_HOST: "rabbitmq"
+  SPRING_RABBITMQ_USERNAME: "pantheon"
+  # Outbound email for transactional messages (e.g. team invitations). Point at the
+  # cluster's SMTP relay; PANTHEON_WEB_BASE_URL is the public origin of pantheon-web,
+  # used to build invitation links.
+  SPRING_MAIL_HOST: "smtp"
+  SPRING_MAIL_PORT: "587"
+  PANTHEON_MAIL_FROM: "no-reply@pantheon.example"
+  PANTHEON_WEB_BASE_URL: "https://app.pantheon.example"
+---
+# Baseline only: real deployments must populate this Secret via a secret manager
+# (Vault, cloud KMS, sealed-secrets, ...), never commit real values to git.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pantheon-message-secrets
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://message-db:5432/pantheon_message"
+  SPRING_DATASOURCE_USERNAME: "pantheon"
+  SPRING_DATASOURCE_PASSWORD: "CHANGE_ME"
+  SPRING_RABBITMQ_PASSWORD: "CHANGE_ME"
+  PANTHEON_API_TOKEN: "CHANGE_ME"
+  SPRING_MAIL_USERNAME: "CHANGE_ME"
+  SPRING_MAIL_PASSWORD: "CHANGE_ME"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pantheon-message
+  labels:
+    app: pantheon-message
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pantheon-message
+  template:
+    metadata:
+      labels:
+        app: pantheon-message
+    spec:
+      containers:
+        - name: pantheon-message
+          image: pantheon-message:latest
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: pantheon-message-config
+            - secretRef:
+                name: pantheon-message-secrets
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pantheon-message
+spec:
+  selector:
+    app: pantheon-message
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: ClusterIP

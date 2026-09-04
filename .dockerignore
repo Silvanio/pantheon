@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+openspec
+pantheon-web/node_modules
+pantheon-web/dist
+pantheon-service/target
+pantheon-message/target
+**/*.log
+.env

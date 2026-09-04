@@ -1,0 +1,69 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: pantheon-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/pantheon_service}
+    username: ${SPRING_DATASOURCE_USERNAME:pantheon}
+    password: ${SPRING_DATASOURCE_PASSWORD:pantheon}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:pantheon}
+    password: ${SPRING_RABBITMQ_PASSWORD:pantheon}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+pantheon:
+  jwt:
+    secret: ${PANTHEON_JWT_SECRET:dev-jwt-signing-secret-change-me-please-32bytes}
+    expiration-minutes: 60
+  api-token: ${PANTHEON_API_TOKEN:dev-shared-api-token}
+  message-service:
+    base-url: ${PANTHEON_MESSAGE_BASE_URL:http://localhost:8082}
+  web:
+    cors-allowed-origin: ${PANTHEON_WEB_ORIGIN:http://localhost:8080}
+  # Deliberately outside spring.security.oauth2.client.*: Spring Boot eagerly
+  # validates every entry under that namespace at startup (even when unused),
+  # so an empty client-id there fails the whole app. Google login is optional
+  # for this bootstrap (email/password always works) - see GoogleOAuth2Config,
+  # which only registers the "google" OAuth2 client when client-id is set.
+  oauth2:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+  storage:
+    endpoint: ${PANTHEON_STORAGE_ENDPOINT:http://localhost:9000}
+    region: ${PANTHEON_STORAGE_REGION:us-east-1}
+    bucket: ${PANTHEON_STORAGE_BUCKET:pantheon}
+    access-key: ${PANTHEON_STORAGE_ACCESS_KEY:pantheon}
+    secret-key: ${PANTHEON_STORAGE_SECRET_KEY:pantheon-secret}
+    max-photo-size-mb: ${PANTHEON_STORAGE_MAX_PHOTO_SIZE_MB:10}
+    max-video-size-mb: ${PANTHEON_STORAGE_MAX_VIDEO_SIZE_MB:100}
+    max-attachment-size-mb: ${PANTHEON_STORAGE_MAX_ATTACHMENT_SIZE_MB:20}
+
+spring.servlet.multipart.max-file-size: 100MB
+spring.servlet.multipart.max-request-size: 100MB

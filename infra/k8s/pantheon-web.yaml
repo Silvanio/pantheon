@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantheon-web-config
+data:
+  # pantheon-web is a static SPA: this value must be baked in at image build time
+  # via the VITE_PANTHEON_SERVICE_URL build arg (see pantheon-web/Dockerfile),
+  # not read from this ConfigMap at runtime.
+  NOTES: "VITE_PANTHEON_SERVICE_URL is a build-time value; rebuild the image to change it."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pantheon-web
+  labels:
+    app: pantheon-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pantheon-web
+  template:
+    metadata:
+      labels:
+        app: pantheon-web
+    spec:
+      containers:
+        - name: pantheon-web
+          image: pantheon-web:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pantheon-web
+spec:
+  selector:
+    app: pantheon-web
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

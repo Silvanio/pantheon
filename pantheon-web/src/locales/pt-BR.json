@@ -1,0 +1,293 @@
+{
+  "constructionSites": {
+    "title": "Obras",
+    "subtitle": "Canteiros de obra deste projeto.",
+    "empty": "Nenhuma obra cadastrada ainda.",
+    "newButton": "Nova obra",
+    "form": {
+      "title": "Nova obra",
+      "name": "Nome",
+      "address": "Endereço",
+      "startDate": "Data de início",
+      "expectedEndDate": "Previsão de término",
+      "submit": "Criar obra",
+      "cancel": "Cancelar",
+      "error": "Não foi possível criar a obra. Verifique os dados e tente novamente."
+    },
+    "status": {
+      "PLANNING": "Planejamento",
+      "IN_PROGRESS": "Em andamento",
+      "PAUSED": "Paralisada",
+      "COMPLETED": "Concluída",
+      "updateLabel": "Status",
+      "updateError": "Não foi possível atualizar o status da obra."
+    }
+  },
+  "architecturalProjects": {
+    "title": "Projetos arquitetônicos",
+    "subtitle": "Registros de projeto/planta deste projeto.",
+    "empty": "Nenhum projeto arquitetônico cadastrado ainda.",
+    "newButton": "Novo projeto arquitetônico",
+    "form": {
+      "title": "Novo projeto arquitetônico",
+      "name": "Nome",
+      "description": "Descrição",
+      "constructionSite": "Obra vinculada",
+      "constructionSiteNone": "Nenhuma",
+      "submit": "Registrar",
+      "cancel": "Cancelar",
+      "error": "Não foi possível registrar o projeto arquitetônico. Verifique os dados e tente novamente."
+    }
+  },
+  "equipment": {
+    "title": "Equipamentos",
+    "subtitle": "Equipamentos cadastrados nesta obra.",
+    "empty": "Nenhum equipamento cadastrado ainda.",
+    "newButton": "Novo equipamento",
+    "toggleLabel": "Equipamentos",
+    "form": {
+      "name": "Nome",
+      "type": "Tipo",
+      "status": "Status",
+      "submit": "Cadastrar",
+      "cancel": "Cancelar",
+      "error": "Não foi possível cadastrar o equipamento. Verifique os dados e tente novamente."
+    },
+    "status": {
+      "AVAILABLE": "Disponível",
+      "IN_USE": "Em uso",
+      "MAINTENANCE": "Manutenção",
+      "UNAVAILABLE": "Indisponível",
+      "updateError": "Não foi possível atualizar o status do equipamento."
+    }
+  },
+  "materials": {
+    "title": "Materiais",
+    "subtitle": "Catálogo de materiais desta obra.",
+    "empty": "Nenhum material cadastrado ainda.",
+    "newButton": "Novo material",
+    "toggleLabel": "Materiais",
+    "form": {
+      "name": "Nome",
+      "unit": "Unidade de medida",
+      "unitPlaceholder": "Ex: m³, kg, un, sc",
+      "submit": "Cadastrar",
+      "cancel": "Cancelar",
+      "error": "Não foi possível cadastrar o material. Verifique os dados e tente novamente."
+    }
+  },
+  "members": {
+    "title": "Equipe",
+    "subtitle": "Membros deste projeto e sua função na obra.",
+    "empty": "Nenhum membro cadastrado ainda.",
+    "newButton": "Adicionar membro",
+    "form": {
+      "email": "E-mail",
+      "submit": "Adicionar",
+      "cancel": "Cancelar",
+      "error": "Não foi possível adicionar o membro. Verifique os dados e tente novamente.",
+      "alreadyMember": "Este e-mail já é um membro ativo deste projeto.",
+      "invited": "Convite enviado para {email}. A pessoa aparecerá como \"Convite\" até aceitar."
+    },
+    "badge": {
+      "invited": "Convite"
+    },
+    "function": {
+      "label": "Função na obra",
+      "specialtyLabel": "Especialidade",
+      "specialtyPlaceholder": "Ex: Pintor, Pedreiro, Ajudante",
+      "CLIENT": "Cliente",
+      "ENGINEER": "Engenheiro",
+      "ARCHITECT": "Arquiteto",
+      "SITE_FOREMAN": "Mestre de Obra",
+      "SERVICE_PROVIDER": "Prestador de Serviço",
+      "OTHER": "Outro"
+    }
+  },
+  "invitation": {
+    "loading": "Carregando convite...",
+    "notFound": "Convite não encontrado ou expirado.",
+    "title": "Convite para a equipe",
+    "summary": "{inviter} convidou você para participar da obra \"{project}\" no Pantheon.",
+    "someone": "Alguém",
+    "registerPrompt": "Conclua seu cadastro para o e-mail {email} e depois aceite o convite.",
+    "loginPrompt": "Entre na sua conta ({email}) para aceitar este convite.",
+    "name": "Nome",
+    "password": "Senha",
+    "continue": "Continuar",
+    "goToLogin": "Ir para o login",
+    "accept": "Aceitar convite",
+    "alreadyAccepted": "Este convite já foi aceito.",
+    "goToApp": "Ir para o app",
+    "registrationError": "Não foi possível concluir o cadastro. Tente novamente.",
+    "registrationNotApplicable": "Este convite não exige cadastro. Faça login para aceitá-lo.",
+    "acceptError": "Não foi possível aceitar o convite. Tente novamente.",
+    "wrongAccount": "Este convite só pode ser aceito pela conta convidada."
+  },
+  "dailyReports": {
+    "toggleLabel": "Diário de Obra",
+    "history": {
+      "title": "Diário de Obra",
+      "subtitle": "Histórico de relatórios diários desta obra.",
+      "empty": "Nenhum relatório registrado ainda.",
+      "newButton": "Novo relatório",
+      "reportLabel": "Relatório",
+      "back": "Voltar",
+      "form": {
+        "date": "Data",
+        "submit": "Criar relatório",
+        "cancel": "Cancelar",
+        "error": "Não foi possível criar o relatório. Verifique se já não existe um para esta data."
+      }
+    },
+    "status": {
+      "DRAFT": "Rascunho",
+      "SUBMITTED": "Enviado"
+    },
+    "detail": {
+      "submitButton": "Enviar relatório",
+      "submitConfirm": "Depois de enviado, o relatório não pode mais ser editado. Confirmar envio?",
+      "submitError": "Não foi possível enviar o relatório.",
+      "submittedNotice": "Este relatório foi enviado e não pode mais ser editado.",
+      "loadError": "Não foi possível carregar o relatório."
+    },
+    "core": {
+      "title": "Clima, horário e comentários",
+      "weatherCondition": "Condição climática",
+      "weatherConditionPlaceholder": "Ex: Ensolarado, Chuvoso",
+      "weatherBlockedTasks": "O clima impediu a execução de tarefas planejadas",
+      "workHoursStart": "Início do expediente",
+      "workHoursEnd": "Fim do expediente",
+      "comments": "Comentários",
+      "save": "Salvar",
+      "error": "Não foi possível salvar. Tente novamente."
+    },
+    "workforce": {
+      "title": "Mão de obra",
+      "empty": "Nenhuma entrada de mão de obra registrada.",
+      "roleDescription": "Função",
+      "roleDescriptionPlaceholder": "Ex: Pedreiro, Ajudante, Pintor",
+      "noMember": "Mão de obra avulsa (sem vínculo)",
+      "headcount": "Quantidade",
+      "addButton": "Adicionar",
+      "error": "Não foi possível adicionar a entrada."
+    },
+    "equipmentUsage": {
+      "title": "Equipamentos utilizados",
+      "empty": "Nenhum equipamento registrado no relatório.",
+      "equipment": "Equipamento",
+      "statusNote": "Observação",
+      "statusNotePlaceholder": "Ex: Operando normalmente",
+      "addButton": "Adicionar",
+      "error": "Não foi possível adicionar o equipamento ao relatório."
+    },
+    "activities": {
+      "title": "Atividades",
+      "empty": "Nenhuma atividade registrada.",
+      "description": "Descrição",
+      "progressNote": "Progresso",
+      "progressNotePlaceholder": "Ex: 60%, Concluída",
+      "status": "Status",
+      "addButton": "Adicionar",
+      "error": "Não foi possível adicionar a atividade.",
+      "statusOptions": {
+        "IN_PROGRESS": "Em execução",
+        "COMPLETED": "Finalizada"
+      }
+    },
+    "occurrences": {
+      "title": "Ocorrências",
+      "empty": "Nenhuma ocorrência registrada.",
+      "description": "Descrição",
+      "addButton": "Adicionar",
+      "error": "Não foi possível adicionar a ocorrência."
+    },
+    "materialsReceived": {
+      "title": "Materiais recebidos",
+      "empty": "Nenhum material recebido registrado.",
+      "material": "Material",
+      "quantity": "Quantidade",
+      "addButton": "Adicionar",
+      "error": "Não foi possível adicionar o material recebido."
+    },
+    "media": {
+      "title": "Fotos e vídeos",
+      "empty": "Nenhuma foto ou vídeo enviado ainda.",
+      "caption": "Legenda",
+      "captionPlaceholder": "Descrição opcional",
+      "uploadButton": "Enviar",
+      "photoLabel": "Foto",
+      "videoLabel": "Vídeo",
+      "error": "Não foi possível enviar o arquivo."
+    },
+    "attachments": {
+      "title": "Anexos",
+      "empty": "Nenhum anexo enviado ainda.",
+      "uploadButton": "Enviar anexo",
+      "downloadButton": "Baixar",
+      "error": "Não foi possível enviar o anexo."
+    },
+    "signatures": {
+      "title": "Assinaturas",
+      "empty": "Nenhuma assinatura registrada ainda.",
+      "signButton": "Assinar relatório",
+      "signRequiresSubmit": "O relatório precisa ser enviado antes de poder ser assinado.",
+      "error": "Não foi possível assinar o relatório.",
+      "signedAt": "Assinado em"
+    },
+    "pdf": {
+      "downloadButton": "Baixar PDF",
+      "error": "Não foi possível gerar o PDF."
+    }
+  },
+  "materialRequests": {
+    "toggleLabel": "Pedidos de Material",
+    "list": {
+      "title": "Pedidos de Material",
+      "subtitle": "Pedidos de material desta obra e seu status.",
+      "empty": "Nenhum pedido registrado ainda.",
+      "newButton": "Novo pedido",
+      "back": "Voltar",
+      "filterLabel": "Filtrar por status",
+      "filterAll": "Todos",
+      "requestLabel": "Pedido"
+    },
+    "status": {
+      "PENDING": "Pendente",
+      "APPROVED": "Aprovado",
+      "REJECTED": "Rejeitado",
+      "PARTIALLY_RECEIVED": "Recebido parcialmente",
+      "RECEIVED": "Recebido"
+    },
+    "form": {
+      "material": "Material",
+      "quantity": "Quantidade",
+      "addItemButton": "Adicionar item",
+      "removeItemButton": "Remover",
+      "submit": "Criar pedido",
+      "cancel": "Cancelar",
+      "error": "Não foi possível criar o pedido. Verifique os itens informados."
+    },
+    "detail": {
+      "loadError": "Não foi possível carregar o pedido.",
+      "itemsTitle": "Itens solicitados",
+      "requestedBy": "Solicitado por",
+      "decisionNote": "Motivo",
+      "approveButton": "Aprovar",
+      "rejectButton": "Rejeitar",
+      "rejectReasonLabel": "Motivo da rejeição",
+      "rejectReasonPlaceholder": "Explique o motivo da rejeição",
+      "confirmReject": "Confirmar rejeição",
+      "decisionError": "Não foi possível registrar a decisão.",
+      "verificationTitle": "Conferência de recebimento",
+      "verificationEmpty": "Nenhum item conferido ainda.",
+      "verifyButton": "Registrar recebimento",
+      "receivedQuantity": "Quantidade recebida",
+      "verificationNote": "Observação",
+      "verificationNotePlaceholder": "Motivo da divergência, se houver",
+      "divergent": "Divergência",
+      "verificationError": "Não foi possível registrar a conferência.",
+      "alreadyVerified": "Já conferido"
+    }
+  }
+}

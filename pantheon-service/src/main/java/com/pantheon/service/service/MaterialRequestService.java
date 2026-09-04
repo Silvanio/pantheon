@@ -7,8 +7,10 @@ import com.pantheon.service.entity.MaterialRequestItem;
 import com.pantheon.service.entity.MaterialRequestStatus;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.ReceiptVerification;
+import com.pantheon.service.entity.ReceiptVerificationPhoto;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DuplicateReceiptVerificationException;
+import com.pantheon.service.exception.InvalidFileException;
 import com.pantheon.service.exception.MaterialRequestItemNotFoundException;
 import com.pantheon.service.exception.MaterialRequestNotApprovedException;
 import com.pantheon.service.exception.MaterialRequestNotFoundException;
@@ -16,13 +18,19 @@ import com.pantheon.service.exception.MaterialRequestNotPendingException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MaterialRequestItemRepository;
 import com.pantheon.service.repository.MaterialRequestRepository;
+import com.pantheon.service.repository.ReceiptVerificationPhotoRepository;
 import com.pantheon.service.repository.ReceiptVerificationRepository;
+import com.pantheon.service.storage.StorageKeys;
+import com.pantheon.service.storage.StorageService;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class MaterialRequestService {
@@ -30,23 +38,29 @@ public class MaterialRequestService {
     private final MaterialRequestRepository requestRepository;
     private final MaterialRequestItemRepository itemRepository;
     private final ReceiptVerificationRepository verificationRepository;
+    private final ReceiptVerificationPhotoRepository verificationPhotoRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final StorageService storageService;
 
     public MaterialRequestService(
             MaterialRequestRepository requestRepository,
             MaterialRequestItemRepository itemRepository,
             ReceiptVerificationRepository verificationRepository,
+            ReceiptVerificationPhotoRepository verificationPhotoRepository,
             ConstructionSiteRepository siteRepository,
             SiteAccessService siteAccessService,
-            SitePermissionService permissionService) {
+            SitePermissionService permissionService,
+            StorageService storageService) {
         this.requestRepository = requestRepository;
         this.itemRepository = itemRepository;
         this.verificationRepository = verificationRepository;
+        this.verificationPhotoRepository = verificationPhotoRepository;
         this.siteRepository = siteRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.storageService = storageService;
     }
 
     @Transactional
@@ -121,6 +135,40 @@ public class MaterialRequestService {
         requestRepository.save(request);
 
         return verification;
+    }
+
+    @Transactional
+    public ReceiptVerificationPhoto uploadVerificationPhoto(
+            UUID requestId, UUID actingUserId, UUID verificationId, MultipartFile file) {
+        MaterialRequest request = requireRequest(requestId);
+        siteAccessService.requireAccess(request.getConstructionSiteId(), actingUserId);
+
+        ReceiptVerification verification = verificationRepository
+                .findById(verificationId)
+                .orElseThrow(() -> new InvalidFileException("Receipt verification not found: " + verificationId));
+        if (file.isEmpty()) {
+            throw new InvalidFileException("Uploaded file is empty");
+        }
+
+        UUID photoId = UUID.randomUUID();
+        String key = StorageKeys.receiptVerificationPhotoKey(verification.getMaterialRequestItemId(), photoId, "jpg");
+        storageService.putObject(key, readBytes(file), file.getContentType());
+
+        ReceiptVerificationPhoto photo = new ReceiptVerificationPhoto(
+                photoId, verificationId, key, file.getContentType(), actingUserId, Instant.now());
+        return verificationPhotoRepository.save(photo);
+    }
+
+    public List<ReceiptVerificationPhoto> listVerificationPhotos(UUID verificationId) {
+        return verificationPhotoRepository.findByReceiptVerificationId(verificationId);
+    }
+
+    private byte[] readBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     public List<MaterialRequest> list(UUID siteId, UUID actingUserId, MaterialRequestStatus statusFilter) {

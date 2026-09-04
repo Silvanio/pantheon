@@ -59,6 +59,16 @@ public class ConstructionSiteService {
         return siteRepository.save(site);
     }
 
+    @Transactional
+    public ConstructionSite updatePhoto(UUID siteId, UUID actingUserId, String photoObjectKey) {
+        ConstructionSite site =
+                siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+        requireAdmin(site.getCompanyId(), actingUserId);
+
+        site.updatePhoto(photoObjectKey, Instant.now());
+        return siteRepository.save(site);
+    }
+
     public List<ConstructionSite> list(UUID companyId, UUID actingUserId) {
         requireMembership(companyId, actingUserId);
         return siteRepository.findByCompanyId(companyId);

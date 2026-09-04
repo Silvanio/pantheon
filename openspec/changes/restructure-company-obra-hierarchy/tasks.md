@@ -26,14 +26,14 @@
 ## 4. Construction site (obra) domain logic
 
 - [x] 4.1 `ConstructionSiteService` keys off `company_id`, enforces admin-of-company authorization, and enforces the plan's active-site limit on creation (`PlanService.requireCapacityForNewSite`)
-- [ ] 4.2 Add optional photo upload on construction site creation/edit (object storage) — column/key builder exist (`ConstructionSite.photoObjectKey`, `StorageKeys.sitePhotoKey`); controller/service wiring not yet added
+- [x] 4.2 `PUT /api/construction-sites/{id}/photo` (multipart) uploads to object storage and calls `ConstructionSiteService.updatePhoto`
 
 ## 5. Site membership, permissions & invitations
 
 - [x] 5.1 `InvitationService` branches on `membership_type` (`COMPANY` vs `SITE`), resolving/flipping the correct table on accept/complete-registration
 - [x] 5.2 `SiteMembershipService`: invite client/architect/engineer/site-foreman (always `INVITED`), create accountless service-provider memberships (`ACTIVE`/`NONE`, no invitation), attach an account to an existing accountless membership later
 - [x] 5.3 `SiteAccessService`: single authorization entry point (`resolve`/`requireAccess`) used by every site-scoped service instead of ad hoc checks
-- [x] 5.4 `SitePermissionService`: resolves effective access level (member override → function override → hardcoded default per design.md Decision 7); override CRUD/admin endpoints not yet added (see 9.2)
+- [x] 5.4 `SitePermissionService`: resolves effective access level (member override → function override → hardcoded default per design.md Decision 7); `setFunctionOverride`/`setMemberOverride` + `SitePermissionController` (company-staff-only) added
 - [x] 5.5 Wired into daily-report creation, site-document-project creation, equipment/material registration, and material-request creation/approval checks
 
 ## 6. Site document projects
@@ -43,9 +43,9 @@
 
 ## 7. Materials/budget (orçamento) workflow
 
-- [ ] 7.1 Add `OrcamentoService`: draft against a `MaterialRequest` with priced line items, send to client (`SENT`), client approve/reject (reason required on reject), propagate approval to the request's status — entities/migrations exist (2.9), service not yet written
-- [ ] 7.2 Add payment-proof / invoice attachment upload on an `Orcamento` (kind `PAYMENT_PROOF` / `INVOICE`)
-- [ ] 7.3 Extend `ReceiptVerification` to accept one or more delivery-proof photos (`ReceiptVerificationPhoto`) — entity exists, service/controller wiring not yet added
+- [x] 7.1 `OrcamentoService`: draft against a `MaterialRequest` with priced line items, send to client (`SENT`), client approve/reject (reason required on reject, requires an active `CLIENT` `SiteMembership`), propagates approval to the request's status
+- [x] 7.2 Payment-proof / invoice attachment upload on an `Orcamento` (kind `PAYMENT_PROOF` / `INVOICE`) via `OrcamentoController`
+- [x] 7.3 `MaterialRequestService.uploadVerificationPhoto`/`listVerificationPhotos` accept one or more delivery-proof photos (`ReceiptVerificationPhoto`) against an existing `ReceiptVerification`
 - [x] 7.4 Existing approve/reject/request endpoints check `SitePermissionService` (`MATERIAL_REQUEST`/`MATERIAL_APPROVAL`) instead of hardcoded admin/`ENGINEER` checks
 
 ## 8. Daily report & equipment/material rescoping
@@ -56,10 +56,10 @@
 ## 9. REST surface
 
 - [x] 9.1 `POST/GET /api/companies`, `GET /api/plans`, `PUT /api/companies/{id}/plan`, `PUT /api/companies/{id}/profile`, `POST/GET /api/companies/{id}/staff`
-- [ ] 9.2 New endpoints: `GET/PUT /api/sites/{id}/permissions` (function-level and member-level override CRUD) — `POST/GET /api/sites/{id}/members` is done (`SiteMembershipController`)
+- [x] 9.2 `POST/GET /api/sites/{id}/members` (`SiteMembershipController`); `GET /api/sites/{id}/permissions`, `PUT /api/sites/{id}/permissions/function`, `PUT /api/sites/{id}/permissions/member` (`SitePermissionController`)
 - [x] 9.3 `POST/GET /api/sites/{id}/projects`, `POST/GET /api/site-projects/{id}/attachments`, `GET /api/site-projects/{id}/attachments/{attachmentId}/content`
-- [ ] 9.4 New endpoints: `POST /api/material-requests/{id}/orcamentos`, `POST /api/orcamentos/{id}/send`, `POST /api/orcamentos/{id}/approve`, `POST /api/orcamentos/{id}/reject`, `POST /api/orcamentos/{id}/attachments`, `POST /api/receipt-verifications/{id}/photos`
-- [x] 9.5 Exception handling updated for the new 403/404/409 cases introduced above (`CompanyExceptionHandler`, extended `ConstructionExceptionHandler`); orçamento-specific exceptions (`OrcamentoNotFoundException` etc.) exist but their controller isn't wired yet
+- [x] 9.4 `POST/GET /api/material-requests/{id}/orcamentos`, `GET /api/orcamentos/{id}`, `POST /api/orcamentos/{id}/send`, `POST /api/orcamentos/{id}/approve`, `POST /api/orcamentos/{id}/reject`, `POST /api/orcamentos/{id}/attachments`, `GET /api/orcamento-attachments/{id}/content`, `POST /api/material-requests/{id}/receipt-verifications/{verificationId}/photos`
+- [x] 9.5 Exception handling updated for the new 403/404/409 cases (`CompanyExceptionHandler`, extended `ConstructionExceptionHandler` covering orçamento/site-document-project exceptions too)
 
 ## 10. pantheon-message
 

@@ -99,4 +99,25 @@ public class SitePermissionService {
     public List<SitePermissionOverride> listOverrides(UUID constructionSiteId) {
         return overrideRepository.findByConstructionSiteId(constructionSiteId);
     }
+
+    /** Sets (creating or replacing) the function-level default for a capability on a site. */
+    public SitePermissionOverride setFunctionOverride(
+            UUID constructionSiteId, ConstructionFunction function, PermissionCapability capability, AccessLevel accessLevel) {
+        SitePermissionOverride existing = overrideRepository
+                .findByConstructionSiteIdAndFunctionAndCapability(constructionSiteId, function, capability)
+                .orElse(null);
+        UUID id = existing != null ? existing.getId() : UUID.randomUUID();
+        return overrideRepository.save(
+                SitePermissionOverride.forFunction(id, constructionSiteId, function, capability, accessLevel));
+    }
+
+    /** Sets (creating or replacing) a member-specific override for a capability. */
+    public SitePermissionOverride setMemberOverride(
+            UUID constructionSiteId, UUID siteMembershipId, PermissionCapability capability, AccessLevel accessLevel) {
+        SitePermissionOverride existing =
+                overrideRepository.findBySiteMembershipIdAndCapability(siteMembershipId, capability).orElse(null);
+        UUID id = existing != null ? existing.getId() : UUID.randomUUID();
+        return overrideRepository.save(
+                SitePermissionOverride.forMember(id, constructionSiteId, siteMembershipId, capability, accessLevel));
+    }
 }

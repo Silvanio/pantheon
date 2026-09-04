@@ -28,8 +28,9 @@ class InvitationEmailHandlerTest {
                 .put("invitationId", "11111111-1111-1111-1111-111111111111")
                 .put("email", "novo@example.com")
                 .put("token", "raw-token-abc")
-                .put("projectId", "22222222-2222-2222-2222-222222222222")
-                .put("projectName", "Obra Centro")
+                .put("targetId", "22222222-2222-2222-2222-222222222222")
+                .put("targetName", "Obra Centro")
+                .put("membershipType", "SITE")
                 .put("inviterName", "Maria")
                 .put("requiresRegistration", requiresRegistration);
     }

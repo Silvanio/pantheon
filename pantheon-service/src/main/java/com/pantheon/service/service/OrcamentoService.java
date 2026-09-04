@@ -1,8 +1,10 @@
 package com.pantheon.service.service;
 
 import com.pantheon.service.dto.OrcamentoCreationRequest;
+import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.AttachmentKind;
 import com.pantheon.service.entity.ConstructionFunction;
+import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.MaterialRequest;
 import com.pantheon.service.entity.MaterialRequestStatus;
 import com.pantheon.service.entity.Orcamento;
@@ -10,11 +12,17 @@ import com.pantheon.service.entity.OrcamentoAttachment;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.OrcamentoStatus;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.SiteMembership;
+import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.InvalidFileException;
 import com.pantheon.service.exception.MaterialRequestNotFoundException;
 import com.pantheon.service.exception.NotSiteClientException;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
 import com.pantheon.service.exception.OrcamentoNotSentException;
+import com.pantheon.service.messaging.EventPublisher;
+import com.pantheon.service.messaging.OrcamentoSentEvent;
+import com.pantheon.service.repository.AppUserRepository;
+import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MaterialRequestRepository;
 import com.pantheon.service.repository.OrcamentoAttachmentRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
@@ -44,28 +52,37 @@ public class OrcamentoService {
     private final OrcamentoLineItemRepository lineItemRepository;
     private final OrcamentoAttachmentRepository attachmentRepository;
     private final MaterialRequestRepository materialRequestRepository;
+    private final ConstructionSiteRepository siteRepository;
     private final SiteMembershipRepository siteMembershipRepository;
+    private final AppUserRepository userRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
     private final StorageService storageService;
+    private final EventPublisher eventPublisher;
 
     public OrcamentoService(
             OrcamentoRepository orcamentoRepository,
             OrcamentoLineItemRepository lineItemRepository,
             OrcamentoAttachmentRepository attachmentRepository,
             MaterialRequestRepository materialRequestRepository,
+            ConstructionSiteRepository siteRepository,
             SiteMembershipRepository siteMembershipRepository,
+            AppUserRepository userRepository,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
-            StorageService storageService) {
+            StorageService storageService,
+            EventPublisher eventPublisher) {
         this.orcamentoRepository = orcamentoRepository;
         this.lineItemRepository = lineItemRepository;
         this.attachmentRepository = attachmentRepository;
         this.materialRequestRepository = materialRequestRepository;
+        this.siteRepository = siteRepository;
         this.siteMembershipRepository = siteMembershipRepository;
+        this.userRepository = userRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
         this.storageService = storageService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -89,7 +106,25 @@ public class OrcamentoService {
         requireRequestAccess(materialRequest, actingUserId);
 
         orcamento.send(Instant.now());
-        return orcamentoRepository.save(orcamento);
+        orcamentoRepository.save(orcamento);
+
+        publishOrcamentoSent(orcamento, materialRequest);
+        return orcamento;
+    }
+
+    private void publishOrcamentoSent(Orcamento orcamento, MaterialRequest materialRequest) {
+        UUID siteId = materialRequest.getConstructionSiteId();
+        ConstructionSite site =
+                siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+        List<SiteMembership> clients = siteMembershipRepository.findByConstructionSiteId(siteId).stream()
+                .filter(m -> m.isActive() && m.getFunction() == ConstructionFunction.CLIENT && m.getUserId() != null)
+                .toList();
+
+        for (SiteMembership client : clients) {
+            userRepository.findById(client.getUserId()).map(AppUser::getEmail).ifPresent(email -> eventPublisher.publish(
+                    OrcamentoSentEvent.TYPE,
+                    new OrcamentoSentEvent(orcamento.getId(), materialRequest.getId(), siteId, site.getName(), email)));
+        }
     }
 
     @Transactional

@@ -63,8 +63,8 @@
 
 ## 10. pantheon-message
 
-- [ ] 10.1 Update invitation email template to render the correct target name/type (company vs. construction site)
-- [ ] 10.2 Add an "orçamento enviado" notification email for the `orcamento-sent` event
+- [x] 10.1 `InvitationEmailHandler` renders the correct target name/type (company vs. construction site) from the generalized `targetId`/`targetName`/`membershipType` event fields
+- [x] 10.2 `OrcamentoSentEmailHandler` sends an "orçamento enviado" notification for the `orcamento-sent` event, published by `OrcamentoService.send` to every active client `SiteMembership` on the site
 
 ## 11. Local orchestration & infra
 

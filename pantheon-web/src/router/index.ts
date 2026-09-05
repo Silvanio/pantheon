@@ -109,6 +109,15 @@ router.beforeEach(async (to) => {
   }
 
   if (!current.hasCompany) {
+    // A user with only site membership(s) — e.g. a client or an outside architect/engineer —
+    // has no company of their own and shouldn't be forced through company onboarding; send
+    // them straight to one of their obras instead of the (company-scoped) dashboard.
+    if (current.siteIds.length > 0) {
+      if (to.name === 'dashboard') {
+        return { name: 'site-detail', params: { siteId: current.siteIds[0] } }
+      }
+      return true
+    }
     return to.name === 'company-new' ? true : { name: 'company-new' }
   }
 

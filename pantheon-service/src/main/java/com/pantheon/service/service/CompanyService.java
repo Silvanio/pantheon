@@ -13,10 +13,12 @@ import com.pantheon.service.exception.CompanyNotFoundException;
 import com.pantheon.service.exception.MemberAlreadyActiveException;
 import com.pantheon.service.exception.NotCompanyAdminException;
 import com.pantheon.service.exception.NotCompanyMemberException;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.CompanyRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -38,18 +40,21 @@ public class CompanyService {
     private final AppUserRepository userRepository;
     private final MembershipInvitationRepository invitationRepository;
     private final MembershipInvitationIssuer invitationIssuer;
+    private final SiteMembershipRepository siteMembershipRepository;
 
     public CompanyService(
             CompanyRepository companyRepository,
             CompanyMembershipRepository membershipRepository,
             AppUserRepository userRepository,
             MembershipInvitationRepository invitationRepository,
-            MembershipInvitationIssuer invitationIssuer) {
+            MembershipInvitationIssuer invitationIssuer,
+            SiteMembershipRepository siteMembershipRepository) {
         this.companyRepository = companyRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.invitationRepository = invitationRepository;
         this.invitationIssuer = invitationIssuer;
+        this.siteMembershipRepository = siteMembershipRepository;
     }
 
     @Transactional
@@ -140,8 +145,12 @@ public class CompanyService {
         List<CompanyMembership> memberships = membershipRepository.findByUserId(userId).stream()
                 .filter(CompanyMembership::isActive)
                 .toList();
+        List<UUID> siteIds = siteMembershipRepository.findByUserId(userId).stream()
+                .filter(SiteMembership::isActive)
+                .map(SiteMembership::getConstructionSiteId)
+                .toList();
         if (memberships.isEmpty()) {
-            return new OnboardingStatusResponse(false, List.of());
+            return new OnboardingStatusResponse(false, List.of(), siteIds);
         }
 
         Map<UUID, Company> companiesById = companiesById(memberships);
@@ -152,7 +161,7 @@ public class CompanyService {
                             company.getId(), company.getName(), m.getRole(), company.getOnboardingStatus());
                 })
                 .toList();
-        return new OnboardingStatusResponse(true, companies);
+        return new OnboardingStatusResponse(true, companies, siteIds);
     }
 
     public List<CompanyMembershipResponse> listMyCompanies(UUID userId) {

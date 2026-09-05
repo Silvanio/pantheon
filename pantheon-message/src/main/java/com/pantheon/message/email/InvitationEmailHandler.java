@@ -34,6 +34,7 @@ public class InvitationEmailHandler {
 
         boolean isSite = "SITE".equals(payload.membershipType());
         String targetLabel = isSite ? "a obra" : "a empresa";
+        String targetLabelContracted = isSite ? "da obra" : "da empresa";
 
         String link = webBaseUrl + "/invitations/" + payload.token();
         String subject = "Convite para " + targetLabel + " " + payload.targetName() + " no Pantheon";
@@ -43,8 +44,8 @@ public class InvitationEmailHandler {
 
         StringBuilder body = new StringBuilder();
         body.append(inviter)
-                .append(" convidou você para participar de ")
-                .append(targetLabel)
+                .append(" convidou você para participar ")
+                .append(targetLabelContracted)
                 .append(" \"")
                 .append(payload.targetName())
                 .append("\" no Pantheon.\n\n");

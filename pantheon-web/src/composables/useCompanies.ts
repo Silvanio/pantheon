@@ -35,6 +35,7 @@ export interface CompanyMembership {
 export interface OnboardingStatus {
   hasCompany: boolean
   companies: CompanyMembership[]
+  siteIds: string[]
 }
 
 export interface CompanyMember {

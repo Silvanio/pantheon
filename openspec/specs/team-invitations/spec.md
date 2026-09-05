@@ -1,5 +1,8 @@
-## MODIFIED Requirements
+# team-invitations Specification
 
+## Purpose
+TBD - created by archiving change add-team-member-invitations. Update Purpose after archive.
+## Requirements
 ### Requirement: Adding a member creates an invitation
 When a company staff member with sufficient access adds someone to a company's staff or a construction site's team by email, `pantheon-service` SHALL create the corresponding membership (`CompanyMembership` or `SiteMembership`) in an `INVITED` state and SHALL NOT grant that person access until the invitation is accepted. This applies whether or not the email already belongs to a registered account, and regardless of which membership type is being invited to.
 
@@ -11,7 +14,7 @@ When a company staff member with sufficient access adds someone to a company's s
 - **WHEN** an administrator adds a company staff member or a construction site's team member whose email does not belong to any account
 - **THEN** `pantheon-service` creates a pre-registration `AppUser` for that email with registration status `PENDING_REGISTRATION` and no credentials, creates an `INVITED` membership linked to it, creates a `MembershipInvitation` marked as requiring registration, and publishes a `team-invitation-created` event
 
-#### Scenario: Invited person has no access yet
+#### Scenario: Invited person has no project access yet
 - **WHEN** a user whose only link to a company or construction site is an `INVITED` membership attempts to read or act on it
 - **THEN** `pantheon-service` rejects the request as if the user had no relationship to it
 
@@ -78,3 +81,4 @@ When a company staff member with sufficient access adds someone to a company's s
 #### Scenario: Email links to the invitation
 - **WHEN** `pantheon-message` consumes a `team-invitation-created` event
 - **THEN** it sends an email to the invited address containing a link to the web invitation page for that token
+

@@ -3,19 +3,21 @@
 ## Purpose
 
 The daily construction report (Relatório Diário de Obra / RDO) — one `DailyReport` per `ConstructionSite` per calendar date, logging weather, work hours, workforce, equipment usage, activities, occurrences, materials received, and comments, with a draft-then-submitted lifecycle.
-
 ## Requirements
-
 ### Requirement: Daily report creation
-`pantheon-service` SHALL allow a member of a construction site's project to create one `DailyReport` per site per calendar date, starting in `DRAFT` status.
+`pantheon-service` SHALL allow a member of a construction site (company staff or an active `SiteMembership`) with `MANAGE` access to that site's daily reports to create one `DailyReport` per site per calendar date, starting in `DRAFT` status.
 
 #### Scenario: Member creates a daily report
-- **WHEN** a project member submits a report date for a construction site that has no existing report for that date
+- **WHEN** a construction site member with daily-report management access submits a report date for a site that has no existing report for that date
 - **THEN** `pantheon-service` persists a new `DailyReport` in `DRAFT` status, assigned the next sequential number for that site
 
 #### Scenario: Duplicate report for the same date rejected
-- **WHEN** a project member attempts to create a daily report for a site and date that already has one
+- **WHEN** a construction site member attempts to create a daily report for a site and date that already has one
 - **THEN** `pantheon-service` rejects the request and does not create a second report
+
+#### Scenario: View-only member cannot create
+- **WHEN** a construction site member whose daily-report access is `VIEW` attempts to create a daily report
+- **THEN** `pantheon-service` rejects the request with HTTP 403
 
 ### Requirement: Weather condition logging
 `pantheon-service` SHALL allow the weather condition and whether it blocked planned tasks to be recorded on a draft daily report.
@@ -89,14 +91,14 @@ The daily construction report (Relatório Diário de Obra / RDO) — one `DailyR
 - **THEN** `pantheon-service` rejects the request
 
 ### Requirement: Daily report listing and detail
-`pantheon-service` SHALL allow any member of a project to list a construction site's daily reports and view the full detail of one, including all of its sections.
+`pantheon-service` SHALL allow any member of a construction site to list its daily reports and view the full detail of one, including all of its sections, regardless of whether their daily-report access is `VIEW` or `MANAGE`.
 
 #### Scenario: Member lists daily reports
-- **WHEN** an authenticated member of a project requests the list of daily reports for one of its construction sites
+- **WHEN** an authenticated member of a construction site requests the list of its daily reports
 - **THEN** `pantheon-service` returns every `DailyReport` for that site, ordered by date
 
 #### Scenario: Member views a daily report's detail
-- **WHEN** an authenticated member of a project requests a specific daily report by id
+- **WHEN** an authenticated member of a construction site requests a specific daily report by id
 - **THEN** `pantheon-service` returns the report with all of its sections (weather, hours, workforce, equipment usage, activities, occurrences, materials received, comments)
 
 ### Requirement: Daily report views
@@ -109,3 +111,4 @@ The daily construction report (Relatório Diário de Obra / RDO) — one `DailyR
 #### Scenario: Member browses report history
 - **WHEN** a project member opens a construction site's report history view
 - **THEN** `pantheon-web` lists the site's daily reports ordered by date, each opening its detail view on selection
+

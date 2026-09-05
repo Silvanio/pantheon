@@ -3,9 +3,13 @@
 ### Requirement: Project creation
 `pantheon-service` SHALL allow an authenticated user with no company to create a `Company` by supplying a company name. The creating user SHALL be recorded as that company's `ADMIN`. The company SHALL start with no plan assigned; plan selection and the company's commercial profile (Razão Social, Nome Fantasia, CNPJ, address, logo) are handled separately (see `company-onboarding`, `company-plan-catalog`).
 
-#### Scenario: Company created successfully
+#### Scenario: Project created successfully
 - **WHEN** an authenticated user with no company submits a company name
 - **THEN** `pantheon-service` persists a new `Company` (identified by the given name) with no plan and no profile fields set, and creates a `CompanyMembership` linking the creator to the company with role `ADMIN`
+
+#### Scenario: Project count limit blocks creation
+- **WHEN** an authenticated user creates a company
+- **THEN** `pantheon-service` does not limit how many companies a user may create or administer — the plan-tied limit instead applies to how many active construction sites a company may have (see `company-plan-catalog`'s "Active construction-site limit enforcement")
 
 #### Scenario: User with an existing company is not offered creation again
 - **WHEN** an authenticated user who already administers or belongs to a company attempts to create another company
@@ -14,7 +18,7 @@
 ### Requirement: List administered and joined projects
 `pantheon-service` SHALL allow an authenticated user to retrieve the list of companies they belong to, along with their role on each and each company's onboarding status.
 
-#### Scenario: User lists their companies
+#### Scenario: User lists their projects
 - **WHEN** an authenticated user requests their list of companies
 - **THEN** `pantheon-service` returns every company for which the user has a `CompanyMembership`, including their role (`ADMIN` or `MEMBER`) and onboarding status on each
 

@@ -3,9 +3,7 @@
 ## Purpose
 
 Core Spring Boot service for the Pantheon platform. Provides the REST API, JPA-backed persistence with Flyway migrations, OAuth2 login (Google) and email/password login unified behind a single session token format, RabbitMQ message publishing to `pantheon-message`, and an authenticated Server-Sent Events (SSE) endpoint for pushing real-time events to `pantheon-web`.
-
 ## Requirements
-
 ### Requirement: REST API
 `pantheon-service` SHALL expose its capabilities as a REST API built with Spring Boot, returning JSON payloads and standard HTTP status codes.
 
@@ -91,74 +89,26 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 - **THEN** `pantheon-service` updates the existing profile record for that user rather than creating a second one
 
 ### Requirement: Project creation
-`pantheon-service` SHALL allow an authenticated user to create a `Project` by supplying a project name, together with their CNPJ/CPF, legal name, address, and postal code (recorded as that user's profile data, not as fields of the project). The creating user SHALL be recorded as that project's `ADMIN`, and the project SHALL start in trial status with no plan assigned.
+`pantheon-service` SHALL allow an authenticated user with no company to create a `Company` by supplying a company name. The creating user SHALL be recorded as that company's `ADMIN`. The company SHALL start with no plan assigned; plan selection and the company's commercial profile (Razão Social, Nome Fantasia, CNPJ, address, logo) are handled separately (see `company-onboarding`, `company-plan-catalog`).
 
 #### Scenario: Project created successfully
-- **WHEN** an authenticated user submits a project name along with their CNPJ/CPF, legal name, address, and CEP
-- **THEN** `pantheon-service` persists a new `Project` (identified by the given name) with `plan` unset and a trial period starting now, records the submitted CNPJ/CPF, legal name, address, and CEP as the user's profile data, and creates a `ProjectMembership` linking the creator to the project with role `ADMIN`
+- **WHEN** an authenticated user with no company submits a company name
+- **THEN** `pantheon-service` persists a new `Company` (identified by the given name) with no plan and no profile fields set, and creates a `CompanyMembership` linking the creator to the company with role `ADMIN`
 
 #### Scenario: Project count limit blocks creation
-- **WHEN** an authenticated user who administers one or more projects on a given confirmed plan attempts to create a new project that would exceed that plan's project limit (Basic: 2, Pro: 10)
-- **THEN** `pantheon-service` rejects the request and does not create the project
+- **WHEN** an authenticated user creates a company
+- **THEN** `pantheon-service` does not limit how many companies a user may create or administer — the plan-tied limit instead applies to how many active construction sites a company may have (see `company-plan-catalog`'s "Active construction-site limit enforcement")
 
-### Requirement: Trial period
-Each `Project` SHALL have a trial period of 3 days starting at its creation time, during which it is considered active without requiring a plan.
-
-#### Scenario: Project active during trial
-- **WHEN** the onboarding/status check for a project runs before 3 days have elapsed since its creation
-- **THEN** `pantheon-service` reports the project as active and does not require plan selection
-
-#### Scenario: Project trial expired
-- **WHEN** the onboarding/status check for a project runs after 3 days have elapsed since its creation and no plan has been confirmed
-- **THEN** `pantheon-service` reports the project as requiring plan selection
-
-### Requirement: Plan confirmation
-`pantheon-service` SHALL allow the administrator of a project to confirm one of three plans — Basic (up to 2 projects), Pro (up to 10 projects), or Ilimitado (unlimited projects) — for that project. Confirming a plan SHALL set the plan's validity to 1 year from the confirmation time.
-
-#### Scenario: Admin confirms a plan
-- **WHEN** the administrator of a project whose trial or previously confirmed plan has expired submits a plan choice (Basic, Pro, or Ilimitado)
-- **THEN** `pantheon-service` records the chosen plan on the project and sets its validity to 1 year from the confirmation time, after which the project is reported as active again
-
-#### Scenario: Non-admin cannot confirm a plan
-- **WHEN** a user who is not the administrator of a project attempts to confirm a plan for it
-- **THEN** `pantheon-service` rejects the request with HTTP 403
-
-#### Scenario: Confirmed plan expires after 1 year
-- **WHEN** the onboarding/status check for a project runs after its confirmed plan's 1-year validity has elapsed
-- **THEN** `pantheon-service` reports the project as requiring plan selection again
-
-### Requirement: Onboarding status
-`pantheon-service` SHALL expose an authenticated endpoint that reports whether the current user has any project membership, whether any of their memberships is on an active (non-expired trial or plan) project, and whether plan selection is required.
-
-#### Scenario: User with no projects
-- **WHEN** an authenticated user with zero project memberships requests their onboarding status
-- **THEN** `pantheon-service` reports that the user has no project
-
-#### Scenario: User with at least one active project
-- **WHEN** an authenticated user has at least one project membership on an active project
-- **THEN** `pantheon-service` reports the user as having an active project and does not require plan selection
-
-#### Scenario: User whose only projects are expired
-- **WHEN** an authenticated user has one or more project memberships but none of the associated projects are active
-- **THEN** `pantheon-service` reports that plan selection is required, identifying the expired project(s) the user administers
-
-### Requirement: Project membership management
-`pantheon-service` SHALL allow the administrator of a project to add another registered user to that project as a `MEMBER`.
-
-#### Scenario: Admin adds a member
-- **WHEN** the administrator of a project submits a request to add a registered user to that project
-- **THEN** `pantheon-service` creates a `ProjectMembership` linking that user to the project with role `MEMBER`
-
-#### Scenario: Non-admin cannot add a member
-- **WHEN** a user who is not the administrator of a project attempts to add another user to it
-- **THEN** `pantheon-service` rejects the request with HTTP 403
+#### Scenario: User with an existing company is not offered creation again
+- **WHEN** an authenticated user who already administers or belongs to a company attempts to create another company
+- **THEN** `pantheon-service` still allows it (a user may administer more than one company), recording the new company independently with its own plan and profile state
 
 ### Requirement: List administered and joined projects
-`pantheon-service` SHALL allow an authenticated user to retrieve the list of projects they belong to, along with their role on each.
+`pantheon-service` SHALL allow an authenticated user to retrieve the list of companies they belong to, along with their role on each and each company's onboarding status.
 
 #### Scenario: User lists their projects
-- **WHEN** an authenticated user requests their list of projects
-- **THEN** `pantheon-service` returns every project for which the user has a `ProjectMembership`, including their role (`ADMIN` or `MEMBER`) on each
+- **WHEN** an authenticated user requests their list of companies
+- **THEN** `pantheon-service` returns every company for which the user has a `CompanyMembership`, including their role (`ADMIN` or `MEMBER`) and onboarding status on each
 
 ### Requirement: Java package and build coordinate convention
 `pantheon-service` SHALL use the `com.pantheon` Maven groupId and `com.pantheon.service` Java package prefix, and SHALL organize its Java source into layered packages (`controller`, `service`, `repository`, `entity`, `dto`, `exception`) rather than per-feature packages. Cross-cutting infrastructure (`security`, `messaging`, `sse`) is exempt from this layering and may remain organized by concern.
@@ -170,3 +120,19 @@ Each `Project` SHALL have a trial period of 3 days starting at its creation time
 #### Scenario: Layered organization
 - **WHEN** inspecting the top-level packages under `com.pantheon.service`
 - **THEN** Spring MVC controllers live in `controller`, business logic in `service`, Spring Data repositories in `repository`, JPA-mapped types (entities and their enums) in `entity`, request/response payload types in `dto`, and exception types together with their `@RestControllerAdvice` handlers in `exception`
+
+### Requirement: Account registration lifecycle
+`pantheon-service` SHALL track a registration status on each account of either `ACTIVE` or `PENDING_REGISTRATION`. A `PENDING_REGISTRATION` account has no usable credentials and SHALL NOT be able to authenticate until its registration is completed.
+
+#### Scenario: Pending account cannot log in
+- **WHEN** someone attempts to log in with the email of a `PENDING_REGISTRATION` account
+- **THEN** `pantheon-service` responds with HTTP 401 and does not issue a token
+
+#### Scenario: Normal registration completes a pending account
+- **WHEN** a user registers through the normal registration endpoint using an email that currently has a `PENDING_REGISTRATION` account
+- **THEN** `pantheon-service` completes that existing account with the submitted credentials and sets its registration status to `ACTIVE` rather than reporting the email as already registered
+
+#### Scenario: Legacy accounts treated as active
+- **WHEN** an account created before this lifecycle existed is loaded
+- **THEN** `pantheon-service` treats its registration status as `ACTIVE`
+

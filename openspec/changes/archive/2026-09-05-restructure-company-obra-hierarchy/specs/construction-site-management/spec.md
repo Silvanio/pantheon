@@ -32,6 +32,18 @@ Each `ConstructionSite` SHALL have a status of `PLANNING`, `IN_PROGRESS`, `PAUSE
 - **WHEN** a company administrator submits the construction site creation form with a valid name, address, and start date
 - **THEN** `pantheon-web` submits the data to `pantheon-service` and, on success, shows the new site as a card on the dashboard
 
+#### Scenario: Admin adds a member with a function from the UI
+- **WHEN** a company administrator submits a construction site's team add-member form with a selected construction function (and specialty, if Service Provider)
+- **THEN** `pantheon-web` submits the function (and specialty) alongside the existing add-member data, scoped to that construction site rather than the company as a whole
+
+#### Scenario: Invited member shows a Convite badge
+- **WHEN** a construction site's team list contains a member whose invitation has not been accepted
+- **THEN** `pantheon-web` displays that member with a "Convite" badge next to their name, and removes the badge once the invitation is accepted
+
+#### Scenario: Admin invites an email with no account
+- **WHEN** a company administrator submits a construction site's team add-member form with an email that is not yet registered
+- **THEN** `pantheon-web` submits it successfully and shows the person in the site's team list with a "Convite" badge
+
 ## REMOVED Requirements
 
 ### Requirement: Architectural project registration

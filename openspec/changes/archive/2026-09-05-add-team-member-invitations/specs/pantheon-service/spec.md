@@ -3,7 +3,7 @@
 ### Requirement: Project membership management
 `pantheon-service` SHALL allow the administrator of a project to add another person to that project by email as a `MEMBER`. The resulting `ProjectMembership` SHALL be created in an `INVITED` state that confers no project access until the invitation is accepted. If the email does not match any existing account, `pantheon-service` SHALL create a pre-registration account for it (registration status `PENDING_REGISTRATION`, no credentials) and link the invited membership to that account.
 
-#### Scenario: Admin invites an existing user
+#### Scenario: Admin adds a member
 - **WHEN** the administrator of a project submits a request to add a person whose email belongs to an existing active account
 - **THEN** `pantheon-service` creates a `ProjectMembership` linking that account to the project with role `MEMBER` and status `INVITED`
 

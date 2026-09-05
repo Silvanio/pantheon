@@ -3,9 +3,7 @@
 ## Purpose
 
 Monorepo structure, per-service local run/build setup, and containerization/Kubernetes-readiness (Dockerfiles, health/readiness probes, externalized config) shared across the `pantheon-service`, `pantheon-message`, and `pantheon-web` services.
-
 ## Requirements
-
 ### Requirement: Monorepo layout with independently deployable services
 The repository SHALL host `pantheon-service`, `pantheon-message`, and `pantheon-web` as independent projects within a single monorepo, each buildable and deployable on its own without requiring the others to be built.
 
@@ -14,11 +12,15 @@ The repository SHALL host `pantheon-service`, `pantheon-message`, and `pantheon-
 - **THEN** that build completes successfully without requiring the other two services to be present or built
 
 ### Requirement: Local development orchestration
-The repository SHALL provide a local orchestration setup (e.g., docker-compose) that runs RabbitMQ, the required databases, and all three services together for end-to-end local development and testing.
+The repository SHALL provide a local orchestration setup (e.g., docker-compose) that runs RabbitMQ, the required databases, an SMTP server for outbound email, and all three services together for end-to-end local development and testing.
 
 #### Scenario: Full stack starts locally
 - **WHEN** a developer runs the local orchestration setup
-- **THEN** RabbitMQ, the databases, `pantheon-service`, `pantheon-message`, and `pantheon-web` all start and can communicate with each other
+- **THEN** RabbitMQ, the databases, the SMTP server, `pantheon-service`, `pantheon-message`, and `pantheon-web` all start and can communicate with each other
+
+#### Scenario: Outbound email captured locally
+- **WHEN** the local stack is running and a service sends an email
+- **THEN** the SMTP server accepts it and the message is inspectable by the developer (e.g., via a local mail UI) rather than being delivered to a real inbox
 
 ### Requirement: Containerization
 Each of the three services SHALL have a Dockerfile that builds a runnable container image for that service, with configuration supplied via environment variables rather than hardcoded values.
@@ -52,3 +54,4 @@ The local orchestration setup SHALL include an S3-compatible object storage serv
 #### Scenario: Files organized by predictable key path
 - **WHEN** a file is stored in object storage on behalf of a specific record (e.g., a daily report)
 - **THEN** its object key is namespaced under a path prefix scoped to that record, so all of that record's files share a common, folder-like prefix
+

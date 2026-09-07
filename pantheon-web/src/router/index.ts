@@ -10,7 +10,6 @@ import CompanyProfileView from '../views/CompanyProfileView.vue'
 import CompanySettingsView from '../views/CompanySettingsView.vue'
 import SiteDetailView from '../views/SiteDetailView.vue'
 import InvitationView from '../views/InvitationView.vue'
-import DailyReportHistoryView from '../views/DailyReportHistoryView.vue'
 import DailyReportDetailView from '../views/DailyReportDetailView.vue'
 import MaterialRequestListView from '../views/MaterialRequestListView.vue'
 import MaterialRequestDetailView from '../views/MaterialRequestDetailView.vue'
@@ -42,12 +41,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     { path: '/sites/:siteId', name: 'site-detail', component: SiteDetailView, meta: { requiresAuth: true } },
-    {
-      path: '/construction-sites/:siteId/daily-reports',
-      name: 'daily-report-history',
-      component: DailyReportHistoryView,
-      meta: { requiresAuth: true },
-    },
     {
       path: '/daily-reports/:id',
       name: 'daily-report-detail',

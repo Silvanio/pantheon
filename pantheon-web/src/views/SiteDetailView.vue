@@ -9,6 +9,7 @@ import SiteDocumentProjectsPanel from '../components/SiteDocumentProjectsPanel.v
 import SitePermissionsPanel from '../components/SitePermissionsPanel.vue'
 import EquipmentPanel from '../components/EquipmentPanel.vue'
 import MaterialsPanel from '../components/MaterialsPanel.vue'
+import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 
 const route = useRoute()
@@ -20,7 +21,7 @@ const siteId = route.params.siteId as string
 const site = ref<ConstructionSite | null>(null)
 const loading = ref(false)
 
-type Tab = 'team' | 'projects' | 'materials' | 'schedule' | 'permissions'
+type Tab = 'team' | 'dailyReport' | 'projects' | 'materials' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('team')
 
 async function load() {
@@ -95,12 +96,14 @@ onMounted(load)
           >
             {{ t('siteDetail.tabs.team') }}
           </button>
-          <router-link
-            :to="`/construction-sites/${siteId}/daily-reports`"
-            class="rounded-lg px-3.5 py-2 text-sm font-medium text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800"
+          <button
+            type="button"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'dailyReport' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'dailyReport'"
           >
             {{ t('siteDetail.tabs.dailyReport') }}
-          </router-link>
+          </button>
           <button
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
@@ -136,6 +139,7 @@ onMounted(load)
         </nav>
 
         <SiteTeamPanel v-if="activeTab === 'team'" :site-id="siteId" />
+        <DailyReportsPanel v-if="activeTab === 'dailyReport'" :site-id="siteId" />
         <SiteDocumentProjectsPanel v-if="activeTab === 'projects'" :site-id="siteId" />
         <template v-if="activeTab === 'materials'">
           <div>

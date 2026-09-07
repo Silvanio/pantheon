@@ -43,6 +43,14 @@ body {
   @apply bg-steel-50 text-steel-800 antialiased dark:bg-steel-900 dark:text-steel-100;
 }
 
+/* Tailwind's preflight resets <button> to cursor: default; restore the expected pointer
+   cursor everywhere except disabled buttons (which already get cursor-not-allowed). */
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* Subtle technical-drawing grid, used behind auth/onboarding screens. */
 .blueprint-grid {
   background-image:

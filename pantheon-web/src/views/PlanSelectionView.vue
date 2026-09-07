@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCompanies, type Plan, type PlanCode } from '../composables/useCompanies'
 import { useCompanyOnboarding } from '../composables/useCompanyOnboarding'
+import AuthShell from '../components/AuthShell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,46 +44,46 @@ async function onConfirm() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-steel-50 px-4 py-8 dark:bg-steel-900">
-    <div class="w-full max-w-2xl rounded-xl border border-steel-200 bg-white p-8 shadow-sm dark:border-steel-700 dark:bg-steel-800">
-      <div class="mb-6 flex items-center gap-2">
-        <div class="h-8 w-8 rounded-md bg-blueprint-600 dark:bg-blueprint-400"></div>
-        <span class="text-lg font-semibold text-steel-800 dark:text-steel-50">Pantheon</span>
-      </div>
+  <AuthShell
+    heading="Escolha o plano ideal para sua empresa."
+    description="Sem cobrança agora — você pode mudar de plano quando quiser."
+    card-class="max-w-3xl"
+  >
+    <h1 class="mb-1 text-2xl font-semibold text-steel-800 dark:text-steel-50">{{ t('company.plan.title') }}</h1>
+    <p class="mb-6 text-sm text-steel-500 dark:text-steel-400">{{ t('company.plan.subtitle') }}</p>
 
-      <h1 class="mb-1 text-xl font-semibold text-steel-800 dark:text-steel-50">{{ t('company.plan.title') }}</h1>
-      <p class="mb-6 text-sm text-steel-500 dark:text-steel-400">{{ t('company.plan.subtitle') }}</p>
-
-      <div v-if="!loading" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <button
-          v-for="plan in plans"
-          :key="plan.id"
-          type="button"
-          class="rounded-lg border p-4 text-left transition"
-          :class="
-            selectedPlanCode === plan.code
-              ? 'border-blueprint-500 bg-blueprint-50 dark:bg-blueprint-900/30'
-              : 'border-steel-200 hover:bg-steel-50 dark:border-steel-600 dark:hover:bg-steel-700'
-          "
-          @click="selectedPlanCode = plan.code"
-        >
-          <div class="font-semibold text-steel-800 dark:text-steel-50">{{ plan.name }}</div>
-          <div class="mt-1 text-sm text-steel-500 dark:text-steel-400">
-            {{ plan.activeSiteLimit ? t('company.plan.limitedSites', { count: plan.activeSiteLimit }) : t('company.plan.unlimitedSites') }}
-          </div>
-        </button>
-      </div>
-
-      <p v-if="errorMessage" class="mb-4 text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
-
+    <div v-if="!loading" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
       <button
+        v-for="plan in plans"
+        :key="plan.id"
         type="button"
-        :disabled="!selectedPlanCode || submitting"
-        class="w-full rounded-md bg-blueprint-600 px-4 py-2 font-medium text-white transition hover:bg-blueprint-700 disabled:opacity-60 dark:bg-blueprint-500 dark:hover:bg-blueprint-600"
-        @click="onConfirm"
+        class="relative rounded-xl border-2 p-5 text-left transition"
+        :class="
+          selectedPlanCode === plan.code
+            ? 'border-blueprint-500 bg-blueprint-50 shadow-md dark:bg-blueprint-900/30'
+            : 'border-steel-200 hover:border-steel-300 hover:shadow-sm dark:border-steel-700 dark:hover:border-steel-600'
+        "
+        @click="selectedPlanCode = plan.code"
       >
-        {{ t('company.plan.confirm') }}
+        <span
+          v-if="selectedPlanCode === plan.code"
+          class="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-blueprint-600 text-white"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3 w-3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+        <div class="font-semibold text-steel-800 dark:text-steel-50">{{ plan.name }}</div>
+        <div class="mt-1.5 text-sm text-steel-500 dark:text-steel-400">
+          {{ plan.activeSiteLimit ? t('company.plan.limitedSites', { count: plan.activeSiteLimit }) : t('company.plan.unlimitedSites') }}
+        </div>
       </button>
     </div>
-  </div>
+
+    <p v-if="errorMessage" class="mb-4 text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
+
+    <button type="button" :disabled="!selectedPlanCode || submitting" class="btn-primary w-full py-2.5" @click="onConfirm">
+      {{ t('company.plan.confirm') }}
+    </button>
+  </AuthShell>
 </template>

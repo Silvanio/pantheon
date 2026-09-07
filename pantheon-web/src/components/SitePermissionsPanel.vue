@@ -60,7 +60,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="rounded-xl border border-steel-200 bg-white p-6 shadow-sm dark:border-steel-700 dark:bg-steel-800">
+  <section class="card card-pad">
     <h2 class="mb-1 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('sitePermissions.title') }}</h2>
     <p class="mb-4 text-sm text-steel-500 dark:text-steel-400">{{ t('sitePermissions.subtitle') }}</p>
 

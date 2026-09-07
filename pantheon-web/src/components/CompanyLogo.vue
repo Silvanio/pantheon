@@ -28,6 +28,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <img v-if="objectUrl" :src="objectUrl" class="h-8 w-8 rounded-md object-cover" alt="" />
-  <div v-else class="h-8 w-8 rounded-md bg-blueprint-600 dark:bg-blueprint-400"></div>
+  <img v-if="objectUrl" :src="objectUrl" class="h-9 w-9 rounded-lg object-cover" alt="" />
+  <div v-else class="h-9 w-9 rounded-lg bg-gradient-to-br from-blueprint-500 to-blueprint-700"></div>
 </template>

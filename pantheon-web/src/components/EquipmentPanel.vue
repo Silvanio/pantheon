@@ -59,37 +59,33 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="rounded-lg border border-steel-200 p-4 dark:border-steel-700">
-    <div class="mb-3 flex items-center justify-between">
+  <div class="card card-pad">
+    <div class="mb-4 flex items-center justify-between">
       <div>
-        <h3 class="text-sm font-semibold text-steel-800 dark:text-steel-50">{{ t('equipment.title') }}</h3>
-        <p class="text-xs text-steel-500 dark:text-steel-400">{{ t('equipment.subtitle') }}</p>
+        <h3 class="font-semibold text-steel-800 dark:text-steel-50">{{ t('equipment.title') }}</h3>
+        <p class="text-sm text-steel-500 dark:text-steel-400">{{ t('equipment.subtitle') }}</p>
       </div>
-      <button
-        type="button"
-        class="rounded-md bg-blueprint-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blueprint-700 dark:bg-blueprint-500 dark:hover:bg-blueprint-600"
-        @click="showForm = !showForm"
-      >
+      <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="showForm = !showForm">
         {{ t('equipment.newButton') }}
       </button>
     </div>
 
-    <form v-if="showForm" class="mb-3 space-y-2 rounded-md border border-steel-200 p-3 dark:border-steel-700" @submit.prevent="onSubmit">
-      <input v-model="name" type="text" required :placeholder="t('equipment.form.name')" class="w-full rounded-md border border-steel-300 bg-white px-2 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-      <input v-model="type" type="text" :placeholder="t('equipment.form.type')" class="w-full rounded-md border border-steel-300 bg-white px-2 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-      <select v-model="status" class="w-full rounded-md border border-steel-300 bg-white px-2 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+    <form v-if="showForm" class="mb-4 space-y-2 rounded-lg border border-steel-200 p-3 dark:border-steel-700" @submit.prevent="onSubmit">
+      <input v-model="name" type="text" required :placeholder="t('equipment.form.name')" class="field-input" />
+      <input v-model="type" type="text" :placeholder="t('equipment.form.type')" class="field-input" />
+      <select v-model="status" class="field-input">
         <option v-for="s in statuses" :key="s" :value="s">{{ t(`equipment.status.${s}`) }}</option>
       </select>
       <p v-if="errorMessage" class="text-xs text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
       <div class="flex gap-2">
-        <button type="submit" :disabled="submitting" class="rounded-md bg-blueprint-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-60 dark:bg-blueprint-500">{{ t('equipment.form.submit') }}</button>
-        <button type="button" class="rounded-md border border-steel-300 px-3 py-1 text-xs font-medium text-steel-600 dark:border-steel-600 dark:text-steel-300" @click="showForm = false">{{ t('equipment.form.cancel') }}</button>
+        <button type="submit" :disabled="submitting" class="btn-primary px-3 py-1.5 text-xs">{{ t('equipment.form.submit') }}</button>
+        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="showForm = false">{{ t('equipment.form.cancel') }}</button>
       </div>
     </form>
 
-    <p v-if="!loading && items.length === 0" class="text-xs text-steel-500 dark:text-steel-400">{{ t('equipment.empty') }}</p>
+    <p v-if="!loading && items.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('equipment.empty') }}</p>
     <ul v-else class="space-y-1.5">
-      <li v-for="item in items" :key="item.id" class="flex items-center justify-between rounded-md border border-steel-200 px-3 py-1.5 text-sm dark:border-steel-700">
+      <li v-for="item in items" :key="item.id" class="flex items-center justify-between rounded-lg border border-steel-200 px-3 py-2 text-sm dark:border-steel-700">
         <div>
           <span class="text-steel-800 dark:text-steel-50">{{ item.name }}</span>
           <span v-if="item.type" class="ml-1 text-steel-500 dark:text-steel-400">({{ item.type }})</span>

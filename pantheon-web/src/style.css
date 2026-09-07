@@ -42,3 +42,64 @@ html {
 body {
   @apply bg-steel-50 text-steel-800 antialiased dark:bg-steel-900 dark:text-steel-100;
 }
+
+/* Subtle technical-drawing grid, used behind auth/onboarding screens. */
+.blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(53 102 245 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(53 102 245 / 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+:root:not([data-theme='light']) .blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(140 170 255 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(140 170 255 / 0.07) 1px, transparent 1px);
+}
+
+@layer components {
+  /* Page chrome */
+  .app-header {
+    @apply sticky top-0 z-20 border-b border-steel-200/80 bg-white/85 backdrop-blur-sm dark:border-steel-800 dark:bg-steel-900/85;
+  }
+  .app-container {
+    @apply mx-auto w-full max-w-[1600px] px-6 sm:px-8 lg:px-10 xl:px-14;
+  }
+
+  /* Surfaces */
+  .card {
+    @apply rounded-2xl border border-steel-200 bg-white shadow-sm dark:border-steel-800 dark:bg-steel-800/60;
+  }
+  .card-pad {
+    @apply p-6;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 bg-blueprint-600 text-white shadow-sm hover:bg-blueprint-700 dark:bg-blueprint-500 dark:hover:bg-blueprint-600;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 border border-steel-300 bg-white text-steel-700 hover:bg-steel-50 dark:border-steel-700 dark:bg-steel-800 dark:text-steel-200 dark:hover:bg-steel-700;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 bg-safety-500 text-white hover:bg-safety-600;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-700;
+  }
+
+  /* Forms */
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-steel-600 dark:text-steel-300;
+  }
+  .field-input {
+    @apply w-full rounded-lg border border-steel-300 bg-white px-3 py-2 text-sm text-steel-800 shadow-sm transition focus:border-blueprint-500 focus:outline-none focus:ring-2 focus:ring-blueprint-500/20 dark:border-steel-700 dark:bg-steel-900 dark:text-steel-50;
+  }
+
+  /* Misc */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-amber {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200;
+  }
+}

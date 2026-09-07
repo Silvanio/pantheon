@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCompanies } from '../composables/useCompanies'
 import { useCompanyOnboarding } from '../composables/useCompanyOnboarding'
+import AuthShell from '../components/AuthShell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,48 +49,37 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-steel-50 px-4 py-8 dark:bg-steel-900">
-    <div class="w-full max-w-md rounded-xl border border-steel-200 bg-white p-8 shadow-sm dark:border-steel-700 dark:bg-steel-800">
-      <div class="mb-6 flex items-center gap-2">
-        <div class="h-8 w-8 rounded-md bg-blueprint-600 dark:bg-blueprint-400"></div>
-        <span class="text-lg font-semibold text-steel-800 dark:text-steel-50">Pantheon</span>
+  <AuthShell heading="Últimos detalhes." description="Esses dados aparecem para clientes e prestadores convidados para suas obras.">
+    <h1 class="mb-1 text-2xl font-semibold text-steel-800 dark:text-steel-50">{{ t('company.profile.title') }}</h1>
+    <p class="mb-6 text-sm text-steel-500 dark:text-steel-400">{{ t('company.profile.subtitle') }}</p>
+
+    <form class="space-y-4" @submit.prevent="onSubmit">
+      <div>
+        <label class="field-label">{{ t('company.profile.legalName') }}</label>
+        <input v-model="legalName" type="text" required class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">{{ t('company.profile.tradeName') }}</label>
+        <input v-model="tradeName" type="text" required class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">{{ t('company.profile.cnpj') }}</label>
+        <input v-model="cnpj" type="text" required class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">{{ t('company.profile.address') }}</label>
+        <input v-model="address" type="text" required class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">{{ t('company.profile.logo') }}</label>
+        <input type="file" accept="image/*" required class="w-full text-sm text-steel-600 dark:text-steel-300" @change="onLogoChange" />
       </div>
 
-      <h1 class="mb-1 text-xl font-semibold text-steel-800 dark:text-steel-50">{{ t('company.profile.title') }}</h1>
-      <p class="mb-6 text-sm text-steel-500 dark:text-steel-400">{{ t('company.profile.subtitle') }}</p>
+      <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
 
-      <form class="space-y-4" @submit.prevent="onSubmit">
-        <div>
-          <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.legalName') }}</label>
-          <input v-model="legalName" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.tradeName') }}</label>
-          <input v-model="tradeName" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.cnpj') }}</label>
-          <input v-model="cnpj" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.address') }}</label>
-          <input v-model="address" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.logo') }}</label>
-          <input type="file" accept="image/*" required class="w-full text-sm text-steel-600 dark:text-steel-300" @change="onLogoChange" />
-        </div>
-
-        <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
-
-        <button
-          type="submit"
-          :disabled="submitting"
-          class="w-full rounded-md bg-blueprint-600 px-4 py-2 font-medium text-white transition hover:bg-blueprint-700 disabled:opacity-60 dark:bg-blueprint-500 dark:hover:bg-blueprint-600"
-        >
-          {{ t('company.profile.submit') }}
-        </button>
-      </form>
-    </div>
-  </div>
+      <button type="submit" :disabled="submitting" class="btn-primary w-full py-2.5">
+        {{ t('company.profile.submit') }}
+      </button>
+    </form>
+  </AuthShell>
 </template>

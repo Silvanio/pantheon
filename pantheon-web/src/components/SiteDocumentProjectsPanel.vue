@@ -83,32 +83,28 @@ onMounted(loadProjects)
 </script>
 
 <template>
-  <section class="rounded-xl border border-steel-200 bg-white p-6 shadow-sm dark:border-steel-700 dark:bg-steel-800">
-    <div class="mb-4 flex items-center justify-between">
+  <section class="card card-pad">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('siteDocumentProjects.title') }}</h2>
         <p class="text-sm text-steel-500 dark:text-steel-400">{{ t('siteDocumentProjects.subtitle') }}</p>
       </div>
-      <button
-        type="button"
-        class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blueprint-700 dark:bg-blueprint-500"
-        @click="showForm = !showForm"
-      >
+      <button type="button" class="btn-primary" @click="showForm = !showForm">
         {{ t('siteDocumentProjects.newButton') }}
       </button>
     </div>
 
-    <form v-if="showForm" class="mb-4 space-y-3 rounded-md border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmit">
+    <form v-if="showForm" class="mb-5 space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmit">
       <div>
-        <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('siteDocumentProjects.form.name') }}</label>
-        <input v-model="name" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
+        <label class="field-label">{{ t('siteDocumentProjects.form.name') }}</label>
+        <input v-model="name" type="text" required class="field-input" />
       </div>
       <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
       <div class="flex gap-2">
-        <button type="submit" :disabled="submitting" class="rounded-md bg-blueprint-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-blueprint-500">
+        <button type="submit" :disabled="submitting" class="btn-primary">
           {{ t('siteDocumentProjects.form.submit') }}
         </button>
-        <button type="button" class="rounded-md border border-steel-300 px-4 py-2 text-sm font-medium text-steel-600 dark:border-steel-600 dark:text-steel-300" @click="showForm = false">
+        <button type="button" class="btn-secondary" @click="showForm = false">
           {{ t('siteDocumentProjects.form.cancel') }}
         </button>
       </div>
@@ -116,7 +112,7 @@ onMounted(loadProjects)
 
     <p v-if="!loading && projects.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('siteDocumentProjects.empty') }}</p>
     <ul v-else class="space-y-2">
-      <li v-for="project in projects" :key="project.id" class="rounded-md border border-steel-200 dark:border-steel-700">
+      <li v-for="project in projects" :key="project.id" class="rounded-lg border border-steel-200 dark:border-steel-700">
         <button type="button" class="flex w-full items-center justify-between px-4 py-3 text-left" @click="toggleProject(project.id)">
           <span class="font-medium text-steel-800 dark:text-steel-50">{{ project.name }}</span>
           <span class="text-xs text-steel-500 dark:text-steel-400">{{ project.createdAt.slice(0, 10) }}</span>

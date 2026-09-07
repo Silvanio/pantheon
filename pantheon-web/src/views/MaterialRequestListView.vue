@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useMaterialRequests, type MaterialRequest, type MaterialRequestStatus } from '../composables/useMaterialRequests'
 import { useEquipmentMaterials, type MaterialItem } from '../composables/useEquipmentMaterials'
+import AppHeader from '../components/AppHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,39 +62,42 @@ onMounted(async () => {
   materialCatalog.value = await listMaterials(siteId)
   await load()
 })
+
+const statusBadgeClass: Record<MaterialRequestStatus, string> = {
+  PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+  APPROVED: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
+  REJECTED: 'bg-safety-500/10 text-safety-600 dark:text-safety-500',
+  PARTIALLY_RECEIVED: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
+  RECEIVED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
-    <header class="border-b border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-800">
-      <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.push(`/sites/${siteId}`)">
-          ← {{ t('materialRequests.list.back') }}
+    <AppHeader>
+      <template #left>
+        <button type="button" class="btn-ghost -ml-2" @click="router.push(`/sites/${siteId}`)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+          </svg>
+          {{ t('materialRequests.list.back') }}
         </button>
-      </div>
-    </header>
-    <main class="mx-auto max-w-4xl space-y-6 px-6 py-8">
-      <div class="flex items-center justify-between">
+      </template>
+    </AppHeader>
+    <main class="app-container max-w-5xl! space-y-6 py-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-semibold text-steel-800 dark:text-steel-50">{{ t('materialRequests.list.title') }}</h1>
-          <p class="mt-1 text-steel-500 dark:text-steel-400">{{ t('materialRequests.list.subtitle') }}</p>
+          <h1 class="text-3xl font-semibold tracking-tight text-steel-800 dark:text-steel-50">{{ t('materialRequests.list.title') }}</h1>
+          <p class="mt-1.5 text-steel-500 dark:text-steel-400">{{ t('materialRequests.list.subtitle') }}</p>
         </div>
-        <button
-          type="button"
-          class="rounded-md bg-blueprint-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blueprint-700 dark:bg-blueprint-500 dark:hover:bg-blueprint-600"
-          @click="showForm = !showForm"
-        >
+        <button type="button" class="btn-primary" @click="showForm = !showForm">
           {{ t('materialRequests.list.newButton') }}
         </button>
       </div>
 
-      <form
-        v-if="showForm"
-        class="space-y-3 rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800"
-        @submit.prevent="onSubmit"
-      >
+      <form v-if="showForm" class="card card-pad space-y-3" @submit.prevent="onSubmit">
         <div v-for="(item, index) in items" :key="index" class="flex flex-wrap items-end gap-2">
-          <select v-model="item.materialId" required class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+          <select v-model="item.materialId" required class="field-input flex-1">
             <option value="" disabled>{{ t('materialRequests.form.material') }}</option>
             <option v-for="m in materialCatalog" :key="m.id" :value="m.id">{{ m.name }} ({{ m.unit }})</option>
           </select>
@@ -104,7 +108,7 @@ onMounted(async () => {
             min="0"
             required
             :placeholder="t('materialRequests.form.quantity')"
-            class="w-32 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50"
+            class="field-input w-32"
           />
           <button
             v-if="items.length > 1"
@@ -120,10 +124,10 @@ onMounted(async () => {
         </button>
         <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
         <div class="flex gap-2">
-          <button type="submit" :disabled="submitting" class="rounded-md bg-blueprint-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-blueprint-500">
+          <button type="submit" :disabled="submitting" class="btn-primary">
             {{ t('materialRequests.form.submit') }}
           </button>
-          <button type="button" class="rounded-md border border-steel-300 px-4 py-2 text-sm font-medium text-steel-600 dark:border-steel-600 dark:text-steel-300" @click="showForm = false">
+          <button type="button" class="btn-secondary" @click="showForm = false">
             {{ t('materialRequests.form.cancel') }}
           </button>
         </div>
@@ -131,7 +135,7 @@ onMounted(async () => {
 
       <div class="flex items-center gap-2">
         <label class="text-sm text-steel-600 dark:text-steel-300">{{ t('materialRequests.list.filterLabel') }}</label>
-        <select v-model="statusFilter" class="rounded-md border border-steel-300 bg-white px-2 py-1 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" @change="load">
+        <select v-model="statusFilter" class="field-input w-auto py-1.5" @change="load">
           <option value="">{{ t('materialRequests.list.filterAll') }}</option>
           <option v-for="s in statuses" :key="s" :value="s">{{ t(`materialRequests.status.${s}`) }}</option>
         </select>
@@ -140,14 +144,11 @@ onMounted(async () => {
       <p v-if="!loading && requests.length === 0" class="text-sm text-steel-500 dark:text-steel-400">
         {{ t('materialRequests.list.empty') }}
       </p>
-      <ul v-else class="space-y-2">
+      <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <li v-for="request in requests" :key="request.id">
-          <router-link
-            :to="{ path: `/material-requests/${request.id}` }"
-            class="flex items-center justify-between rounded-md border border-steel-200 bg-white px-4 py-3 transition hover:bg-steel-50 dark:border-steel-700 dark:bg-steel-800 dark:hover:bg-steel-700"
-          >
+          <router-link :to="{ path: `/material-requests/${request.id}` }" class="card flex items-center justify-between px-4 py-3.5 transition hover:shadow-md">
             <span class="font-medium text-steel-800 dark:text-steel-50">{{ t('materialRequests.list.requestLabel') }} #{{ request.id.slice(0, 8) }}</span>
-            <span class="text-sm text-steel-500 dark:text-steel-400">{{ t(`materialRequests.status.${request.status}`) }}</span>
+            <span class="badge" :class="statusBadgeClass[request.status]">{{ t(`materialRequests.status.${request.status}`) }}</span>
           </router-link>
         </li>
       </ul>

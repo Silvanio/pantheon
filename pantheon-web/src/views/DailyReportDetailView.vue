@@ -13,6 +13,7 @@ import {
 } from '../composables/useDailyReports'
 import { useEquipmentMaterials, type Equipment, type MaterialItem } from '../composables/useEquipmentMaterials'
 import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
+import AppHeader from '../components/AppHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -346,15 +347,18 @@ onMounted(load)
 
 <template>
   <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
-    <header class="border-b border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-800">
-      <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.back()">
-          ← {{ t('dailyReports.history.back') }}
+    <AppHeader>
+      <template #left>
+        <button type="button" class="btn-ghost -ml-2" @click="router.back()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+          </svg>
+          {{ t('dailyReports.history.back') }}
         </button>
-      </div>
-    </header>
+      </template>
+    </AppHeader>
 
-    <main v-if="detail" class="mx-auto max-w-4xl space-y-6 px-6 py-8">
+    <main v-if="detail" class="app-container max-w-5xl! space-y-6 py-8">
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-semibold text-steel-800 dark:text-steel-50">
@@ -366,7 +370,7 @@ onMounted(load)
           <button
             type="button"
             :disabled="downloadingPdf"
-            class="rounded-md border border-steel-300 px-4 py-2 text-sm font-medium text-steel-600 transition hover:bg-steel-100 disabled:opacity-60 dark:border-steel-600 dark:text-steel-300 dark:hover:bg-steel-700"
+            class="btn-secondary"
             @click="onDownloadPdf"
           >
             {{ t('dailyReports.pdf.downloadButton') }}
@@ -375,7 +379,7 @@ onMounted(load)
             v-if="isDraft"
             type="button"
             :disabled="submitting"
-            class="rounded-md bg-safety-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-safety-600 disabled:opacity-60"
+            class="btn-danger"
             @click="onSubmitReport"
           >
             {{ t('dailyReports.detail.submitButton') }}
@@ -389,13 +393,13 @@ onMounted(load)
       <p v-if="pdfError" class="text-sm text-safety-600 dark:text-safety-500">{{ pdfError }}</p>
 
       <!-- Core: weather, hours, comments -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.core.title') }}</h2>
         <template v-if="isDraft">
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.weatherCondition') }}</label>
-              <input v-model="weatherCondition" type="text" :placeholder="t('dailyReports.core.weatherConditionPlaceholder')" class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
+              <input v-model="weatherCondition" type="text" :placeholder="t('dailyReports.core.weatherConditionPlaceholder')" class="field-input" />
             </div>
             <div class="flex items-end">
               <label class="flex items-center gap-2 text-sm text-steel-600 dark:text-steel-300">
@@ -405,19 +409,19 @@ onMounted(load)
             </div>
             <div>
               <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursStart') }}</label>
-              <input v-model="workHoursStart" type="time" class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
+              <input v-model="workHoursStart" type="time" class="field-input" />
             </div>
             <div>
               <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursEnd') }}</label>
-              <input v-model="workHoursEnd" type="time" class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
+              <input v-model="workHoursEnd" type="time" class="field-input" />
             </div>
           </div>
           <div class="mt-3">
             <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.comments') }}</label>
-            <textarea v-model="comments" rows="3" class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50"></textarea>
+            <textarea v-model="comments" rows="3" class="field-input"></textarea>
           </div>
           <p v-if="coreErrorMessage" class="mt-2 text-sm text-safety-600 dark:text-safety-500">{{ coreErrorMessage }}</p>
-          <button type="button" :disabled="coreSaving" class="mt-3 rounded-md bg-blueprint-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-blueprint-500" @click="onSaveCore">
+          <button type="button" :disabled="coreSaving" class="btn-primary mt-3" @click="onSaveCore">
             {{ t('dailyReports.core.save') }}
           </button>
         </template>
@@ -429,7 +433,7 @@ onMounted(load)
       </section>
 
       <!-- Workforce -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.workforce.title') }}</h2>
         <p v-if="detail.workforceEntries.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.workforce.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -439,7 +443,7 @@ onMounted(load)
           </li>
         </ul>
         <form v-if="isDraft" class="flex flex-wrap items-end gap-2" @submit.prevent="onAddWorkforce">
-          <select v-if="siteMembers.length > 0" v-model="selectedMembershipId" class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+          <select v-if="siteMembers.length > 0" v-model="selectedMembershipId" class="field-input">
             <option value="">{{ t('dailyReports.workforce.noMember') }}</option>
             <option v-for="member in siteMembers" :key="member.membershipId" :value="member.membershipId">{{ member.displayName }}</option>
           </select>
@@ -448,16 +452,16 @@ onMounted(load)
             type="text"
             :required="!selectedMembershipId"
             :placeholder="t('dailyReports.workforce.roleDescriptionPlaceholder')"
-            class="flex-1 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50"
+            class="field-input flex-1"
           />
-          <input v-model.number="headcount" type="number" min="1" required class="w-24 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.workforce.addButton') }}</button>
+          <input v-model.number="headcount" type="number" min="1" required class="field-input w-24" />
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.workforce.addButton') }}</button>
         </form>
         <p v-if="workforceError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ workforceError }}</p>
       </section>
 
       <!-- Equipment usage -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.equipmentUsage.title') }}</h2>
         <p v-if="detail.equipmentUsage.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.equipmentUsage.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -467,18 +471,18 @@ onMounted(load)
           </li>
         </ul>
         <form v-if="isDraft" class="flex flex-wrap items-end gap-2" @submit.prevent="onAddEquipmentUsage">
-          <select v-model="selectedEquipmentId" required class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+          <select v-model="selectedEquipmentId" required class="field-input">
             <option value="" disabled>{{ t('dailyReports.equipmentUsage.equipment') }}</option>
             <option v-for="eq in equipmentCatalog" :key="eq.id" :value="eq.id">{{ eq.name }}</option>
           </select>
-          <input v-model="equipmentStatusNote" type="text" :placeholder="t('dailyReports.equipmentUsage.statusNotePlaceholder')" class="flex-1 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.equipmentUsage.addButton') }}</button>
+          <input v-model="equipmentStatusNote" type="text" :placeholder="t('dailyReports.equipmentUsage.statusNotePlaceholder')" class="field-input flex-1" />
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.equipmentUsage.addButton') }}</button>
         </form>
         <p v-if="equipmentUsageError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ equipmentUsageError }}</p>
       </section>
 
       <!-- Activities -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.activities.title') }}</h2>
         <p v-if="detail.activities.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.activities.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -492,20 +496,20 @@ onMounted(load)
         </ul>
         <form v-if="isDraft" class="space-y-2" @submit.prevent="onAddActivity">
           <div class="flex flex-wrap gap-2">
-            <input v-model="activityDescription" type="text" required :placeholder="t('dailyReports.activities.description')" class="flex-1 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-            <input v-model="activityProgressNote" type="text" required :placeholder="t('dailyReports.activities.progressNotePlaceholder')" class="w-40 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-            <select v-model="activityStatus" class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+            <input v-model="activityDescription" type="text" required :placeholder="t('dailyReports.activities.description')" class="field-input flex-1" />
+            <input v-model="activityProgressNote" type="text" required :placeholder="t('dailyReports.activities.progressNotePlaceholder')" class="field-input w-40" />
+            <select v-model="activityStatus" class="field-input">
               <option value="IN_PROGRESS">{{ t('dailyReports.activities.statusOptions.IN_PROGRESS') }}</option>
               <option value="COMPLETED">{{ t('dailyReports.activities.statusOptions.COMPLETED') }}</option>
             </select>
           </div>
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.activities.addButton') }}</button>
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.activities.addButton') }}</button>
         </form>
         <p v-if="activityError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ activityError }}</p>
       </section>
 
       <!-- Occurrences -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.occurrences.title') }}</h2>
         <p v-if="detail.occurrences.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.occurrences.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -514,14 +518,14 @@ onMounted(load)
           </li>
         </ul>
         <form v-if="isDraft" class="flex flex-wrap items-end gap-2" @submit.prevent="onAddOccurrence">
-          <input v-model="occurrenceDescription" type="text" required :placeholder="t('dailyReports.occurrences.description')" class="flex-1 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.occurrences.addButton') }}</button>
+          <input v-model="occurrenceDescription" type="text" required :placeholder="t('dailyReports.occurrences.description')" class="field-input flex-1" />
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.occurrences.addButton') }}</button>
         </form>
         <p v-if="occurrenceError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ occurrenceError }}</p>
       </section>
 
       <!-- Materials received -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.materialsReceived.title') }}</h2>
         <p v-if="detail.materialsReceived.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.materialsReceived.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -531,18 +535,18 @@ onMounted(load)
           </li>
         </ul>
         <form v-if="isDraft" class="flex flex-wrap items-end gap-2" @submit.prevent="onAddMaterialReceived">
-          <select v-model="selectedMaterialId" required class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+          <select v-model="selectedMaterialId" required class="field-input">
             <option value="" disabled>{{ t('dailyReports.materialsReceived.material') }}</option>
             <option v-for="m in materialCatalog" :key="m.id" :value="m.id">{{ m.name }} ({{ m.unit }})</option>
           </select>
-          <input v-model="materialQuantity" type="number" step="0.001" min="0" required :placeholder="t('dailyReports.materialsReceived.quantity')" class="w-32 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.materialsReceived.addButton') }}</button>
+          <input v-model="materialQuantity" type="number" step="0.001" min="0" required :placeholder="t('dailyReports.materialsReceived.quantity')" class="field-input w-32" />
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.materialsReceived.addButton') }}</button>
         </form>
         <p v-if="materialReceivedError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ materialReceivedError }}</p>
       </section>
 
       <!-- Media -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.media.title') }}</h2>
         <p v-if="media.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.media.empty') }}</p>
         <div v-else class="mb-3 flex flex-wrap gap-3">
@@ -555,19 +559,19 @@ onMounted(load)
           </div>
         </div>
         <form class="flex flex-wrap items-end gap-2" @submit.prevent="onUploadMedia">
-          <select v-model="mediaType" class="rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50">
+          <select v-model="mediaType" class="field-input">
             <option value="PHOTO">{{ t('dailyReports.media.photoLabel') }}</option>
             <option value="VIDEO">{{ t('dailyReports.media.videoLabel') }}</option>
           </select>
           <input type="file" accept="image/*,video/*" required @change="onMediaFileChange" class="text-sm text-steel-600 dark:text-steel-300" />
-          <input v-model="mediaCaption" type="text" :placeholder="t('dailyReports.media.captionPlaceholder')" class="flex-1 rounded-md border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.media.uploadButton') }}</button>
+          <input v-model="mediaCaption" type="text" :placeholder="t('dailyReports.media.captionPlaceholder')" class="field-input flex-1" />
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.media.uploadButton') }}</button>
         </form>
         <p v-if="mediaError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ mediaError }}</p>
       </section>
 
       <!-- Attachments -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.attachments.title') }}</h2>
         <p v-if="attachments.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.attachments.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -580,13 +584,13 @@ onMounted(load)
         </ul>
         <form class="flex flex-wrap items-end gap-2" @submit.prevent="onUploadAttachment">
           <input type="file" required @change="onAttachmentFileChange" class="text-sm text-steel-600 dark:text-steel-300" />
-          <button type="submit" class="rounded-md bg-blueprint-600 px-3 py-1.5 text-sm font-medium text-white dark:bg-blueprint-500">{{ t('dailyReports.attachments.uploadButton') }}</button>
+          <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.attachments.uploadButton') }}</button>
         </form>
         <p v-if="attachmentError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ attachmentError }}</p>
       </section>
 
       <!-- Signatures -->
-      <section class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.signatures.title') }}</h2>
         <p v-if="signatures.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.signatures.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
@@ -607,7 +611,7 @@ onMounted(load)
           v-else
           type="button"
           :disabled="signing"
-          class="rounded-md bg-blueprint-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blueprint-700 disabled:opacity-60 dark:bg-blueprint-500 dark:hover:bg-blueprint-600"
+          class="btn-primary"
           @click="onSign"
         >
           {{ t('dailyReports.signatures.signButton') }}
@@ -617,6 +621,6 @@ onMounted(load)
       </section>
     </main>
 
-    <p v-else-if="loadError" class="mx-auto max-w-4xl px-6 py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
+    <p v-else-if="loadError" class="app-container max-w-5xl! py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
   </div>
 </template>

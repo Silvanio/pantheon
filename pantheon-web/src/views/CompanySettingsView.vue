@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCompanies } from '../composables/useCompanies'
 import CompanyStaffPanel from '../components/CompanyStaffPanel.vue'
+import AppHeader from '../components/AppHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,55 +57,57 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
-    <header class="border-b border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-800">
-      <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-        <button type="button" class="text-sm text-blueprint-600 dark:text-blueprint-400" @click="router.push('/')">
-          ← {{ t('company.settings.back') }}
+    <AppHeader>
+      <template #left>
+        <button type="button" class="btn-ghost -ml-2" @click="router.push('/')">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+          </svg>
+          {{ t('company.settings.back') }}
         </button>
-      </div>
-    </header>
+      </template>
+    </AppHeader>
 
-    <main class="mx-auto max-w-4xl space-y-6 px-6 py-8">
-      <h1 class="text-2xl font-semibold text-steel-800 dark:text-steel-50">{{ t('company.settings.title') }}</h1>
+    <main class="app-container max-w-4xl! space-y-6 py-8">
+      <h1 class="text-3xl font-semibold tracking-tight text-steel-800 dark:text-steel-50">{{ t('company.settings.title') }}</h1>
 
-      <section class="rounded-xl border border-steel-200 bg-white p-6 shadow-sm dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('company.profile.title') }}</h2>
         <form class="space-y-4" @submit.prevent="onSubmit">
-          <div>
-            <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.legalName') }}</label>
-            <input v-model="legalName" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label class="field-label">{{ t('company.profile.legalName') }}</label>
+              <input v-model="legalName" type="text" required class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">{{ t('company.profile.tradeName') }}</label>
+              <input v-model="tradeName" type="text" required class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">{{ t('company.profile.cnpj') }}</label>
+              <input v-model="cnpj" type="text" required class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">{{ t('company.profile.address') }}</label>
+              <input v-model="address" type="text" required class="field-input" />
+            </div>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.tradeName') }}</label>
-            <input v-model="tradeName" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.cnpj') }}</label>
-            <input v-model="cnpj" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.profile.address') }}</label>
-            <input v-model="address" type="text" required class="w-full rounded-md border border-steel-300 bg-white px-3 py-2 text-steel-800 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-50" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('company.settings.newLogo') }}</label>
+            <label class="field-label">{{ t('company.settings.newLogo') }}</label>
             <input type="file" accept="image/*" class="w-full text-sm text-steel-600 dark:text-steel-300" @change="onLogoChange" />
           </div>
           <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
           <p v-if="successMessage" class="text-sm text-blueprint-600 dark:text-blueprint-400">{{ successMessage }}</p>
-          <button type="submit" :disabled="submitting" class="rounded-md bg-blueprint-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-blueprint-500">
+          <button type="submit" :disabled="submitting" class="btn-primary">
             {{ t('company.profile.submit') }}
           </button>
         </form>
       </section>
 
-      <section class="rounded-xl border border-steel-200 bg-white p-6 shadow-sm dark:border-steel-700 dark:bg-steel-800">
+      <section class="card card-pad">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('company.plan.title') }}</h2>
-          <router-link
-            :to="`/companies/${companyId}/plan`"
-            class="rounded-md border border-steel-300 px-3 py-1.5 text-sm font-medium text-steel-600 transition hover:bg-steel-100 dark:border-steel-600 dark:text-steel-300 dark:hover:bg-steel-700"
-          >
+          <router-link :to="`/companies/${companyId}/plan`" class="btn-secondary py-1.5">
             {{ t('company.settings.changePlan') }}
           </router-link>
         </div>

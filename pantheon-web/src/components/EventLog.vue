@@ -8,7 +8,7 @@ onMounted(connect)
 </script>
 
 <template>
-  <div class="rounded-xl border border-steel-200 bg-white p-6 dark:border-steel-700 dark:bg-steel-800">
+  <div class="card card-pad">
     <div class="mb-4 flex items-center justify-between">
       <h2 class="text-sm font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
         Eventos em tempo real

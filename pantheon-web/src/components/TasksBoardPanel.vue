@@ -47,6 +47,7 @@ const newCommentBody = ref('')
 const postingComment = ref(false)
 const newLabelName = ref('')
 const newLabelColor = ref(LABEL_COLORS[0])
+const confirmingDelete = ref(false)
 
 const sortedColumns = computed(() => [...board.value.columns].sort((a, b) => a.sortOrder - b.sortOrder))
 const companyId = computed(() => board.value.columns[0]?.companyId ?? null)
@@ -158,6 +159,7 @@ function closeCard() {
   selectedCard.value = null
   comments.value = []
   newCommentBody.value = ''
+  confirmingDelete.value = false
 }
 
 async function refreshSelectedCard() {
@@ -251,9 +253,8 @@ async function onAddComment() {
   }
 }
 
-async function onDeleteCard() {
+async function onConfirmDeleteCard() {
   if (!selectedCard.value) return
-  if (!window.confirm(t('tasks.deleteCardConfirm'))) return
   errorMessage.value = ''
   try {
     await deleteCard(selectedCard.value.id)
@@ -261,6 +262,7 @@ async function onDeleteCard() {
     await load()
   } catch {
     errorMessage.value = t('tasks.error')
+    confirmingDelete.value = false
   }
 }
 
@@ -470,8 +472,19 @@ onMounted(load)
           </form>
         </div>
 
-        <div class="border-t border-steel-100 pt-3 dark:border-steel-800">
-          <button type="button" class="btn-danger py-1 text-xs" @click="onDeleteCard">{{ t('tasks.deleteCard') }}</button>
+        <div class="relative border-t border-steel-100 pt-3 dark:border-steel-800">
+          <button type="button" class="btn-danger py-1 text-xs" @click="confirmingDelete = true">{{ t('tasks.deleteCard') }}</button>
+
+          <div
+            v-if="confirmingDelete"
+            class="modal-panel absolute bottom-full left-0 z-10 mb-2 w-64 p-3 shadow-lg"
+          >
+            <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('tasks.deleteCardConfirm') }}</p>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDelete = false">{{ t('tasks.cancel') }}</button>
+              <button type="button" class="btn-danger py-1 text-xs" @click="onConfirmDeleteCard">{{ t('tasks.deleteCard') }}</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

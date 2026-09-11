@@ -10,6 +10,7 @@ import EventLog from '../components/EventLog.vue'
 import CompanyLogo from '../components/CompanyLogo.vue'
 import SitePhoto from '../components/SitePhoto.vue'
 import AppHeader from '../components/AppHeader.vue'
+import { vDatePicker } from '../lib/datePicker'
 import BrandMark from '../components/BrandMark.vue'
 
 const router = useRouter()
@@ -165,11 +166,11 @@ onMounted(loadSites)
           </div>
           <div>
             <label class="field-label">{{ t('constructionSites.form.startDate') }}</label>
-            <input v-model="startDate" type="date" required class="field-input" />
+            <input v-model="startDate" v-date-picker type="date" required class="field-input" />
           </div>
           <div>
             <label class="field-label">{{ t('constructionSites.form.expectedEndDate') }}</label>
-            <input v-model="expectedEndDate" type="date" class="field-input" />
+            <input v-model="expectedEndDate" v-date-picker type="date" class="field-input" />
           </div>
         </div>
         <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>

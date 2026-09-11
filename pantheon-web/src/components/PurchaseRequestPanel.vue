@@ -6,6 +6,7 @@ import {
   type PurchaseRequest,
   type PurchaseRequestItemCreationData,
 } from '../composables/usePurchaseRequests'
+import { vDatePicker } from '../lib/datePicker'
 
 const props = defineProps<{ siteId: string }>()
 
@@ -114,7 +115,7 @@ onMounted(load)
     <div class="mb-4 flex flex-wrap items-end gap-3">
       <div>
         <label class="field-label">{{ t('purchaseRequests.dateFilterLabel') }}</label>
-        <input v-model="dateFilter" type="date" class="field-input" />
+        <input v-model="dateFilter" v-date-picker type="date" class="field-input" />
       </div>
       <button v-if="dateFilter" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="dateFilter = ''">
         {{ t('purchaseRequests.clearFilterButton') }}

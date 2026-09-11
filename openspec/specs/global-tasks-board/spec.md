@@ -1,7 +1,7 @@
 # global-tasks-board Specification
 
 ## Purpose
-TBD - created by syncing change add-obra-tasks-board. Update Purpose after archive.
+Defines the company-admin-only board that aggregates every obra's Tasks cards into one read-only view, color-coded by obra.
 
 ## Requirements
 ### Requirement: Admin-only aggregated board
@@ -25,6 +25,13 @@ TBD - created by syncing change add-obra-tasks-board. Update Purpose after archi
 #### Scenario: Cards from different obras are visually distinguishable
 - **WHEN** the global task board includes cards from more than one obra
 - **THEN** each card is annotated with its obra's name and derived color
+
+### Requirement: Labels and due date visible on the aggregated board
+`pantheon-service` SHALL include each card's label ids and due date in the aggregated board response, alongside a catalog of the labels needed to render them; `pantheon-web` SHALL render each card's labels and due date on the aggregated board the same way they render on that card's per-obra board.
+
+#### Scenario: Aggregated board shows a card's labels and due date
+- **WHEN** a company member with role `ADMIN` requests the company's global task board and a card has labels or a due date
+- **THEN** `pantheon-web` shows that card's labels and due date on the aggregated board
 
 ### Requirement: Dashboard shortcut for admins
 `pantheon-web` SHALL show a shortcut to the global Tasks board on the dashboard only to users whose active company membership role is `ADMIN`.

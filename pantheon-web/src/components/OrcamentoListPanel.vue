@@ -6,6 +6,7 @@ import { useOrcamentos, type Orcamento } from '../composables/useOrcamentos'
 import { usePurchaseRequests, type PurchaseRequest } from '../composables/usePurchaseRequests'
 import type { FornecedorInput } from '../composables/useFornecedores'
 import FornecedorPicker from './FornecedorPicker.vue'
+import { vDatePicker } from '../lib/datePicker'
 
 const props = defineProps<{ siteId: string }>()
 
@@ -89,7 +90,7 @@ onMounted(async () => {
     <div class="mb-5 flex flex-wrap items-end gap-3">
       <div>
         <label class="field-label">{{ t('orcamento.dateFilterLabel') }}</label>
-        <input v-model="dateFilter" type="date" class="field-input" />
+        <input v-model="dateFilter" v-date-picker type="date" class="field-input" />
       </div>
       <div>
         <label class="field-label">{{ t('orcamento.purchaseRequestFilterLabel') }}</label>

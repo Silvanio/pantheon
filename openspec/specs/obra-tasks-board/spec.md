@@ -51,7 +51,7 @@ Defines the per-obra Tasks board: a Trello-like board of cards placed into the c
 - **THEN** `pantheon-service` returns the existing comments
 
 ### Requirement: Card due date
-`pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` to set or clear a `TaskCard`'s due date (an optional, day-granularity date with no associated time), both at creation and afterward; `pantheon-web` SHALL display a card's due date on its face on the board when set.
+`pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` to set or clear a `TaskCard`'s due date (an optional, day-granularity date with no associated time), both at creation and afterward; `pantheon-web` SHALL display a card's due date on its face on the board when set, rendered in a distinct color once the due date has been reached or passed.
 
 #### Scenario: Member sets a due date at creation
 - **WHEN** a member with `MANAGE` access to `TASKS` creates a card with a due date
@@ -68,6 +68,10 @@ Defines the per-obra Tasks board: a Trello-like board of cards placed into the c
 #### Scenario: Card has no due date
 - **WHEN** a card has no due date set
 - **THEN** `pantheon-web` shows the card without a due date indicator
+
+#### Scenario: Due date reached or passed is visually flagged
+- **WHEN** a card's due date is today or earlier
+- **THEN** `pantheon-web` renders that card's due date in a distinct color from a card whose due date is still in the future
 
 ### Requirement: Labels visible on the card face
 `pantheon-web` SHALL render each card's attached labels on the card face on the board, showing each label's name and color, without requiring the card's detail modal to be opened.

@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTaskCards, type TaskBoard, type TaskCard, type TaskComment, type TaskLabel } from '../composables/useTaskCards'
+import { vDatePicker } from '../lib/datePicker'
 
 const props = defineProps<{ siteId: string }>()
 
@@ -55,6 +56,11 @@ function labelById(id: string): TaskLabel | undefined {
 function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-')
   return `${day}/${month}/${year}`
+}
+
+function isDueOrOverdue(isoDate: string): boolean {
+  const todayIso = new Date().toISOString().slice(0, 10)
+  return isoDate <= todayIso
 }
 
 async function load() {
@@ -233,28 +239,42 @@ onMounted(load)
               <span
                 v-for="labelId in card.labelIds"
                 :key="labelId"
-                class="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+                class="rounded-full px-2.5 py-1 text-xs font-medium text-white"
                 :style="{ backgroundColor: labelById(labelId)?.colorHex }"
               >
                 {{ labelById(labelId)?.name }}
               </span>
             </div>
 
-            <p v-if="card.dueDate" class="mt-2 text-xs text-steel-500 dark:text-steel-400">
+            <p
+              v-if="card.dueDate"
+              class="mt-2 text-xs font-medium"
+              :class="isDueOrOverdue(card.dueDate) ? 'text-safety-600 dark:text-safety-500' : 'text-steel-500 dark:text-steel-400'"
+            >
               {{ t('tasks.dueDateIcon') }} {{ formatDate(card.dueDate) }}
             </p>
 
             <div class="mt-3 border-t border-steel-100 pt-2 dark:border-steel-800">
               <button
                 type="button"
-                class="flex w-full items-center justify-between text-xs text-steel-500 hover:text-steel-700 dark:text-steel-400 dark:hover:text-steel-200"
+                class="flex w-full items-center justify-between text-sm text-steel-500 hover:text-steel-700 dark:text-steel-400 dark:hover:text-steel-200"
                 @click.stop="toggleComments(card)"
               >
                 <span>
                   {{ t('tasks.comments') }}
                   <span v-if="commentsByCard[card.id]">({{ commentsByCard[card.id].length }})</span>
                 </span>
-                <span>{{ expandedCardId === card.id ? '▾' : '▸' }}</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  class="h-4 w-4 shrink-0 transition-transform"
+                  :class="expandedCardId === card.id ? 'rotate-180' : ''"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+                </svg>
               </button>
 
               <div v-if="expandedCardId === card.id" class="mt-2 space-y-2" @click.stop>
@@ -294,7 +314,13 @@ onMounted(load)
             class="field-input w-full text-sm"
             autofocus
           />
-          <input v-model="newCardDueDate" type="date" :aria-label="t('tasks.dueDate')" class="field-input w-full text-sm" />
+          <input
+            v-model="newCardDueDate"
+            v-date-picker
+            type="date"
+            :aria-label="t('tasks.dueDate')"
+            class="field-input w-full text-sm"
+          />
           <div class="flex gap-2">
             <button type="submit" :disabled="creatingCard" class="btn-primary py-1 text-xs">{{ t('tasks.addCard') }}</button>
             <button type="button" class="btn-secondary py-1 text-xs" @click="newCardOpenFor = null">{{ t('tasks.cancel') }}</button>
@@ -315,7 +341,13 @@ onMounted(load)
 
         <div class="mb-4">
           <label class="field-label mb-1 block">{{ t('tasks.dueDate') }}</label>
-          <input type="date" class="field-input text-sm" :value="selectedCard.dueDate ?? ''" @change="onChangeDueDate" />
+          <input
+            type="date"
+            v-date-picker
+            class="field-input text-sm"
+            :value="selectedCard.dueDate ?? ''"
+            @change="onChangeDueDate"
+          />
         </div>
 
         <div>

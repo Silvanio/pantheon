@@ -1,6 +1,7 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 import type { TaskColumn } from './useTaskColumns'
+import type { TaskLabel } from './useTaskCards'
 
 export interface GlobalTaskCard {
   id: string
@@ -10,6 +11,7 @@ export interface GlobalTaskCard {
   columnId: string
   title: string
   description: string | null
+  dueDate: string | null
   sortOrder: number
   labelIds: string[]
   createdBy: string
@@ -20,6 +22,7 @@ export interface GlobalTaskCard {
 export interface GlobalTaskBoard {
   columns: TaskColumn[]
   cards: GlobalTaskCard[]
+  labels: TaskLabel[]
 }
 
 async function authFetch<T>(path: string): Promise<T> {

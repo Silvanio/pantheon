@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TaskLabelRepository extends JpaRepository<TaskLabel, UUID> {
 
     List<TaskLabel> findByConstructionSiteIdOrderByNameAsc(UUID constructionSiteId);
+
+    List<TaskLabel> findByConstructionSiteIdIn(List<UUID> constructionSiteIds);
 }

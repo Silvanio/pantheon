@@ -6,12 +6,14 @@ import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.TaskCard;
 import com.pantheon.service.entity.TaskCardLabel;
 import com.pantheon.service.entity.TaskColumn;
+import com.pantheon.service.entity.TaskLabel;
 import com.pantheon.service.exception.NotCompanyAdminException;
 import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.TaskCardLabelRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskColumnRepository;
+import com.pantheon.service.repository.TaskLabelRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,16 +38,18 @@ public class GlobalTaskBoardService {
     private final TaskColumnRepository columnRepository;
     private final TaskCardRepository cardRepository;
     private final TaskCardLabelRepository cardLabelRepository;
+    private final TaskLabelRepository labelRepository;
     private final CompanyMembershipRepository membershipRepository;
 
     public GlobalTaskBoardService(
             ConstructionSiteRepository siteRepository, TaskColumnRepository columnRepository,
             TaskCardRepository cardRepository, TaskCardLabelRepository cardLabelRepository,
-            CompanyMembershipRepository membershipRepository) {
+            TaskLabelRepository labelRepository, CompanyMembershipRepository membershipRepository) {
         this.siteRepository = siteRepository;
         this.columnRepository = columnRepository;
         this.cardRepository = cardRepository;
         this.cardLabelRepository = cardLabelRepository;
+        this.labelRepository = labelRepository;
         this.membershipRepository = membershipRepository;
     }
 
@@ -64,7 +68,9 @@ public class GlobalTaskBoardService {
         Map<UUID, List<UUID>> labelIdsByCard = cardLabelRepository.findByCardIdIn(cardIds).stream()
                 .collect(Collectors.groupingBy(TaskCardLabel::getCardId, Collectors.mapping(TaskCardLabel::getLabelId, Collectors.toList())));
 
-        return new GlobalTaskBoard(columns, cards, siteById, labelIdsByCard);
+        List<TaskLabel> labels = labelRepository.findByConstructionSiteIdIn(siteById.keySet().stream().toList());
+
+        return new GlobalTaskBoard(columns, cards, siteById, labelIdsByCard, labels);
     }
 
     /** Deterministic color for an obra: same input always yields the same palette entry. */
@@ -85,6 +91,6 @@ public class GlobalTaskBoardService {
 
     public record GlobalTaskBoard(
             List<TaskColumn> columns, List<TaskCard> cards, Map<UUID, ConstructionSite> siteById,
-            Map<UUID, List<UUID>> labelIdsByCard) {
+            Map<UUID, List<UUID>> labelIdsByCard, List<TaskLabel> labels) {
     }
 }

@@ -16,6 +16,7 @@ import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.TaskCardLabelRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskColumnRepository;
+import com.pantheon.service.repository.TaskLabelRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -43,6 +44,9 @@ class GlobalTaskBoardServiceTest {
     private TaskCardLabelRepository cardLabelRepository;
 
     @Mock
+    private TaskLabelRepository labelRepository;
+
+    @Mock
     private CompanyMembershipRepository membershipRepository;
 
     private GlobalTaskBoardService service;
@@ -53,7 +57,8 @@ class GlobalTaskBoardServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new GlobalTaskBoardService(siteRepository, columnRepository, cardRepository, cardLabelRepository, membershipRepository);
+        service = new GlobalTaskBoardService(
+                siteRepository, columnRepository, cardRepository, cardLabelRepository, labelRepository, membershipRepository);
         companyId = UUID.randomUUID();
         adminUserId = UUID.randomUUID();
         memberUserId = UUID.randomUUID();
@@ -80,11 +85,27 @@ class GlobalTaskBoardServiceTest {
         TaskCard cardB = new TaskCard(UUID.randomUUID(), siteBId, UUID.randomUUID(), "Card B", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
         when(cardRepository.findByConstructionSiteIdInOrderBySortOrderAsc(any())).thenReturn(List.of(cardA, cardB));
         when(cardLabelRepository.findByCardIdIn(any())).thenReturn(List.of());
+        when(labelRepository.findByConstructionSiteIdIn(any())).thenReturn(List.of());
 
         var board = service.build(companyId, adminUserId);
 
         assertThat(board.cards()).containsExactly(cardA, cardB);
         assertThat(board.siteById()).containsKeys(siteAId, siteBId);
+    }
+
+    @Test
+    void boardIncludesLabelCatalogAcrossSites() {
+        UUID siteAId = UUID.randomUUID();
+        when(siteRepository.findByCompanyId(companyId)).thenReturn(List.of(site(siteAId, companyId, "Obra A")));
+        when(columnRepository.findByCompanyIdOrderBySortOrderAsc(companyId)).thenReturn(List.of());
+        when(cardRepository.findByConstructionSiteIdInOrderBySortOrderAsc(any())).thenReturn(List.of());
+        when(cardLabelRepository.findByCardIdIn(any())).thenReturn(List.of());
+        var label = new com.pantheon.service.entity.TaskLabel(UUID.randomUUID(), siteAId, "Urgente", "#EF4444", Instant.now());
+        when(labelRepository.findByConstructionSiteIdIn(any())).thenReturn(List.of(label));
+
+        var board = service.build(companyId, adminUserId);
+
+        assertThat(board.labels()).containsExactly(label);
     }
 
     @Test

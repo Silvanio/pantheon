@@ -3,6 +3,7 @@ package com.pantheon.service.controller;
 import com.pantheon.service.dto.GlobalTaskBoardResponse;
 import com.pantheon.service.dto.GlobalTaskCardResponse;
 import com.pantheon.service.dto.TaskColumnResponse;
+import com.pantheon.service.dto.TaskLabelResponse;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.service.GlobalTaskBoardService;
 import java.util.List;
@@ -33,6 +34,7 @@ public class GlobalTaskBoardController {
                         card, board.siteById().get(card.getConstructionSiteId()),
                         board.labelIdsByCard().getOrDefault(card.getId(), List.of())))
                 .toList();
-        return ResponseEntity.ok(new GlobalTaskBoardResponse(columns, cards));
+        List<TaskLabelResponse> labels = board.labels().stream().map(TaskLabelResponse::from).toList();
+        return ResponseEntity.ok(new GlobalTaskBoardResponse(columns, cards, labels));
     }
 }

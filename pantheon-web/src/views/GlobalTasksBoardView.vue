@@ -11,13 +11,27 @@ const { t } = useI18n()
 const { getGlobalBoard } = useGlobalTasksBoard()
 
 const companyId = route.params.companyId as string
-const board = ref<GlobalTaskBoard>({ columns: [], cards: [] })
+const board = ref<GlobalTaskBoard>({ columns: [], cards: [], labels: [] })
 const loading = ref(false)
 
 const sortedColumns = computed(() => [...board.value.columns].sort((a, b) => a.sortOrder - b.sortOrder))
 
 function cardsForColumn(columnId: string): GlobalTaskCard[] {
   return board.value.cards.filter((c) => c.columnId === columnId).sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+function labelById(id: string) {
+  return board.value.labels.find((l) => l.id === id)
+}
+
+function formatDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-')
+  return `${day}/${month}/${year}`
+}
+
+function isDueOrOverdue(isoDate: string): boolean {
+  const todayIso = new Date().toISOString().slice(0, 10)
+  return isoDate <= todayIso
 }
 
 async function load() {
@@ -68,6 +82,25 @@ onMounted(load)
                 {{ card.siteName }}
               </span>
               <p class="text-sm font-medium text-steel-800 dark:text-steel-50">{{ card.title }}</p>
+
+              <div v-if="card.labelIds.length" class="mt-2 flex flex-wrap gap-1">
+                <span
+                  v-for="labelId in card.labelIds"
+                  :key="labelId"
+                  class="rounded-full px-2.5 py-1 text-xs font-medium text-white"
+                  :style="{ backgroundColor: labelById(labelId)?.colorHex }"
+                >
+                  {{ labelById(labelId)?.name }}
+                </span>
+              </div>
+
+              <p
+                v-if="card.dueDate"
+                class="mt-2 text-xs font-medium"
+                :class="isDueOrOverdue(card.dueDate) ? 'text-safety-600 dark:text-safety-500' : 'text-steel-500 dark:text-steel-400'"
+              >
+                {{ t('tasks.dueDateIcon') }} {{ formatDate(card.dueDate) }}
+              </p>
             </div>
           </div>
         </div>

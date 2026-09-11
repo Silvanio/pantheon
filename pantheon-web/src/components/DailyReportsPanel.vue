@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDailyReports, type DailyReport } from '../composables/useDailyReports'
+import { vDatePicker } from '../lib/datePicker'
 
 const props = defineProps<{ siteId: string }>()
 
@@ -57,7 +58,7 @@ onMounted(load)
     <form v-if="showForm" class="mb-5 space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmit">
       <div>
         <label class="field-label">{{ t('dailyReports.history.form.date') }}</label>
-        <input v-model="reportDate" type="date" required class="field-input" />
+        <input v-model="reportDate" v-date-picker type="date" required class="field-input" />
       </div>
       <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
       <div class="flex gap-2">

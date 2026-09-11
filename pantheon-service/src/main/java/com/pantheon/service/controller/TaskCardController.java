@@ -5,6 +5,7 @@ import com.pantheon.service.dto.TaskBoardResponse;
 import com.pantheon.service.dto.TaskCardCreationRequest;
 import com.pantheon.service.dto.TaskCardResponse;
 import com.pantheon.service.dto.TaskColumnResponse;
+import com.pantheon.service.dto.UpdateTaskCardDueDateRequest;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.TaskCard;
 import com.pantheon.service.service.TaskCardService;
@@ -56,6 +57,15 @@ public class TaskCardController {
             @PathVariable UUID cardId,
             @Valid @RequestBody MoveTaskCardRequest request) {
         TaskCard card = taskCardService.moveCard(cardId, user.getId(), request);
+        return ResponseEntity.ok(TaskCardResponse.from(card, taskCardService.labelIdsForCard(card.getId())));
+    }
+
+    @PatchMapping("/api/task-cards/{cardId}/due-date")
+    public ResponseEntity<TaskCardResponse> updateDueDate(
+            @AuthenticationPrincipal AppUser user,
+            @PathVariable UUID cardId,
+            @RequestBody UpdateTaskCardDueDateRequest request) {
+        TaskCard card = taskCardService.updateDueDate(cardId, user.getId(), request);
         return ResponseEntity.ok(TaskCardResponse.from(card, taskCardService.labelIdsForCard(card.getId())));
     }
 }

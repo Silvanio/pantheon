@@ -4,16 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.MoveTaskCardRequest;
 import com.pantheon.service.dto.TaskCardCreationRequest;
+import com.pantheon.service.dto.UpdateTaskCardDueDateRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.TaskCard;
 import com.pantheon.service.entity.TaskColumn;
+import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.TaskColumnNotFoundException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.TaskCardLabelRepository;
@@ -78,12 +81,24 @@ class TaskCardServiceTest {
     void createCardPersistsInColumnWithEndOfColumnSortOrder() {
         when(cardRepository.countByConstructionSiteIdAndColumnId(siteId, columnId)).thenReturn(2L);
 
-        TaskCard card = service.createCard(siteId, UUID.randomUUID(), new TaskCardCreationRequest(columnId, "Entregar telhas", null));
+        TaskCard card = service.createCard(
+                siteId, UUID.randomUUID(), new TaskCardCreationRequest(columnId, "Entregar telhas", null, null));
 
         assertThat(card.getConstructionSiteId()).isEqualTo(siteId);
         assertThat(card.getColumnId()).isEqualTo(columnId);
         assertThat(card.getSortOrder()).isEqualTo(2);
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+    }
+
+    @Test
+    void createCardPersistsDueDate() {
+        when(cardRepository.countByConstructionSiteIdAndColumnId(siteId, columnId)).thenReturn(0L);
+        LocalDate dueDate = LocalDate.now().plusDays(7);
+
+        TaskCard card = service.createCard(
+                siteId, UUID.randomUUID(), new TaskCardCreationRequest(columnId, "Entregar telhas", null, dueDate));
+
+        assertThat(card.getDueDate()).isEqualTo(dueDate);
     }
 
     @Test
@@ -93,7 +108,7 @@ class TaskCardServiceTest {
                 .thenReturn(Optional.of(new TaskColumn(otherCompanyColumnId, UUID.randomUUID(), "Outra", 0, Instant.now())));
 
         assertThatThrownBy(() -> service.createCard(
-                siteId, UUID.randomUUID(), new TaskCardCreationRequest(otherCompanyColumnId, "Card", null)))
+                siteId, UUID.randomUUID(), new TaskCardCreationRequest(otherCompanyColumnId, "Card", null, null)))
                 .isInstanceOf(TaskColumnNotFoundException.class);
     }
 
@@ -115,7 +130,7 @@ class TaskCardServiceTest {
     @Test
     void moveCardUpdatesColumnAndSortOrder() {
         TaskCard card = new TaskCard(
-                UUID.randomUUID(), siteId, columnId, "Card", null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
+                UUID.randomUUID(), siteId, columnId, "Card", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
         when(cardRepository.findById(card.getId())).thenReturn(Optional.of(card));
         UUID newColumnId = UUID.randomUUID();
         when(columnRepository.findById(newColumnId))
@@ -126,5 +141,43 @@ class TaskCardServiceTest {
         assertThat(moved.getColumnId()).isEqualTo(newColumnId);
         assertThat(moved.getSortOrder()).isEqualTo(3);
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+    }
+
+    @Test
+    void updateDueDateSetsNewDate() {
+        TaskCard card = new TaskCard(
+                UUID.randomUUID(), siteId, columnId, "Card", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
+        when(cardRepository.findById(card.getId())).thenReturn(Optional.of(card));
+        LocalDate dueDate = LocalDate.now().plusDays(3);
+
+        TaskCard updated = service.updateDueDate(card.getId(), UUID.randomUUID(), new UpdateTaskCardDueDateRequest(dueDate));
+
+        assertThat(updated.getDueDate()).isEqualTo(dueDate);
+        verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+    }
+
+    @Test
+    void updateDueDateClearsExistingDate() {
+        TaskCard card = new TaskCard(
+                UUID.randomUUID(), siteId, columnId, "Card", null, LocalDate.now().plusDays(1), 0, UUID.randomUUID(),
+                Instant.now(), Instant.now());
+        when(cardRepository.findById(card.getId())).thenReturn(Optional.of(card));
+
+        TaskCard updated = service.updateDueDate(card.getId(), UUID.randomUUID(), new UpdateTaskCardDueDateRequest(null));
+
+        assertThat(updated.getDueDate()).isNull();
+    }
+
+    @Test
+    void updateDueDateRejectsCallerWithoutManage() {
+        TaskCard card = new TaskCard(
+                UUID.randomUUID(), siteId, columnId, "Card", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
+        when(cardRepository.findById(card.getId())).thenReturn(Optional.of(card));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.TASKS))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+
+        assertThatThrownBy(() -> service.updateDueDate(
+                card.getId(), UUID.randomUUID(), new UpdateTaskCardDueDateRequest(LocalDate.now())))
+                .isInstanceOf(ForbiddenCapabilityException.class);
     }
 }

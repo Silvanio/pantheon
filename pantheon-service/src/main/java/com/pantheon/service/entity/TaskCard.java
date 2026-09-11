@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -30,6 +31,9 @@ public class TaskCard {
     @Column
     private String description;
 
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
@@ -47,13 +51,14 @@ public class TaskCard {
     }
 
     public TaskCard(
-            UUID id, UUID constructionSiteId, UUID columnId, String title, String description, int sortOrder,
-            UUID createdBy, Instant createdAt, Instant updatedAt) {
+            UUID id, UUID constructionSiteId, UUID columnId, String title, String description, LocalDate dueDate,
+            int sortOrder, UUID createdBy, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.constructionSiteId = constructionSiteId;
         this.columnId = columnId;
         this.title = title;
         this.description = description;
+        this.dueDate = dueDate;
         this.sortOrder = sortOrder;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
@@ -63,6 +68,11 @@ public class TaskCard {
     public void moveTo(UUID columnId, int sortOrder, Instant now) {
         this.columnId = columnId;
         this.sortOrder = sortOrder;
+        this.updatedAt = now;
+    }
+
+    public void updateDueDate(LocalDate dueDate, Instant now) {
+        this.dueDate = dueDate;
         this.updatedAt = now;
     }
 
@@ -84,6 +94,10 @@ public class TaskCard {
 
     public String getDescription() {
         return description;
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
     }
 
     public int getSortOrder() {

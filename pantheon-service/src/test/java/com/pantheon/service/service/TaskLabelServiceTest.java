@@ -55,7 +55,7 @@ class TaskLabelServiceTest {
         cardId = UUID.randomUUID();
 
         lenient().when(cardRepository.findById(cardId)).thenReturn(Optional.of(
-                new TaskCard(cardId, siteId, UUID.randomUUID(), "Card", null, 0, UUID.randomUUID(), Instant.now(), Instant.now())));
+                new TaskCard(cardId, siteId, UUID.randomUUID(), "Card", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now())));
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
         lenient().when(labelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }

@@ -172,6 +172,8 @@
     "error": "Não foi possível concluir a ação. Tente novamente.",
     "noColumns": "Nenhuma coluna configurada ainda. Peça a um administrador para configurar as colunas em Configurações da empresa.",
     "newCardPlaceholder": "Título do card",
+    "dueDate": "Data de conclusão prevista",
+    "dueDateIcon": "📅",
     "addCard": "Adicionar card",
     "cancel": "Cancelar",
     "close": "Fechar",

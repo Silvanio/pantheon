@@ -2,6 +2,7 @@ package com.pantheon.service.service;
 
 import com.pantheon.service.dto.MoveTaskCardRequest;
 import com.pantheon.service.dto.TaskCardCreationRequest;
+import com.pantheon.service.dto.UpdateTaskCardDueDateRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.TaskCard;
@@ -69,7 +70,7 @@ public class TaskCardService {
         Instant now = Instant.now();
         TaskCard card = new TaskCard(
                 UUID.randomUUID(), siteId, request.columnId(), request.title(), request.description(),
-                nextSortOrder, actingUserId, now, now);
+                request.dueDate(), nextSortOrder, actingUserId, now, now);
         return cardRepository.save(card);
     }
 
@@ -81,6 +82,15 @@ public class TaskCardService {
         requireColumnBelongsToCompany(request.columnId(), site.getCompanyId());
 
         card.moveTo(request.columnId(), request.sortOrder(), Instant.now());
+        return cardRepository.save(card);
+    }
+
+    @Transactional
+    public TaskCard updateDueDate(UUID cardId, UUID actingUserId, UpdateTaskCardDueDateRequest request) {
+        TaskCard card = requireCard(cardId);
+        requireManage(card.getConstructionSiteId(), actingUserId);
+
+        card.updateDueDate(request.dueDate(), Instant.now());
         return cardRepository.save(card);
     }
 

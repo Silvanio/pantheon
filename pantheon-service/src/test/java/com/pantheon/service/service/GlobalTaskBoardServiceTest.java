@@ -76,8 +76,8 @@ class GlobalTaskBoardServiceTest {
         when(siteRepository.findByCompanyId(companyId)).thenReturn(List.of(
                 site(siteAId, companyId, "Obra A"), site(siteBId, companyId, "Obra B")));
         when(columnRepository.findByCompanyIdOrderBySortOrderAsc(companyId)).thenReturn(List.of());
-        TaskCard cardA = new TaskCard(UUID.randomUUID(), siteAId, UUID.randomUUID(), "Card A", null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
-        TaskCard cardB = new TaskCard(UUID.randomUUID(), siteBId, UUID.randomUUID(), "Card B", null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
+        TaskCard cardA = new TaskCard(UUID.randomUUID(), siteAId, UUID.randomUUID(), "Card A", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
+        TaskCard cardB = new TaskCard(UUID.randomUUID(), siteBId, UUID.randomUUID(), "Card B", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
         when(cardRepository.findByConstructionSiteIdInOrderBySortOrderAsc(any())).thenReturn(List.of(cardA, cardB));
         when(cardLabelRepository.findByCardIdIn(any())).thenReturn(List.of());
 

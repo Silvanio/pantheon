@@ -8,6 +8,7 @@ export interface TaskCard {
   columnId: string
   title: string
   description: string | null
+  dueDate: string | null
   sortOrder: number
   labelIds: string[]
   createdBy: string
@@ -59,10 +60,16 @@ export function useTaskCards() {
     return authFetch(`/api/construction-sites/${siteId}/task-board`)
   }
 
-  function createCard(siteId: string, columnId: string, title: string, description: string | null): Promise<TaskCard> {
+  function createCard(
+    siteId: string,
+    columnId: string,
+    title: string,
+    description: string | null,
+    dueDate: string | null = null,
+  ): Promise<TaskCard> {
     return authFetch(`/api/construction-sites/${siteId}/task-cards`, {
       method: 'POST',
-      body: JSON.stringify({ columnId, title, description }),
+      body: JSON.stringify({ columnId, title, description, dueDate }),
     })
   }
 
@@ -70,6 +77,13 @@ export function useTaskCards() {
     return authFetch(`/api/task-cards/${cardId}/move`, {
       method: 'PATCH',
       body: JSON.stringify({ columnId, sortOrder }),
+    })
+  }
+
+  function updateDueDate(cardId: string, dueDate: string | null): Promise<TaskCard> {
+    return authFetch(`/api/task-cards/${cardId}/due-date`, {
+      method: 'PATCH',
+      body: JSON.stringify({ dueDate }),
     })
   }
 
@@ -107,6 +121,7 @@ export function useTaskCards() {
     getBoard,
     createCard,
     moveCard,
+    updateDueDate,
     listLabels,
     createLabel,
     attachLabel,

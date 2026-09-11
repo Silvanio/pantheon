@@ -299,7 +299,7 @@ onMounted(load)
             v-for="card in cardsForColumn(column.id)"
             :key="card.id"
             draggable="true"
-            class="relative w-full cursor-pointer rounded-lg bg-white p-3 pr-14 text-left shadow-sm transition hover:shadow dark:bg-steel-900"
+            class="relative w-full cursor-pointer rounded-lg bg-white p-3 pr-14 pb-5 text-left shadow-sm transition hover:shadow dark:bg-steel-900"
             @dragstart="onDragStart(card)"
             @click="openCard(card)"
           >
@@ -324,36 +324,36 @@ onMounted(load)
               </span>
             </div>
 
-            <div class="mt-2 flex items-center justify-between">
-              <div v-if="card.assigneeIds.length" class="flex -space-x-1.5">
-                <span
-                  v-for="memberId in card.assigneeIds.slice(0, 3)"
-                  :key="memberId"
-                  class="flex h-5 w-5 items-center justify-center rounded-full border border-white bg-blueprint-500 text-[9px] font-semibold text-white dark:border-steel-900"
-                  :title="memberLabel(memberId)"
-                >
-                  {{ memberInitials(memberId) }}
-                </span>
-                <span
-                  v-if="card.assigneeIds.length > 3"
-                  class="flex h-5 w-5 items-center justify-center rounded-full border border-white bg-steel-400 text-[9px] font-semibold text-white dark:border-steel-900"
-                >
-                  +{{ card.assigneeIds.length - 3 }}
-                </span>
-              </div>
-              <span v-else />
-
-              <span v-if="card.commentCount > 0" class="flex items-center gap-1 text-[10px] text-steel-400 dark:text-steel-500">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3 w-3">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"
-                  />
-                </svg>
-                {{ card.commentCount }}
+            <div v-if="card.assigneeIds.length" class="mt-2 flex -space-x-1.5">
+              <span
+                v-for="memberId in card.assigneeIds.slice(0, 3)"
+                :key="memberId"
+                class="flex h-5 w-5 items-center justify-center rounded-full border border-white bg-blueprint-500 text-[9px] font-semibold text-white dark:border-steel-900"
+                :title="memberLabel(memberId)"
+              >
+                {{ memberInitials(memberId) }}
+              </span>
+              <span
+                v-if="card.assigneeIds.length > 3"
+                class="flex h-5 w-5 items-center justify-center rounded-full border border-white bg-steel-400 text-[9px] font-semibold text-white dark:border-steel-900"
+              >
+                +{{ card.assigneeIds.length - 3 }}
               </span>
             </div>
+
+            <span
+              v-if="card.commentCount > 0"
+              class="absolute bottom-1.5 right-2 flex items-center gap-1 text-[10px] text-steel-400 dark:text-steel-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3 w-3">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"
+                />
+              </svg>
+              {{ card.commentCount }}
+            </span>
           </div>
         </div>
 
@@ -462,7 +462,12 @@ onMounted(load)
           <p class="field-label mb-2">{{ t('tasks.comments') }}</p>
           <ul class="mb-3 space-y-2">
             <li v-for="comment in comments" :key="comment.id" class="rounded-lg bg-steel-100 px-3 py-2 text-sm dark:bg-steel-800">
-              {{ comment.body }}
+              <p class="whitespace-pre-wrap">{{ comment.body }}</p>
+              <div class="mt-1.5 flex justify-end">
+                <span class="rounded-full bg-steel-200 px-2 py-0.5 text-[10px] font-medium text-steel-600 dark:bg-steel-700 dark:text-steel-300">
+                  {{ comment.authorName ?? t('tasks.unknownAuthor') }}
+                </span>
+              </div>
             </li>
             <li v-if="comments.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('tasks.noComments') }}</li>
           </ul>

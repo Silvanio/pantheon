@@ -9,9 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.TaskCommentRequest;
+import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.TaskCard;
 import com.pantheon.service.entity.TaskComment;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskCommentRepository;
 import java.time.Instant;
@@ -34,6 +36,9 @@ class TaskCommentServiceTest {
     private TaskCardRepository cardRepository;
 
     @Mock
+    private AppUserRepository userRepository;
+
+    @Mock
     private SiteAccessService siteAccessService;
 
     @Mock
@@ -46,7 +51,7 @@ class TaskCommentServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TaskCommentService(commentRepository, cardRepository, siteAccessService, permissionService);
+        service = new TaskCommentService(commentRepository, cardRepository, userRepository, siteAccessService, permissionService);
         siteId = UUID.randomUUID();
         cardId = UUID.randomUUID();
 
@@ -74,5 +79,21 @@ class TaskCommentServiceTest {
 
         verify(permissionService, never()).requireManage(any(), any(), any());
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void authorNamesForResolvesDisplayNameFallingBackToEmail() {
+        UUID authorWithName = UUID.randomUUID();
+        UUID authorWithoutName = UUID.randomUUID();
+        var comment1 = new TaskComment(UUID.randomUUID(), cardId, authorWithName, "Ok", Instant.now());
+        var comment2 = new TaskComment(UUID.randomUUID(), cardId, authorWithoutName, "Ok", Instant.now());
+        when(userRepository.findAllById(List.of(authorWithName, authorWithoutName))).thenReturn(List.of(
+                new AppUser(authorWithName, "joao@example.com", "João Silva", "hash", null, Instant.now(), Instant.now()),
+                new AppUser(authorWithoutName, "maria@example.com", null, "hash", null, Instant.now(), Instant.now())));
+
+        var names = service.authorNamesFor(List.of(comment1, comment2));
+
+        assertThat(names).containsEntry(authorWithName, "João Silva");
+        assertThat(names).containsEntry(authorWithoutName, "maria@example.com");
     }
 }

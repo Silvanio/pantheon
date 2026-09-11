@@ -189,6 +189,7 @@
     "newLabelButton": "Criar label",
     "comments": "Comentários",
     "noComments": "Nenhum comentário ainda.",
+    "unknownAuthor": "Usuário",
     "newCommentPlaceholder": "Escreva um comentário",
     "addComment": "Comentar",
     "assignees": "Responsáveis",

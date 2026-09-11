@@ -3,9 +3,11 @@ package com.pantheon.service.controller;
 import com.pantheon.service.dto.TaskCommentRequest;
 import com.pantheon.service.dto.TaskCommentResponse;
 import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.TaskComment;
 import com.pantheon.service.service.TaskCommentService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,9 +29,12 @@ public class TaskCommentController {
 
     @GetMapping("/api/task-cards/{cardId}/comments")
     public ResponseEntity<List<TaskCommentResponse>> list(@AuthenticationPrincipal AppUser user, @PathVariable UUID cardId) {
-        List<TaskCommentResponse> comments =
-                taskCommentService.list(cardId, user.getId()).stream().map(TaskCommentResponse::from).toList();
-        return ResponseEntity.ok(comments);
+        List<TaskComment> comments = taskCommentService.list(cardId, user.getId());
+        Map<UUID, String> authorNames = taskCommentService.authorNamesFor(comments);
+        List<TaskCommentResponse> response = comments.stream()
+                .map(comment -> TaskCommentResponse.from(comment, authorNames.get(comment.getAuthorId())))
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/api/task-cards/{cardId}/comments")
@@ -38,6 +43,9 @@ public class TaskCommentController {
             @PathVariable UUID cardId,
             @Valid @RequestBody TaskCommentRequest request) {
         var comment = taskCommentService.add(cardId, user.getId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(TaskCommentResponse.from(comment));
+        String authorName = user.getDisplayName() != null && !user.getDisplayName().isBlank()
+                ? user.getDisplayName()
+                : user.getEmail();
+        return ResponseEntity.status(HttpStatus.CREATED).body(TaskCommentResponse.from(comment, authorName));
     }
 }

@@ -36,6 +36,7 @@ export interface TaskComment {
   id: string
   cardId: string
   authorId: string
+  authorName: string | null
   body: string
   createdAt: string
 }

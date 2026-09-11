@@ -8,4 +8,6 @@ import com.pantheon.service.entity.Material;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
     List<Material> findByConstructionSiteId(UUID constructionSiteId);
+
+    List<Material> findByOrcamentoLineItemIdIn(List<UUID> orcamentoLineItemIds);
 }

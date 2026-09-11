@@ -37,12 +37,8 @@ public final class StorageKeys {
                 .formatted(constructionSiteId, documentProjectId, attachmentId, extension);
     }
 
-    public static String orcamentoAttachmentKey(UUID materialRequestId, UUID orcamentoId, UUID attachmentId, String extension) {
-        return "material-requests/%s/orcamentos/%s/attachments/%s.%s"
-                .formatted(materialRequestId, orcamentoId, attachmentId, extension);
-    }
-
-    public static String receiptVerificationPhotoKey(UUID materialRequestItemId, UUID photoId, String extension) {
-        return "material-request-items/%s/receipt-photos/%s.%s".formatted(materialRequestItemId, photoId, extension);
+    public static String materialDeliveryPhotoKey(UUID constructionSiteId, UUID materialId, UUID photoId, String extension) {
+        return "construction-sites/%s/materials/%s/delivery-photos/%s.%s"
+                .formatted(constructionSiteId, materialId, photoId, extension);
     }
 }

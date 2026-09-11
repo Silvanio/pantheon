@@ -176,7 +176,8 @@ public class DailyReportService {
             UUID reportId, UUID actingUserId, MaterialReceivedRequest request) {
         DailyReport report = requireEditableReport(reportId, actingUserId);
         DailyReportMaterialReceived received = new DailyReportMaterialReceived(
-                UUID.randomUUID(), report.getId(), request.materialId(), request.quantity(), Instant.now());
+                UUID.randomUUID(), report.getId(), request.materialName(), request.unit(), request.quantity(),
+                Instant.now());
         return materialReceivedRepository.save(received);
     }
 

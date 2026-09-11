@@ -66,6 +66,6 @@ public class EquipmentService {
 
     private void requireManage(UUID siteId, UUID userId) {
         var access = siteAccessService.requireAccess(siteId, userId);
-        permissionService.requireManage(siteId, access, PermissionCapability.EQUIPMENT_MATERIAL);
+        permissionService.requireManage(siteId, access, PermissionCapability.EQUIPMENT);
     }
 }

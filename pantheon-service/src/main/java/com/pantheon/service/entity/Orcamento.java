@@ -10,8 +10,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A client-facing budget/quote drafted against a {@link MaterialRequest}. A request may have
- * more than one over time (e.g., a revised quote after a rejection).
+ * A construction site's budget/quote, with free-text line items (see {@link OrcamentoLineItem})
+ * and a configurable sequential approval chain (see {@link OrcamentoApproval}). See
+ * {@code orcamento-approval-workflow}.
  */
 @Entity
 @Table(name = "orcamento")
@@ -20,8 +21,8 @@ public class Orcamento {
     @Id
     private UUID id;
 
-    @Column(name = "material_request_id", nullable = false)
-    private UUID materialRequestId;
+    @Column(name = "construction_site_id", nullable = false)
+    private UUID constructionSiteId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -33,49 +34,94 @@ public class Orcamento {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "sent_at")
-    private Instant sentAt;
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
 
-    @Column(name = "decided_at")
-    private Instant decidedAt;
+    @Column(name = "approved_at")
+    private Instant approvedAt;
 
-    @Column(name = "rejection_reason")
-    private String rejectionReason;
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
+    @Column(name = "current_approval_cycle", nullable = false)
+    private int currentApprovalCycle;
+
+    @Column(name = "last_rejection_reason")
+    private String lastRejectionReason;
+
+    @Column(name = "fornecedor_cnpj", nullable = false)
+    private String fornecedorCnpj;
+
+    @Column(name = "fornecedor_nome", nullable = false)
+    private String fornecedorNome;
+
+    @Column(name = "fornecedor_endereco")
+    private String fornecedorEndereco;
+
+    @Column(name = "fornecedor_contato_nome")
+    private String fornecedorContatoNome;
+
+    @Column(name = "fornecedor_contato_telefone")
+    private String fornecedorContatoTelefone;
+
+    @Column(name = "source_fornecedor_id")
+    private UUID sourceFornecedorId;
+
+    @Column(name = "source_purchase_request_id")
+    private UUID sourcePurchaseRequestId;
 
     protected Orcamento() {
         // JPA
     }
 
-    public Orcamento(UUID id, UUID materialRequestId, UUID createdBy, Instant createdAt) {
+    public Orcamento(
+            UUID id, UUID constructionSiteId, UUID createdBy, Instant createdAt, String fornecedorCnpj,
+            String fornecedorNome, String fornecedorEndereco, String fornecedorContatoNome,
+            String fornecedorContatoTelefone, UUID sourceFornecedorId, UUID sourcePurchaseRequestId) {
         this.id = id;
-        this.materialRequestId = materialRequestId;
+        this.constructionSiteId = constructionSiteId;
         this.status = OrcamentoStatus.DRAFT;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
+        this.currentApprovalCycle = 0;
+        this.fornecedorCnpj = fornecedorCnpj;
+        this.fornecedorNome = fornecedorNome;
+        this.fornecedorEndereco = fornecedorEndereco;
+        this.fornecedorContatoNome = fornecedorContatoNome;
+        this.fornecedorContatoTelefone = fornecedorContatoTelefone;
+        this.sourceFornecedorId = sourceFornecedorId;
+        this.sourcePurchaseRequestId = sourcePurchaseRequestId;
     }
 
-    public void send(Instant now) {
-        this.status = OrcamentoStatus.SENT;
-        this.sentAt = now;
+    /** Starts a new approval cycle: DRAFT/rejected -> IN_APPROVAL. */
+    public void submitForApproval(Instant now) {
+        this.status = OrcamentoStatus.IN_APPROVAL;
+        this.submittedAt = now;
+        this.currentApprovalCycle += 1;
     }
 
     public void approve(Instant now) {
         this.status = OrcamentoStatus.APPROVED;
-        this.decidedAt = now;
+        this.approvedAt = now;
     }
 
-    public void reject(String reason, Instant now) {
-        this.status = OrcamentoStatus.REJECTED;
-        this.rejectionReason = reason;
-        this.decidedAt = now;
+    /** A rejection at any approval step bounces the whole Orcamento back to DRAFT for revision. */
+    public void returnToDraftAfterRejection(String reason) {
+        this.status = OrcamentoStatus.DRAFT;
+        this.lastRejectionReason = reason;
+    }
+
+    public void complete(Instant now) {
+        this.status = OrcamentoStatus.COMPLETED;
+        this.completedAt = now;
     }
 
     public UUID getId() {
         return id;
     }
 
-    public UUID getMaterialRequestId() {
-        return materialRequestId;
+    public UUID getConstructionSiteId() {
+        return constructionSiteId;
     }
 
     public OrcamentoStatus getStatus() {
@@ -90,15 +136,51 @@ public class Orcamento {
         return createdAt;
     }
 
-    public Instant getSentAt() {
-        return sentAt;
+    public Instant getSubmittedAt() {
+        return submittedAt;
     }
 
-    public Instant getDecidedAt() {
-        return decidedAt;
+    public Instant getApprovedAt() {
+        return approvedAt;
     }
 
-    public String getRejectionReason() {
-        return rejectionReason;
+    public Instant getCompletedAt() {
+        return completedAt;
+    }
+
+    public int getCurrentApprovalCycle() {
+        return currentApprovalCycle;
+    }
+
+    public String getLastRejectionReason() {
+        return lastRejectionReason;
+    }
+
+    public String getFornecedorCnpj() {
+        return fornecedorCnpj;
+    }
+
+    public String getFornecedorNome() {
+        return fornecedorNome;
+    }
+
+    public String getFornecedorEndereco() {
+        return fornecedorEndereco;
+    }
+
+    public String getFornecedorContatoNome() {
+        return fornecedorContatoNome;
+    }
+
+    public String getFornecedorContatoTelefone() {
+        return fornecedorContatoTelefone;
+    }
+
+    public UUID getSourceFornecedorId() {
+        return sourceFornecedorId;
+    }
+
+    public UUID getSourcePurchaseRequestId() {
+        return sourcePurchaseRequestId;
     }
 }

@@ -12,7 +12,6 @@ import com.pantheon.service.entity.DailyReportOccurrence;
 import com.pantheon.service.entity.DailyReportSignature;
 import com.pantheon.service.entity.DailyReportWorkforceEntry;
 import com.pantheon.service.entity.Equipment;
-import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MediaType;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
@@ -27,7 +26,6 @@ import com.pantheon.service.repository.DailyReportRepository;
 import com.pantheon.service.repository.DailyReportSignatureRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
 import com.pantheon.service.repository.EquipmentRepository;
-import com.pantheon.service.repository.MaterialRepository;
 import com.pantheon.service.storage.StorageService;
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
@@ -56,7 +54,6 @@ public class DailyReportPdfService {
     private final ConstructionSiteRepository siteRepository;
     private final SiteAccessService siteAccessService;
     private final EquipmentRepository equipmentRepository;
-    private final MaterialRepository materialRepository;
     private final StorageService storageService;
 
     public DailyReportPdfService(
@@ -72,7 +69,6 @@ public class DailyReportPdfService {
             ConstructionSiteRepository siteRepository,
             SiteAccessService siteAccessService,
             EquipmentRepository equipmentRepository,
-            MaterialRepository materialRepository,
             StorageService storageService) {
         this.dailyReportRepository = dailyReportRepository;
         this.workforceEntryRepository = workforceEntryRepository;
@@ -86,7 +82,6 @@ public class DailyReportPdfService {
         this.siteRepository = siteRepository;
         this.siteAccessService = siteAccessService;
         this.equipmentRepository = equipmentRepository;
-        this.materialRepository = materialRepository;
         this.storageService = storageService;
     }
 
@@ -119,11 +114,6 @@ public class DailyReportPdfService {
                         equipmentUsage.stream().map(DailyReportEquipmentUsage::getEquipmentId).toList())
                 .stream()
                 .collect(Collectors.toMap(Equipment::getId, e -> e));
-        Map<UUID, Material> materialById = materialRepository.findAllById(
-                        materialsReceived.stream().map(DailyReportMaterialReceived::getMaterialId).toList())
-                .stream()
-                .collect(Collectors.toMap(Material::getId, m -> m));
-
         StringBuilder html = new StringBuilder();
         html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\"/>");
@@ -178,10 +168,9 @@ public class DailyReportPdfService {
 
         html.append("<h2>Materiais recebidos</h2><table><tr><th>Material</th><th>Quantidade</th></tr>");
         for (DailyReportMaterialReceived received : materialsReceived) {
-            Material material = materialById.get(received.getMaterialId());
-            html.append("<tr><td>").append(escape(material != null ? material.getName() : received.getMaterialId().toString()))
+            html.append("<tr><td>").append(escape(received.getMaterialName()))
                     .append("</td><td>").append(received.getQuantity())
-                    .append(material != null ? " " + escape(material.getUnit()) : "").append("</td></tr>");
+                    .append(received.getUnit() != null ? " " + escape(received.getUnit()) : "").append("</td></tr>");
         }
         html.append("</table>");
 

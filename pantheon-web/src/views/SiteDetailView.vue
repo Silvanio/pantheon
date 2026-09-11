@@ -7,8 +7,10 @@ import SitePhoto from '../components/SitePhoto.vue'
 import SiteTeamPanel from '../components/SiteTeamPanel.vue'
 import SiteDocumentProjectsPanel from '../components/SiteDocumentProjectsPanel.vue'
 import SitePermissionsPanel from '../components/SitePermissionsPanel.vue'
+import SiteOrcamentoApprovalLevelsPanel from '../components/SiteOrcamentoApprovalLevelsPanel.vue'
 import EquipmentPanel from '../components/EquipmentPanel.vue'
-import MaterialsPanel from '../components/MaterialsPanel.vue'
+import PurchaseRequestPanel from '../components/PurchaseRequestPanel.vue'
+import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
 import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 
@@ -21,7 +23,7 @@ const siteId = route.params.siteId as string
 const site = ref<ConstructionSite | null>(null)
 const loading = ref(false)
 
-type Tab = 'team' | 'dailyReport' | 'projects' | 'materials' | 'schedule' | 'permissions'
+type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('team')
 
 async function load() {
@@ -115,10 +117,26 @@ onMounted(load)
           <button
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
-            :class="activeTab === 'materials' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
-            @click="activeTab = 'materials'"
+            :class="activeTab === 'equipment' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'equipment'"
           >
-            {{ t('siteDetail.tabs.materials') }}
+            {{ t('siteDetail.tabs.equipment') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'purchaseRequests' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'purchaseRequests'"
+          >
+            {{ t('siteDetail.tabs.purchaseRequests') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'orcamentos' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'orcamentos'"
+          >
+            {{ t('siteDetail.tabs.orcamentos') }}
           </button>
           <button
             type="button"
@@ -141,18 +159,13 @@ onMounted(load)
         <SiteTeamPanel v-if="activeTab === 'team'" :site-id="siteId" />
         <DailyReportsPanel v-if="activeTab === 'dailyReport'" :site-id="siteId" />
         <SiteDocumentProjectsPanel v-if="activeTab === 'projects'" :site-id="siteId" />
-        <template v-if="activeTab === 'materials'">
-          <div>
-            <router-link :to="`/construction-sites/${siteId}/material-requests`" class="btn-primary inline-flex">
-              {{ t('materialRequests.toggleLabel') }}
-            </router-link>
-          </div>
-          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <EquipmentPanel :site-id="siteId" />
-            <MaterialsPanel :site-id="siteId" />
-          </div>
+        <EquipmentPanel v-if="activeTab === 'equipment'" :site-id="siteId" />
+        <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests'" :site-id="siteId" />
+        <OrcamentoListPanel v-if="activeTab === 'orcamentos'" :site-id="siteId" />
+        <template v-if="activeTab === 'permissions'">
+          <SitePermissionsPanel :site-id="siteId" />
+          <SiteOrcamentoApprovalLevelsPanel :site-id="siteId" />
         </template>
-        <SitePermissionsPanel v-if="activeTab === 'permissions'" :site-id="siteId" />
       </main>
     </template>
   </div>

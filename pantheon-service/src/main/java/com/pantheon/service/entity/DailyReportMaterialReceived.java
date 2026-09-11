@@ -18,8 +18,11 @@ public class DailyReportMaterialReceived {
     @Column(name = "daily_report_id", nullable = false)
     private UUID dailyReportId;
 
-    @Column(name = "material_id", nullable = false)
-    private UUID materialId;
+    @Column(name = "material_name", nullable = false)
+    private String materialName;
+
+    @Column
+    private String unit;
 
     @Column(nullable = false, precision = 19, scale = 3)
     private BigDecimal quantity;
@@ -32,10 +35,11 @@ public class DailyReportMaterialReceived {
     }
 
     public DailyReportMaterialReceived(
-            UUID id, UUID dailyReportId, UUID materialId, BigDecimal quantity, Instant createdAt) {
+            UUID id, UUID dailyReportId, String materialName, String unit, BigDecimal quantity, Instant createdAt) {
         this.id = id;
         this.dailyReportId = dailyReportId;
-        this.materialId = materialId;
+        this.materialName = materialName;
+        this.unit = unit;
         this.quantity = quantity;
         this.createdAt = createdAt;
     }
@@ -48,8 +52,12 @@ public class DailyReportMaterialReceived {
         return dailyReportId;
     }
 
-    public UUID getMaterialId() {
-        return materialId;
+    public String getMaterialName() {
+        return materialName;
+    }
+
+    public String getUnit() {
+        return unit;
     }
 
     public BigDecimal getQuantity() {

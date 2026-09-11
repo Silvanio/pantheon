@@ -53,7 +53,8 @@ export interface Occurrence {
 
 export interface MaterialReceived {
   id: string
-  materialId: string
+  materialName: string
+  unit: string | null
   quantity: string
 }
 
@@ -191,7 +192,7 @@ export function useDailyReports() {
 
   function addMaterialReceived(
     reportId: string,
-    data: { materialId: string; quantity: string },
+    data: { materialName: string; unit: string | null; quantity: string },
   ): Promise<MaterialReceived> {
     return authFetch(`/api/daily-reports/${reportId}/materials-received`, {
       method: 'POST',

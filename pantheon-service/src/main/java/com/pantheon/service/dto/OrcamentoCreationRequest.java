@@ -1,8 +1,9 @@
 package com.pantheon.service.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
-public record OrcamentoCreationRequest(@NotEmpty @Valid List<OrcamentoLineItemRequest> items) {
+/** {@code items} may be empty (a blank Rascunho to be filled in via line-item management). */
+public record OrcamentoCreationRequest(@NotNull @Valid List<OrcamentoLineItemRequest> items, @NotNull @Valid FornecedorRequest fornecedor) {
 }

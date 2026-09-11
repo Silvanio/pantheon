@@ -80,7 +80,9 @@
       "team": "Equipe",
       "dailyReport": "Diário de Obra",
       "projects": "Projetos",
-      "materials": "Materiais",
+      "equipment": "Equipamentos",
+      "purchaseRequests": "Pedido de Compra",
+      "orcamentos": "Orçamentos",
       "schedule": "Cronograma",
       "scheduleDisabled": "Em breve",
       "permissions": "Permissões"
@@ -169,21 +171,6 @@
       "MAINTENANCE": "Manutenção",
       "UNAVAILABLE": "Indisponível",
       "updateError": "Não foi possível atualizar o status do equipamento."
-    }
-  },
-  "materials": {
-    "title": "Materiais",
-    "subtitle": "Catálogo de materiais desta obra.",
-    "empty": "Nenhum material cadastrado ainda.",
-    "newButton": "Novo material",
-    "toggleLabel": "Materiais",
-    "form": {
-      "name": "Nome",
-      "unit": "Unidade de medida",
-      "unitPlaceholder": "Ex: m³, kg, un, sc",
-      "submit": "Cadastrar",
-      "cancel": "Cancelar",
-      "error": "Não foi possível cadastrar o material. Verifique os dados e tente novamente."
     }
   },
   "members": {
@@ -296,7 +283,8 @@
       "material": "Material",
       "quantity": "Quantidade",
       "addButton": "Adicionar",
-      "error": "Não foi possível adicionar o material recebido."
+      "error": "Não foi possível adicionar o material recebido.",
+      "unit": "Unidade (opcional)"
     },
     "media": {
       "title": "Fotos e vídeos",
@@ -328,84 +316,136 @@
       "error": "Não foi possível gerar o PDF."
     }
   },
-  "materialRequests": {
-    "toggleLabel": "Pedidos de Material",
-    "list": {
-      "title": "Pedidos de Material",
-      "subtitle": "Pedidos de material desta obra e seu status.",
-      "empty": "Nenhum pedido registrado ainda.",
-      "newButton": "Novo pedido",
-      "back": "Voltar",
-      "filterLabel": "Filtrar por status",
-      "filterAll": "Todos",
-      "requestLabel": "Pedido"
-    },
-    "status": {
-      "PENDING": "Pendente",
-      "APPROVED": "Aprovado",
-      "REJECTED": "Rejeitado",
-      "PARTIALLY_RECEIVED": "Recebido parcialmente",
-      "RECEIVED": "Recebido"
-    },
-    "form": {
-      "material": "Material",
-      "quantity": "Quantidade",
-      "addItemButton": "Adicionar item",
-      "removeItemButton": "Remover",
-      "submit": "Criar pedido",
-      "cancel": "Cancelar",
-      "error": "Não foi possível criar o pedido. Verifique os itens informados."
-    },
-    "detail": {
-      "loadError": "Não foi possível carregar o pedido.",
-      "itemsTitle": "Itens solicitados",
-      "requestedBy": "Solicitado por",
-      "decisionNote": "Motivo",
-      "approveButton": "Aprovar",
-      "rejectButton": "Rejeitar",
-      "rejectReasonLabel": "Motivo da rejeição",
-      "rejectReasonPlaceholder": "Explique o motivo da rejeição",
-      "confirmReject": "Confirmar rejeição",
-      "decisionError": "Não foi possível registrar a decisão.",
-      "verificationTitle": "Conferência de recebimento",
-      "verificationEmpty": "Nenhum item conferido ainda.",
-      "verifyButton": "Registrar recebimento",
-      "receivedQuantity": "Quantidade recebida",
-      "verificationNote": "Observação",
-      "verificationNotePlaceholder": "Motivo da divergência, se houver",
-      "divergent": "Divergência",
-      "verificationError": "Não foi possível registrar a conferência.",
-      "alreadyVerified": "Já conferido",
-      "uploadPhoto": "Anexar foto de entrega"
-    }
-  },
   "orcamento": {
     "title": "Orçamentos",
     "label": "Orçamento",
+    "subtitle": "Orçamentos desta obra e seu status de aprovação.",
     "newButton": "Novo orçamento",
     "empty": "Nenhum orçamento criado ainda.",
+    "back": "Voltar",
     "error": "Não foi possível concluir a ação. Tente novamente.",
-    "sendButton": "Enviar ao cliente",
-    "approveButton": "Aprovar",
-    "rejectButton": "Rejeitar",
+    "loadError": "Não foi possível carregar o orçamento.",
+    "lineItemsTitle": "Itens do orçamento",
+    "lineItemsEmpty": "Nenhum item adicionado ainda.",
+    "addItemButton": "Adicionar item",
+    "removeItemButton": "Remover",
+    "editItemButton": "Editar",
+    "submitButton": "Enviar para aprovação",
+    "submitError": "Não foi possível enviar o orçamento para aprovação. Adicione ao menos um item.",
+    "concludeButton": "Concluir orçamento",
+    "approveStepButton": "Aprovar",
+    "rejectStepButton": "Rejeitar",
     "rejectReasonPlaceholder": "Motivo da rejeição",
-    "rejectionReason": "Motivo da rejeição",
-    "uploadPaymentProof": "Anexar comprovante de pagamento",
-    "uploadInvoice": "Anexar nota fiscal",
+    "confirmReject": "Confirmar rejeição",
+    "lastRejectionReason": "Motivo da última rejeição",
+    "approvalHistoryTitle": "Histórico de aprovação",
+    "cycleLabel": "Ciclo",
+    "stepLabel": "Etapa",
+    "materialsTitle": "Materiais gerados",
+    "materialsEmpty": "Nenhum material gerado ainda.",
     "form": {
+      "name": "Nome",
+      "type": "Tipo",
+      "quantity": "Quantidade",
       "unitPrice": "Preço unitário",
-      "submit": "Criar orçamento",
-      "error": "Não foi possível criar o orçamento. Verifique os preços informados."
+      "submit": "Salvar item",
+      "cancel": "Cancelar",
+      "error": "Não foi possível salvar o item. Verifique os dados informados."
     },
     "status": {
       "DRAFT": "Rascunho",
-      "SENT": "Enviado",
+      "IN_APPROVAL": "Em aprovação",
+      "APPROVED": "Aprovado",
+      "COMPLETED": "Concluído"
+    },
+    "approvalStatus": {
+      "PENDING": "Pendente",
       "APPROVED": "Aprovado",
       "REJECTED": "Rejeitado"
     },
-    "attachmentKind": {
-      "PAYMENT_PROOF": "Comprovante de pagamento",
-      "INVOICE": "Nota fiscal"
+    "approverFunction": {
+      "CLIENT": "Cliente",
+      "ARCHITECT": "Arquiteto",
+      "ENGINEER": "Engenheiro",
+      "SITE_FOREMAN": "Mestre de Obra",
+      "SERVICE_PROVIDER": "Prestador de Serviço",
+      "OTHER": "Outro"
+    },
+    "approvalLevels": {
+      "title": "Níveis de aprovação de orçamento",
+      "subtitle": "Defina a sequência de funções que devem aprovar um orçamento nesta obra. Sem configuração, um único nível (Engenheiro) é usado.",
+      "stepLabel": "Etapa",
+      "addLevelButton": "Adicionar nível",
+      "removeLevelButton": "Remover",
+      "saveButton": "Salvar níveis",
+      "error": "Não foi possível salvar os níveis de aprovação.",
+      "saved": "Níveis de aprovação salvos."
+    },
+    "dateFilterLabel": "Filtrar por data",
+    "purchaseRequestFilterLabel": "Filtrar por pedido de compra",
+    "clearFilterButton": "Limpar filtros",
+    "sourcePurchaseRequestLabel": "Originado do pedido",
+    "supplierSectionTitle": "Fornecedor",
+    "totalLabel": "Total",
+    "changeSupplierButton": "Trocar fornecedor"
+  },
+  "purchaseRequests": {
+    "title": "Pedido de Compra",
+    "subtitle": "Pedidos de materiais que esta obra precisa comprar.",
+    "toggleLabel": "Pedido de Compra",
+    "empty": "Nenhum pedido de compra criado ainda.",
+    "newButton": "Novo pedido",
+    "dateFilterLabel": "Filtrar por data",
+    "clearFilterButton": "Limpar filtro",
+    "backToList": "Voltar aos pedidos",
+    "detailTitle": "Itens do pedido",
+    "pendingTitle": "Pendentes",
+    "convertedTitle": "Convertidos em orçamento",
+    "convertButton": "Criar orçamento",
+    "convertError": "Não foi possível criar o orçamento a partir dos itens selecionados.",
+    "addRowButton": "+ Adicionar item",
+    "removeRowButton": "Remover",
+    "form": {
+      "name": "Nome",
+      "type": "Tipo",
+      "quantity": "Quantidade",
+      "unit": "Unidade",
+      "submit": "Criar pedido",
+      "cancel": "Cancelar",
+      "error": "Não foi possível criar o pedido. Verifique os dados informados."
+    },
+    "status": {
+      "PENDING": "Pendente",
+      "CONVERTED": "Convertido"
     }
+  },
+  "materialDelivery": {
+    "title": "Materiais",
+    "markDeliveredButton": "Marcar como entregue",
+    "markCheckedButton": "Marcar como conferido",
+    "uploadPhotoLabel": "Anexar foto(s) da conferência",
+    "error": "Não foi possível atualizar o status do material.",
+    "status": {
+      "AWAITING_DELIVERY": "Aguardando entrega",
+      "DELIVERED": "Entregue",
+      "DELIVERED_AND_CHECKED": "Entregue e conferido"
+    }
+  },
+  "fornecedor": {
+    "title": "Fornecedor",
+    "subtitle": "Dados da empresa que está fazendo este orçamento.",
+    "cnpjLabel": "CNPJ",
+    "cnpjPlaceholder": "Digite o CNPJ",
+    "nameLabel": "Nome",
+    "addressLabel": "Endereço",
+    "contactNameLabel": "Contato (nome)",
+    "contactPhoneLabel": "Contato (telefone)",
+    "searching": "Buscando fornecedores...",
+    "suggestionsTitle": "Fornecedores encontrados",
+    "noMatchHint": "Nenhum fornecedor encontrado com este CNPJ. Preencha os dados abaixo para cadastrar um novo.",
+    "selectedHint": "Dados preenchidos automaticamente. Você pode ajustá-los se necessário.",
+    "continueButton": "Continuar",
+    "cancelButton": "Cancelar",
+    "error": "Preencha o CNPJ e o nome do fornecedor."
   }
 }

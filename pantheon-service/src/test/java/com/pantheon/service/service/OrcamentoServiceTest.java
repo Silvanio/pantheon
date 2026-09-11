@@ -3,34 +3,38 @@ package com.pantheon.service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.pantheon.service.dto.OrcamentoCreationRequest;
+import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.dto.OrcamentoLineItemRequest;
-import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
-import com.pantheon.service.entity.MaterialRequest;
-import com.pantheon.service.entity.MaterialRequestStatus;
+import com.pantheon.service.entity.Fornecedor;
 import com.pantheon.service.entity.Orcamento;
+import com.pantheon.service.entity.OrcamentoApproval;
+import com.pantheon.service.entity.OrcamentoApprovalStatus;
+import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.OrcamentoStatus;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
-import com.pantheon.service.exception.NotSiteClientException;
-import com.pantheon.service.exception.OrcamentoNotSentException;
+import com.pantheon.service.entity.SiteOrcamentoApprovalLevel;
+import com.pantheon.service.exception.NotCurrentApprovalStepException;
+import com.pantheon.service.exception.OrcamentoEmptyException;
+import com.pantheon.service.exception.OrcamentoNotApprovedException;
 import com.pantheon.service.messaging.EventPublisher;
+import com.pantheon.service.messaging.OrcamentoApprovalStepPendingEvent;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
-import com.pantheon.service.repository.MaterialRequestRepository;
-import com.pantheon.service.repository.OrcamentoAttachmentRepository;
+import com.pantheon.service.repository.OrcamentoApprovalRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
+import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
-import com.pantheon.service.repository.AppUserRepository;
-import com.pantheon.service.storage.StorageService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,10 +57,7 @@ class OrcamentoServiceTest {
     private OrcamentoLineItemRepository lineItemRepository;
 
     @Mock
-    private OrcamentoAttachmentRepository attachmentRepository;
-
-    @Mock
-    private MaterialRequestRepository materialRequestRepository;
+    private OrcamentoApprovalRepository approvalRepository;
 
     @Mock
     private ConstructionSiteRepository siteRepository;
@@ -68,13 +69,22 @@ class OrcamentoServiceTest {
     private AppUserRepository userRepository;
 
     @Mock
+    private PurchaseRequestRepository purchaseRequestRepository;
+
+    @Mock
     private SiteAccessService siteAccessService;
 
     @Mock
     private SitePermissionService permissionService;
 
     @Mock
-    private StorageService storageService;
+    private SiteOrcamentoApprovalLevelService approvalLevelService;
+
+    @Mock
+    private MaterialService materialService;
+
+    @Mock
+    private FornecedorService fornecedorService;
 
     @Mock
     private EventPublisher eventPublisher;
@@ -82,134 +92,253 @@ class OrcamentoServiceTest {
     private OrcamentoService service;
 
     private UUID siteId;
-    private UUID requestId;
-    private MaterialRequest materialRequest;
+    private UUID companyId;
 
     @BeforeEach
     void setUp() {
         service = new OrcamentoService(
-                orcamentoRepository, lineItemRepository, attachmentRepository, materialRequestRepository, siteRepository,
-                siteMembershipRepository, userRepository, siteAccessService, permissionService, storageService,
-                eventPublisher);
+                orcamentoRepository, lineItemRepository, approvalRepository, siteRepository, siteMembershipRepository,
+                userRepository, purchaseRequestRepository, siteAccessService, permissionService, approvalLevelService,
+                materialService, fornecedorService, eventPublisher);
 
         siteId = UUID.randomUUID();
-        requestId = UUID.randomUUID();
-        materialRequest = new MaterialRequest(requestId, siteId, UUID.randomUUID(), Instant.now());
-        lenient().when(materialRequestRepository.findById(requestId)).thenReturn(Optional.of(materialRequest));
-        lenient().when(materialRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        companyId = UUID.randomUUID();
+        lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));
         lenient().when(orcamentoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        lenient().when(siteAccessService.requireAccess(any(), any())).thenReturn(new SiteAccessContext(true, null));
+        lenient().when(lineItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(approvalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
+        lenient().when(fornecedorService.findOrCreate(eq(companyId), any(), any())).thenAnswer(inv -> {
+            FornecedorRequest req = inv.getArgument(2);
+            return new Fornecedor(
+                    UUID.randomUUID(), companyId, req.cnpj(), req.name(), req.address(), req.contactName(),
+                    req.contactPhone(), UUID.randomUUID(), Instant.now());
+        });
+    }
+
+    private ConstructionSite site(UUID id) {
+        return new ConstructionSite(
+                id, companyId, "Obra", "Endereco", LocalDate.now(), null, UUID.randomUUID(), Instant.now());
+    }
+
+    private SiteMembership activeMember(UUID userId, ConstructionFunction function) {
+        SiteMembership member = SiteMembership.invited(UUID.randomUUID(), siteId, userId, function, null, Instant.now());
+        member.accept();
+        return member;
+    }
+
+    private FornecedorRequest fornecedorRequest() {
+        return new FornecedorRequest("12345678000199", "Fornecedor Teste", null, null, null);
+    }
+
+    private Orcamento orcamento() {
+        return new Orcamento(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor Teste",
+                null, null, null, null, null);
     }
 
     @Test
-    void createDraftsOrcamentoWithPricedLineItems() {
-        UUID itemId = UUID.randomUUID();
+    void createPersistsDraftOrcamentoWithLineItems() {
         UUID actingUserId = UUID.randomUUID();
 
-        Orcamento result = service.create(
-                requestId, actingUserId, new OrcamentoCreationRequest(List.of(new OrcamentoLineItemRequest(itemId, new BigDecimal("10.50")))));
+        Orcamento result = service.create(siteId, actingUserId, List.of(
+                new OrcamentoLineItemRequest("Cimento", "Saco", new BigDecimal("50"), new BigDecimal("32.5"))),
+                fornecedorRequest());
 
-        assertThat(result.getMaterialRequestId()).isEqualTo(requestId);
+        assertThat(result.getConstructionSiteId()).isEqualTo(siteId);
         assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.DRAFT);
-        verify(permissionService).requireManage(siteId, new SiteAccessContext(true, null), PermissionCapability.MATERIAL_REQUEST);
+        assertThat(result.getFornecedorCnpj()).isEqualTo("12345678000199");
+        assertThat(result.getFornecedorNome()).isEqualTo("Fornecedor Teste");
+        verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.ORCAMENTO_MANAGE));
+        verify(lineItemRepository).save(argThat(
+                item -> item.getName().equals("Cimento") && item.getUnitPrice().equals(new BigDecimal("32.5"))));
     }
 
     @Test
-    void sendTransitionsToSentAndNotifiesActiveClients() {
-        Orcamento orcamento = new Orcamento(UUID.randomUUID(), requestId, UUID.randomUUID(), Instant.now());
+    void createReusesExistingFornecedorForSameCnpj() {
+        UUID actingUserId = UUID.randomUUID();
+        Fornecedor existing = new Fornecedor(
+                UUID.randomUUID(), companyId, "12345678000199", "Fornecedor Existente", null, null, null,
+                UUID.randomUUID(), Instant.now());
+        when(fornecedorService.findOrCreate(eq(companyId), any(), any())).thenReturn(existing);
+
+        Orcamento result = service.create(siteId, actingUserId, List.of(), fornecedorRequest());
+
+        assertThat(result.getFornecedorNome()).isEqualTo("Fornecedor Existente");
+    }
+
+    @Test
+    void submitForApprovalRejectsEmptyOrcamento() {
+        Orcamento orcamento = orcamento();
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+        when(lineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.submitForApproval(orcamento.getId(), UUID.randomUUID()))
+                .isInstanceOf(OrcamentoEmptyException.class);
+    }
+
+    @Test
+    void submitForApprovalCreatesStepsFromDefaultLevelAndNotifies() {
+        Orcamento orcamento = orcamento();
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+        when(lineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of(new OrcamentoLineItem(
+                UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, null)));
+        when(approvalLevelService.getEffectiveLevels(siteId)).thenReturn(List.of(new SiteOrcamentoApprovalLevel(
+                UUID.randomUUID(), siteId, 1, ConstructionFunction.ENGINEER, Instant.now())));
+
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteMembershipRepository.findByConstructionSiteIdAndFunction(siteId, ConstructionFunction.ENGINEER))
+                .thenReturn(List.of(activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(userRepository.findById(engineerUserId)).thenReturn(Optional.of(
+                new AppUser(engineerUserId, "eng@example.com", "Eng", "hash", null, Instant.now(), Instant.now())));
+
+        Orcamento result = service.submitForApproval(orcamento.getId(), UUID.randomUUID());
+
+        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.IN_APPROVAL);
+        assertThat(result.getCurrentApprovalCycle()).isEqualTo(1);
+        verify(approvalRepository).save(
+                argThat(a -> a.getStepOrder() == 1 && a.getApproverFunction() == ConstructionFunction.ENGINEER));
+        verify(eventPublisher).publish(eq(OrcamentoApprovalStepPendingEvent.TYPE), any());
+    }
+
+    @Test
+    void approveStepAdvancesToNextStepWithoutApprovingOrcamento() {
+        Orcamento orcamento = orcamento();
+        orcamento.submitForApproval(Instant.now());
         when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
 
-        ConstructionSite site = new ConstructionSite(
-                siteId, UUID.randomUUID(), "Obra", "Endereco", LocalDate.now(), null, UUID.randomUUID(), Instant.now());
-        when(siteRepository.findById(siteId)).thenReturn(Optional.of(site));
+        OrcamentoApproval step1 = new OrcamentoApproval(
+                UUID.randomUUID(), orcamento.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        OrcamentoApproval step2 = new OrcamentoApproval(
+                UUID.randomUUID(), orcamento.getId(), 1, 2, ConstructionFunction.CLIENT, Instant.now());
+        when(approvalRepository.findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                orcamento.getId(), 1, OrcamentoApprovalStatus.PENDING))
+                .thenReturn(Optional.of(step1), Optional.of(step2));
 
-        UUID clientUserId = UUID.randomUUID();
-        SiteMembership client = SiteMembership.invited(
-                UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, null, Instant.now());
-        client.accept();
-        when(siteMembershipRepository.findByConstructionSiteId(siteId)).thenReturn(List.of(client));
-        when(userRepository.findById(clientUserId)).thenReturn(
-                Optional.of(new AppUser(clientUserId, "cliente@example.com", "Cliente", "hash", null, Instant.now(), Instant.now())));
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(siteMembershipRepository.findByConstructionSiteIdAndFunction(siteId, ConstructionFunction.CLIENT))
+                .thenReturn(List.of());
 
-        Orcamento result = service.send(orcamento.getId(), UUID.randomUUID());
+        Orcamento result = service.approveStep(orcamento.getId(), engineerUserId, null);
 
-        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.SENT);
-        verify(eventPublisher).publish(org.mockito.ArgumentMatchers.eq("orcamento-sent"), any());
+        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.IN_APPROVAL);
+        assertThat(step1.getStatus()).isEqualTo(OrcamentoApprovalStatus.APPROVED);
     }
 
     @Test
-    void approveRequiresActiveClientMembership() {
-        Orcamento orcamento = new Orcamento(UUID.randomUUID(), requestId, UUID.randomUUID(), Instant.now());
-        orcamento.send(Instant.now());
+    void approveStepApprovesOrcamentoWhenLastStep() {
+        Orcamento orcamento = orcamento();
+        orcamento.submitForApproval(Instant.now());
         when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
 
-        UUID nonClientUserId = UUID.randomUUID();
-        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, nonClientUserId)).thenReturn(Optional.empty());
+        OrcamentoApproval onlyStep = new OrcamentoApproval(
+                UUID.randomUUID(), orcamento.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                orcamento.getId(), 1, OrcamentoApprovalStatus.PENDING))
+                .thenReturn(Optional.of(onlyStep), Optional.empty());
 
-        assertThatThrownBy(() -> service.approve(orcamento.getId(), nonClientUserId)).isInstanceOf(NotSiteClientException.class);
-    }
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
 
-    @Test
-    void approveRequiresSentStatus() {
-        Orcamento draft = new Orcamento(UUID.randomUUID(), requestId, UUID.randomUUID(), Instant.now());
-        when(orcamentoRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
-
-        UUID clientUserId = UUID.randomUUID();
-        SiteMembership client = SiteMembership.invited(UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, null, Instant.now());
-        client.accept();
-        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, clientUserId)).thenReturn(Optional.of(client));
-
-        assertThatThrownBy(() -> service.approve(draft.getId(), clientUserId)).isInstanceOf(OrcamentoNotSentException.class);
-    }
-
-    @Test
-    void approvingSentOrcamentoApprovesThePendingMaterialRequest() {
-        Orcamento orcamento = new Orcamento(UUID.randomUUID(), requestId, UUID.randomUUID(), Instant.now());
-        orcamento.send(Instant.now());
-        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
-
-        UUID clientUserId = UUID.randomUUID();
-        SiteMembership client = SiteMembership.invited(UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, null, Instant.now());
-        client.accept();
-        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, clientUserId)).thenReturn(Optional.of(client));
-
-        Orcamento result = service.approve(orcamento.getId(), clientUserId);
+        Orcamento result = service.approveStep(orcamento.getId(), engineerUserId, null);
 
         assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.APPROVED);
-        assertThat(materialRequest.getStatus()).isEqualTo(MaterialRequestStatus.APPROVED);
-        verify(materialRequestRepository, times(1)).save(materialRequest);
     }
 
     @Test
-    void rejectRequiresAReason() {
-        Orcamento orcamento = new Orcamento(UUID.randomUUID(), requestId, UUID.randomUUID(), Instant.now());
-        orcamento.send(Instant.now());
+    void approveStepBlocksNonMatchingFunction() {
+        Orcamento orcamento = orcamento();
+        orcamento.submitForApproval(Instant.now());
         when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
 
-        UUID clientUserId = UUID.randomUUID();
-        SiteMembership client = SiteMembership.invited(UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, null, Instant.now());
-        client.accept();
-        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, clientUserId)).thenReturn(Optional.of(client));
+        OrcamentoApproval step = new OrcamentoApproval(
+                UUID.randomUUID(), orcamento.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                orcamento.getId(), 1, OrcamentoApprovalStatus.PENDING)).thenReturn(Optional.of(step));
 
-        assertThatThrownBy(() -> service.reject(orcamento.getId(), clientUserId, " "))
+        UUID architectUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, architectUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(architectUserId, ConstructionFunction.ARCHITECT)));
+
+        assertThatThrownBy(() -> service.approveStep(orcamento.getId(), architectUserId, null))
+                .isInstanceOf(NotCurrentApprovalStepException.class);
+    }
+
+    @Test
+    void companyStaffCanAlwaysActOnApprovalStep() {
+        Orcamento orcamento = orcamento();
+        orcamento.submitForApproval(Instant.now());
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+
+        OrcamentoApproval step = new OrcamentoApproval(
+                UUID.randomUUID(), orcamento.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                orcamento.getId(), 1, OrcamentoApprovalStatus.PENDING))
+                .thenReturn(Optional.of(step), Optional.empty());
+
+        UUID staffUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, staffUserId)).thenReturn(new SiteAccessContext(true, null));
+
+        Orcamento result = service.approveStep(orcamento.getId(), staffUserId, "ok");
+
+        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.APPROVED);
+        assertThat(step.getDecidedBySiteMembershipId()).isNull();
+    }
+
+    @Test
+    void rejectStepRequiresAReason() {
+        assertThatThrownBy(() -> service.rejectStep(UUID.randomUUID(), UUID.randomUUID(), " "))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void rejectWithReasonLeavesMaterialRequestPendingForARevision() {
-        Orcamento orcamento = new Orcamento(UUID.randomUUID(), requestId, UUID.randomUUID(), Instant.now());
-        orcamento.send(Instant.now());
+    void rejectStepReturnsOrcamentoToDraftWithReason() {
+        Orcamento orcamento = orcamento();
+        orcamento.submitForApproval(Instant.now());
         when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
 
-        UUID clientUserId = UUID.randomUUID();
-        SiteMembership client = SiteMembership.invited(UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, null, Instant.now());
-        client.accept();
-        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, clientUserId)).thenReturn(Optional.of(client));
+        OrcamentoApproval step = new OrcamentoApproval(
+                UUID.randomUUID(), orcamento.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                orcamento.getId(), 1, OrcamentoApprovalStatus.PENDING)).thenReturn(Optional.of(step));
 
-        Orcamento result = service.reject(orcamento.getId(), clientUserId, "Preço muito alto");
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
 
-        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.REJECTED);
-        assertThat(result.getRejectionReason()).isEqualTo("Preço muito alto");
-        assertThat(materialRequest.getStatus()).isEqualTo(MaterialRequestStatus.PENDING);
+        Orcamento result = service.rejectStep(orcamento.getId(), engineerUserId, "Preço muito alto");
+
+        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.DRAFT);
+        assertThat(result.getLastRejectionReason()).isEqualTo("Preço muito alto");
+        assertThat(step.getStatus()).isEqualTo(OrcamentoApprovalStatus.REJECTED);
+    }
+
+    @Test
+    void concludeRequiresApprovedStatus() {
+        Orcamento draft = orcamento();
+        when(orcamentoRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+
+        assertThatThrownBy(() -> service.conclude(draft.getId(), UUID.randomUUID()))
+                .isInstanceOf(OrcamentoNotApprovedException.class);
+    }
+
+    @Test
+    void concludeCreatesMaterialsFromLineItems() {
+        Orcamento orcamento = orcamento();
+        orcamento.submitForApproval(Instant.now());
+        orcamento.approve(Instant.now());
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+
+        List<OrcamentoLineItem> items = List.of(new OrcamentoLineItem(
+                UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, null));
+        when(lineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(items);
+
+        Orcamento result = service.conclude(orcamento.getId(), UUID.randomUUID());
+
+        assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.COMPLETED);
+        verify(materialService).createFromOrcamento(orcamento, items);
     }
 }

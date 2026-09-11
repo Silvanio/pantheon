@@ -16,9 +16,10 @@ import org.springframework.stereotype.Service;
  * Resolves a site member's effective {@link AccessLevel} for a {@link PermissionCapability}:
  * a member-specific override wins, then a function-level override, then the hardcoded default
  * below (matching the pre-permission-configuration role rules, so a freshly created obra needs
- * no configuration to behave correctly). {@code MATERIAL_REQUEST}/{@code MATERIAL_APPROVAL}
- * have no real "view" mode — {@link AccessLevel#MANAGE} means granted, {@link AccessLevel#VIEW}
- * means denied.
+ * no configuration to behave correctly). {@code PURCHASE_REQUEST}/{@code ORCAMENTO_MANAGE}
+ * have no real "view" mode - {@link AccessLevel#MANAGE} means granted, {@link AccessLevel#VIEW}
+ * means denied. Orcamento approval-step authority is resolved separately, from that site's
+ * {@code SiteOrcamentoApprovalLevel} configuration, not from a capability here.
  */
 @Service
 public class SitePermissionService {
@@ -30,33 +31,33 @@ public class SitePermissionService {
         DEFAULTS.put(ConstructionFunction.ENGINEER, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.MANAGE,
                 PermissionCapability.DAILY_REPORT, AccessLevel.MANAGE,
-                PermissionCapability.EQUIPMENT_MATERIAL, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_REQUEST, AccessLevel.MANAGE,
-                PermissionCapability.MATERIAL_APPROVAL, AccessLevel.MANAGE));
+                PermissionCapability.EQUIPMENT, AccessLevel.VIEW,
+                PermissionCapability.PURCHASE_REQUEST, AccessLevel.MANAGE,
+                PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.MANAGE));
         DEFAULTS.put(ConstructionFunction.ARCHITECT, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.MANAGE,
                 PermissionCapability.DAILY_REPORT, AccessLevel.MANAGE,
-                PermissionCapability.EQUIPMENT_MATERIAL, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_REQUEST, AccessLevel.MANAGE,
-                PermissionCapability.MATERIAL_APPROVAL, AccessLevel.VIEW));
+                PermissionCapability.EQUIPMENT, AccessLevel.VIEW,
+                PermissionCapability.PURCHASE_REQUEST, AccessLevel.MANAGE,
+                PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.MANAGE));
         DEFAULTS.put(ConstructionFunction.SITE_FOREMAN, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
                 PermissionCapability.DAILY_REPORT, AccessLevel.MANAGE,
-                PermissionCapability.EQUIPMENT_MATERIAL, AccessLevel.MANAGE,
-                PermissionCapability.MATERIAL_REQUEST, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_APPROVAL, AccessLevel.VIEW));
+                PermissionCapability.EQUIPMENT, AccessLevel.MANAGE,
+                PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW,
+                PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW));
         DEFAULTS.put(ConstructionFunction.CLIENT, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
                 PermissionCapability.DAILY_REPORT, AccessLevel.VIEW,
-                PermissionCapability.EQUIPMENT_MATERIAL, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_REQUEST, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_APPROVAL, AccessLevel.VIEW));
+                PermissionCapability.EQUIPMENT, AccessLevel.VIEW,
+                PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW,
+                PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW));
         DEFAULTS.put(ConstructionFunction.SERVICE_PROVIDER, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
                 PermissionCapability.DAILY_REPORT, AccessLevel.VIEW,
-                PermissionCapability.EQUIPMENT_MATERIAL, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_REQUEST, AccessLevel.VIEW,
-                PermissionCapability.MATERIAL_APPROVAL, AccessLevel.VIEW));
+                PermissionCapability.EQUIPMENT, AccessLevel.VIEW,
+                PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW,
+                PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW));
     }
 
     private final SitePermissionOverrideRepository overrideRepository;

@@ -46,7 +46,7 @@ class SitePermissionServiceTest {
     void companyStaffAlwaysResolveToManage() {
         SiteAccessContext staffAccess = new SiteAccessContext(true, null);
 
-        AccessLevel level = service.resolve(siteId, staffAccess, PermissionCapability.MATERIAL_APPROVAL);
+        AccessLevel level = service.resolve(siteId, staffAccess, PermissionCapability.ORCAMENTO_MANAGE);
 
         assertThat(level).isEqualTo(AccessLevel.MANAGE);
     }
@@ -93,28 +93,28 @@ class SitePermissionServiceTest {
 
     @Test
     void requireManageThrowsWhenResolvedAccessIsViewOnly() {
-        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.MATERIAL_REQUEST))
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.PURCHASE_REQUEST))
                 .thenReturn(Optional.empty());
         when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
-                        siteId, ConstructionFunction.CLIENT, PermissionCapability.MATERIAL_REQUEST))
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.PURCHASE_REQUEST))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.requireManage(siteId, clientAccess, PermissionCapability.MATERIAL_REQUEST))
+        assertThatThrownBy(() -> service.requireManage(siteId, clientAccess, PermissionCapability.PURCHASE_REQUEST))
                 .isInstanceOf(ForbiddenCapabilityException.class);
     }
 
     @Test
-    void engineerCanApproveMaterialsByDefault() {
+    void engineerCanManageOrcamentoByDefault() {
         SiteMembership engineer = SiteMembership.invited(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.ENGINEER, null, Instant.now());
         engineer.accept();
         SiteAccessContext engineerAccess = new SiteAccessContext(false, engineer);
-        when(overrideRepository.findBySiteMembershipIdAndCapability(engineer.getId(), PermissionCapability.MATERIAL_APPROVAL))
+        when(overrideRepository.findBySiteMembershipIdAndCapability(engineer.getId(), PermissionCapability.ORCAMENTO_MANAGE))
                 .thenReturn(Optional.empty());
         when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
-                        siteId, ConstructionFunction.ENGINEER, PermissionCapability.MATERIAL_APPROVAL))
+                        siteId, ConstructionFunction.ENGINEER, PermissionCapability.ORCAMENTO_MANAGE))
                 .thenReturn(Optional.empty());
 
-        service.requireManage(siteId, engineerAccess, PermissionCapability.MATERIAL_APPROVAL);
+        service.requireManage(siteId, engineerAccess, PermissionCapability.ORCAMENTO_MANAGE);
     }
 }

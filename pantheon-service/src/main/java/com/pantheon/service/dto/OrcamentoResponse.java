@@ -7,18 +7,34 @@ import java.util.UUID;
 
 public record OrcamentoResponse(
         UUID id,
-        UUID materialRequestId,
+        UUID constructionSiteId,
         OrcamentoStatus status,
         UUID createdBy,
         Instant createdAt,
-        Instant sentAt,
-        Instant decidedAt,
-        String rejectionReason) {
+        Instant submittedAt,
+        Instant approvedAt,
+        Instant completedAt,
+        int currentApprovalCycle,
+        String lastRejectionReason,
+        String fornecedorCnpj,
+        String fornecedorNome,
+        String fornecedorEndereco,
+        String fornecedorContatoNome,
+        String fornecedorContatoTelefone,
+        UUID sourcePurchaseRequestId,
+        String sourcePurchaseRequestName) {
 
     public static OrcamentoResponse from(Orcamento orcamento) {
+        return from(orcamento, null);
+    }
+
+    public static OrcamentoResponse from(Orcamento orcamento, String sourcePurchaseRequestName) {
         return new OrcamentoResponse(
-                orcamento.getId(), orcamento.getMaterialRequestId(), orcamento.getStatus(), orcamento.getCreatedBy(),
-                orcamento.getCreatedAt(), orcamento.getSentAt(), orcamento.getDecidedAt(),
-                orcamento.getRejectionReason());
+                orcamento.getId(), orcamento.getConstructionSiteId(), orcamento.getStatus(), orcamento.getCreatedBy(),
+                orcamento.getCreatedAt(), orcamento.getSubmittedAt(), orcamento.getApprovedAt(),
+                orcamento.getCompletedAt(), orcamento.getCurrentApprovalCycle(), orcamento.getLastRejectionReason(),
+                orcamento.getFornecedorCnpj(), orcamento.getFornecedorNome(), orcamento.getFornecedorEndereco(),
+                orcamento.getFornecedorContatoNome(), orcamento.getFornecedorContatoTelefone(),
+                orcamento.getSourcePurchaseRequestId(), sourcePurchaseRequestName);
     }
 }

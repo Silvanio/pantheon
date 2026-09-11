@@ -66,10 +66,10 @@ The daily construction report (Relatório Diário de Obra / RDO) — one `DailyR
 - **THEN** `pantheon-service` adds an occurrence entry to that report
 
 ### Requirement: Materials received logging
-`pantheon-service` SHALL allow one or more `DailyReportMaterialReceived` records, referencing the site's registered `Material` catalog, to be recorded on a draft daily report.
+`pantheon-service` SHALL allow one or more `DailyReportMaterialReceived` records, each a free-text material name with an optional unit of measure, to be recorded on a draft daily report.
 
 #### Scenario: Material received entry added
-- **WHEN** a project member submits a reference to one of the site's registered materials and a quantity for a draft daily report
+- **WHEN** a project member submits a material name, optional unit, and a quantity for a draft daily report
 - **THEN** `pantheon-service` adds a materials-received entry to that report
 
 ### Requirement: Report comments

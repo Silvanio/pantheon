@@ -1,0 +1,52 @@
+## Context
+
+Today: `Material` (catalog: name+unit, cadastro'd per site) → `MaterialRequest`/`MaterialRequestItem` (picks catalog items + quantity, single approve/reject step gated by `MATERIAL_APPROVAL`) → `Orcamento`/`OrcamentoLineItem` (line items reference the `MaterialRequestItem`, priced; single client-approval gate via `SENT`→`APPROVED`/`REJECTED`) → `ReceiptVerification` per `MaterialRequestItem` (received quantity, photos). Equipment (`Equipment`/`EquipmentStatus`) shares a UI tab and a permission capability (`EQUIPMENT_MATERIAL`) with the material catalog but is otherwise independent. `DailyReportMaterialReceived` also FKs into the `Material` catalog. This is a from-scratch obra-management product still in active development with only seed/test data in any environment — there are no real customers depending on today's shape, which is why this change can cut over cleanly instead of running both models in parallel.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Replace the catalog-bound purchase pipeline with a free-text one: a running "Pedido de Compra" list, a quote (Orçamento) whose line items are always typed in by hand, and delivery tracking that only exists for materials that made it through an approved, concluded quote.
+- Support a per-obra-configurable, sequential, multi-step Orçamento approval chain (1..N steps, each tied to a construction-site function), replacing the hard-coded single client-approval gate.
+- Give equipment its own tab and its own permission capability, independent of anything material-related.
+- Keep obras that have no approval-chain configuration working exactly as before (a single approval step) so this isn't a hard breaking change for the *behavior*, only for the *data shape*.
+
+**Non-Goals:**
+- No automatic migration of existing `Material` catalog rows, `MaterialRequest`s, or in-flight `Orcamento`s into the new shape — see Migration Plan.
+- No payment-proof/invoice attachment on Orçamento in this pass (the old `OrcamentoAttachment`/`AttachmentKind` behavior is dropped, not carried over) — nothing in the requested redesign calls for it, and re-adding it later is a small, additive follow-up if needed.
+- No UI for reordering/renaming approval steps mid-flight once an Orçamento has already been submitted for approval (the step list is snapshotted at submit time).
+- No change to `SiteDocumentProjectService`, `DailyReportEquipmentUsage`, or any other feature that doesn't touch the material catalog.
+
+## Decisions
+
+**1. "Pedido de Compra" is a flat per-site item list, not a header/document entity.** The ask describes a single ongoing list per obra ("inserir os materiais que vamos precisar comprar"), not multiple named purchase-request documents, and it has no approval step of its own. So: one entity, `PurchaseRequestItem` (site-scoped, free-text name/type/quantity/unit, status `PENDING`/`CONVERTED`), no parent "PurchaseRequest" header. Alternative considered: a header entity grouping items into named requests — rejected as unrequested structure with no described use case.
+
+**2. Orçamento line items are always a snapshot, never a live reference.** `OrcamentoLineItem` stores its own `name`/`type`/`quantity`/`unitPrice`. When created from selected `PurchaseRequestItem`s, the text is copied in and each line item keeps an optional `sourcePurchaseRequestItemId` purely for traceability — editing the line item after creation never touches the source, and deleting/changing the source item never touches the orçamento. This matches "os dados do orçamento são a cópia livre, não uma referência viva" and avoids the exact coupling problem (catalog rows being both editable and referenced live) that this change is removing.
+
+**3. Multi-level approval is driven by a per-site ordered function list, snapshotted per submission cycle.** New config entity `SiteOrcamentoApprovalLevel` (site-scoped, `stepOrder`, `approverFunction` from the existing `ConstructionFunction` enum, `active`) lets company staff define e.g. `[ENGINEER, CLIENT]`. A site with no configured levels defaults to a single implicit level (`ENGINEER`) — the same function that held `MATERIAL_APPROVAL` today — so existing/未configured obras keep working unchanged. When an Orçamento is submitted (Rascunho → Em aprovação), the current level config is copied into `OrcamentoApproval` rows tagged with a `cycleNumber` (`Orcamento.currentApprovalCycle`, incremented each submission). Only the lowest-`stepOrder` `PENDING` row in the current cycle is actionable; approving it activates the next step, approving the last step marks the Orçamento `APPROVED`; rejecting at any step sets that row `REJECTED`, records the reason on the Orçamento, and returns it to `Rascunho` (old cycle rows are kept, never deleted, as an audit trail — resubmitting starts a new cycle). Authority to act on a step = the acting user's active `SiteMembership.function` on that site matches the step's `approverFunction` (company staff can always act on any step, consistent with how `SiteAccessContext.companyStaff` already bypasses function-based checks elsewhere in this codebase). Alternative considered: a `MANAGE`/`VIEW` `PermissionCapability` per approval step — rejected because approval authority here is inherently about *which function*, not a flat manage/view toggle; it doesn't fit the existing capability model and would need per-step capabilities anyway.
+
+**4. "Concluído" is a distinct, explicit action from "Aprovado".** Reaching `APPROVED` only means the approval chain finished; someone (anyone with `ORCAMENTO_MANAGE`) still has to explicitly click "Concluir" to lock in the quote and spawn delivery tracking. This matches the ask precisely ("Depois que o Orçamento é concluído aí sim vamos criar os materiais") and keeps "the budget is approved" and "we've committed to buying against it" as separate, auditable moments.
+
+**5. The new `Material` entity is delivery-tracking only, created 1:1 from `OrcamentoLineItem` at conclusion time, and denormalized.** Each `Material` row copies `name`/`type`/`quantity` from its line item at creation time (so later edits to a *different*, unrelated future orçamento can never affect an already-concluded delivery record) and owns its own status (`AWAITING_DELIVERY`/`DELIVERED`/`DELIVERED_AND_CHECKED`) plus `MaterialDeliveryPhoto`s attached when marking `DELIVERED_AND_CHECKED`. This directly replaces `ReceiptVerification`/`ReceiptVerificationPhoto`, which are dropped.
+
+**6. Permission capabilities are split three ways, not kept as one bundle.** `EQUIPMENT_MATERIAL` → `EQUIPMENT` (equipment only). `MATERIAL_REQUEST` → `PURCHASE_REQUEST` (create/edit Pedido de Compra items, and trigger "criar orçamento") — same default matrix as today's `MATERIAL_REQUEST` (`ENGINEER`/`ARCHITECT` = MANAGE, others VIEW). New `ORCAMENTO_MANAGE` covers creating/editing a Rascunho Orçamento and submitting it for approval — same default matrix as today's `MATERIAL_REQUEST` too (it's the same people who today can create a material request and draft/send its orçamento). `MATERIAL_APPROVAL` is retired outright — approval authority now comes from approval-step function matching (Decision 3), not a capability. Existing `SitePermissionOverride` rows for the three retired capability values are deleted by migration since they'd otherwise reference meaningless enum strings.
+
+**7. `DailyReportMaterialReceived` becomes free text.** Its `material_id` FK is dropped in favor of `material_name`/`unit` columns, mirroring how every other "material" mention in this redesign is free text. This is the smallest change that unblocks dropping the `material` catalog table.
+
+**8. Clean-cut Flyway migration, no data carry-forward.** Drop `receipt_verification_photo`, `receipt_verification`, `orcamento_attachment`, `orcamento_line_item`, `orcamento`, `material_request_item`, `material_request`, `material`; recreate `orcamento`/`orcamento_line_item` with the new shape; create `purchase_request_item`, `site_orcamento_approval_level`, `orcamento_approval`, `material` (new shape), `material_delivery_photo`; alter `daily_report_material_received`. Alternative considered: write a data-migration script mapping old rows into the new shape — rejected per Non-Goals (no real customer data exists yet to preserve, and the shapes are different enough — e.g. multi-level approval didn't exist before — that a faithful mapping would be speculative).
+
+## Risks / Trade-offs
+
+- **[Risk]** Dropping `OrcamentoAttachment` removes payment-proof/invoice upload, a real capability today. → **Mitigation**: not requested for removal by name, but also not mentioned as required in the new flow; flagged here explicitly so it's a visible, cheap-to-reverse follow-up rather than a silent regression.
+- **[Risk]** A site could configure an approval level for a function that currently has zero active `SiteMembership`s on that site (e.g. no CLIENT yet invited), stalling every Orçamento indefinitely. → **Mitigation**: company staff can always act on any pending step regardless of function (Decision 3), so there's always an escape hatch; document this in the capability spec.
+- **[Risk]** Denormalizing name/type/quantity onto `Material` at conclusion time means a typo caught after conclusion requires fixing the `Material` row directly (the `OrcamentoLineItem` it came from is now historical). → **Mitigation**: acceptable — the alternative (live FK) is exactly the coupling problem this change removes; a future "edit concluded material" affordance is straightforward to add if needed.
+- **[Risk]** Removing `MaterialRequest`/`ReceiptVerification` is a hard cutover for anyone with in-flight data in a shared dev/staging environment. → **Mitigation**: confirmed non-goal; communicate the cutover, no rollback path beyond restoring a DB backup.
+
+## Migration Plan
+
+1. Flyway migration(s) drop the retired tables/columns and create the new ones (see Decision 8), including deleting `site_permission_override` rows for retired capability values.
+2. Deploy backend (new entities/services/controllers/DTOs) and frontend together — this is not a rolling/backward-compatible change, so both must ship in the same release.
+3. No rollback migration is provided beyond the standard "restore from backup" — consistent with Non-Goals (no production data to preserve yet).
+
+## Open Questions
+
+None outstanding — decisions above resolve every point raised in the proposal discussion.

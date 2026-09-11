@@ -4,7 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.pantheon.message.domain.ProcessedMessage;
 import com.pantheon.message.domain.ProcessedMessageRepository;
 import com.pantheon.message.email.InvitationEmailHandler;
-import com.pantheon.message.email.OrcamentoSentEmailHandler;
+import com.pantheon.message.email.OrcamentoApprovalStepPendingEmailHandler;
 import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -21,17 +21,17 @@ public class EventListener {
     private final ProcessedMessageRepository repository;
     private final ObjectMapper objectMapper;
     private final InvitationEmailHandler invitationEmailHandler;
-    private final OrcamentoSentEmailHandler orcamentoSentEmailHandler;
+    private final OrcamentoApprovalStepPendingEmailHandler orcamentoApprovalStepPendingEmailHandler;
 
     public EventListener(
             ProcessedMessageRepository repository,
             ObjectMapper objectMapper,
             InvitationEmailHandler invitationEmailHandler,
-            OrcamentoSentEmailHandler orcamentoSentEmailHandler) {
+            OrcamentoApprovalStepPendingEmailHandler orcamentoApprovalStepPendingEmailHandler) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.invitationEmailHandler = invitationEmailHandler;
-        this.orcamentoSentEmailHandler = orcamentoSentEmailHandler;
+        this.orcamentoApprovalStepPendingEmailHandler = orcamentoApprovalStepPendingEmailHandler;
     }
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE)
@@ -43,8 +43,8 @@ public class EventListener {
             // failure propagates so the message is retried / dead-lettered rather than lost.
             if (InvitationEmailHandler.EVENT_TYPE.equals(envelope.type())) {
                 invitationEmailHandler.handle(envelope.payload());
-            } else if (OrcamentoSentEmailHandler.EVENT_TYPE.equals(envelope.type())) {
-                orcamentoSentEmailHandler.handle(envelope.payload());
+            } else if (OrcamentoApprovalStepPendingEmailHandler.EVENT_TYPE.equals(envelope.type())) {
+                orcamentoApprovalStepPendingEmailHandler.handle(envelope.payload());
             }
 
             ProcessedMessage processed = new ProcessedMessage(

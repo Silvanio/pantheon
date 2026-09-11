@@ -11,7 +11,7 @@ import {
   type ReportMedia,
   type ReportSignature,
 } from '../composables/useDailyReports'
-import { useEquipmentMaterials, type Equipment, type MaterialItem } from '../composables/useEquipmentMaterials'
+import { useEquipment, type Equipment } from '../composables/useEquipment'
 import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
 import AppHeader from '../components/AppHeader.vue'
 
@@ -37,13 +37,12 @@ const {
   signReport,
   getPdf,
 } = useDailyReports()
-const { listEquipment, listMaterials } = useEquipmentMaterials()
+const { listEquipment } = useEquipment()
 const { listMembers } = useSiteMembers()
 
 const reportId = route.params.id as string
 const detail = ref<DailyReportDetail | null>(null)
 const equipmentCatalog = ref<Equipment[]>([])
-const materialCatalog = ref<MaterialItem[]>([])
 const siteMembers = ref<SiteMember[]>([])
 const loading = ref(false)
 const loadError = ref('')
@@ -82,7 +81,8 @@ const occurrenceDescription = ref('')
 
 // materials received
 const materialReceivedError = ref('')
-const selectedMaterialId = ref('')
+const materialReceivedName = ref('')
+const materialReceivedUnit = ref('')
 const materialQuantity = ref('')
 
 const submitError = ref('')
@@ -122,10 +122,7 @@ async function load() {
     comments.value = detail.value.report.comments ?? ''
 
     const siteId = detail.value.report.constructionSiteId
-    ;[equipmentCatalog.value, materialCatalog.value] = await Promise.all([
-      listEquipment(siteId),
-      listMaterials(siteId),
-    ])
+    equipmentCatalog.value = await listEquipment(siteId)
     siteMembers.value = await listMembers(siteId)
 
     media.value = await listMedia(reportId)
@@ -309,11 +306,13 @@ async function onAddMaterialReceived() {
   materialReceivedError.value = ''
   try {
     const received = await addMaterialReceived(reportId, {
-      materialId: selectedMaterialId.value,
+      materialName: materialReceivedName.value,
+      unit: materialReceivedUnit.value || null,
       quantity: materialQuantity.value,
     })
     detail.value?.materialsReceived.push(received)
-    selectedMaterialId.value = ''
+    materialReceivedName.value = ''
+    materialReceivedUnit.value = ''
     materialQuantity.value = ''
   } catch {
     materialReceivedError.value = t('dailyReports.materialsReceived.error')
@@ -336,10 +335,6 @@ async function onSubmitReport() {
 
 function equipmentName(equipmentId: string): string {
   return equipmentCatalog.value.find((e) => e.id === equipmentId)?.name ?? equipmentId
-}
-
-function materialName(materialId: string): string {
-  return materialCatalog.value.find((m) => m.id === materialId)?.name ?? materialId
 }
 
 onMounted(load)
@@ -530,15 +525,13 @@ onMounted(load)
         <p v-if="detail.materialsReceived.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.materialsReceived.empty') }}</p>
         <ul v-else class="mb-3 space-y-1.5">
           <li v-for="received in detail.materialsReceived" :key="received.id" class="flex justify-between rounded-md border border-steel-200 px-3 py-1.5 text-sm dark:border-steel-700">
-            <span class="text-steel-800 dark:text-steel-50">{{ materialName(received.materialId) }}</span>
-            <span class="text-steel-500 dark:text-steel-400">{{ received.quantity }}</span>
+            <span class="text-steel-800 dark:text-steel-50">{{ received.materialName }}</span>
+            <span class="text-steel-500 dark:text-steel-400">{{ received.quantity }}{{ received.unit ? ` ${received.unit}` : '' }}</span>
           </li>
         </ul>
         <form v-if="isDraft" class="flex flex-wrap items-end gap-2" @submit.prevent="onAddMaterialReceived">
-          <select v-model="selectedMaterialId" required class="field-input">
-            <option value="" disabled>{{ t('dailyReports.materialsReceived.material') }}</option>
-            <option v-for="m in materialCatalog" :key="m.id" :value="m.id">{{ m.name }} ({{ m.unit }})</option>
-          </select>
+          <input v-model="materialReceivedName" required :placeholder="t('dailyReports.materialsReceived.material')" class="field-input" />
+          <input v-model="materialReceivedUnit" :placeholder="t('dailyReports.materialsReceived.unit')" class="field-input w-24" />
           <input v-model="materialQuantity" type="number" step="0.001" min="0" required :placeholder="t('dailyReports.materialsReceived.quantity')" class="field-input w-32" />
           <button type="submit" class="btn-primary px-3 py-1.5">{{ t('dailyReports.materialsReceived.addButton') }}</button>
         </form>

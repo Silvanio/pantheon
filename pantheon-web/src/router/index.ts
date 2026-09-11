@@ -11,8 +11,8 @@ import CompanySettingsView from '../views/CompanySettingsView.vue'
 import SiteDetailView from '../views/SiteDetailView.vue'
 import InvitationView from '../views/InvitationView.vue'
 import DailyReportDetailView from '../views/DailyReportDetailView.vue'
-import MaterialRequestListView from '../views/MaterialRequestListView.vue'
-import MaterialRequestDetailView from '../views/MaterialRequestDetailView.vue'
+import OrcamentoDetailView from '../views/OrcamentoDetailView.vue'
+import PurchaseRequestDetailView from '../views/PurchaseRequestDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -48,15 +48,15 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/construction-sites/:siteId/material-requests',
-      name: 'material-request-list',
-      component: MaterialRequestListView,
+      path: '/orcamentos/:id',
+      name: 'orcamento-detail',
+      component: OrcamentoDetailView,
       meta: { requiresAuth: true },
     },
     {
-      path: '/material-requests/:id',
-      name: 'material-request-detail',
-      component: MaterialRequestDetailView,
+      path: '/purchase-requests/:id',
+      name: 'purchase-request-detail',
+      component: PurchaseRequestDetailView,
       meta: { requiresAuth: true },
     },
   ],

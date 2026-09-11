@@ -38,13 +38,63 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
-    @ExceptionHandler(OrcamentoNotSentException.class)
-    public ResponseEntity<String> handleOrcamentoNotSent(OrcamentoNotSentException e) {
+    @ExceptionHandler(OrcamentoNotDraftException.class)
+    public ResponseEntity<String> handleOrcamentoNotDraft(OrcamentoNotDraftException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
-    @ExceptionHandler(NotSiteClientException.class)
-    public ResponseEntity<String> handleNotSiteClient(NotSiteClientException e) {
+    @ExceptionHandler(OrcamentoNotApprovedException.class)
+    public ResponseEntity<String> handleOrcamentoNotApproved(OrcamentoNotApprovedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrcamentoEmptyException.class)
+    public ResponseEntity<String> handleOrcamentoEmpty(OrcamentoEmptyException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(NoPendingApprovalStepException.class)
+    public ResponseEntity<String> handleNoPendingApprovalStep(NoPendingApprovalStepException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(NotCurrentApprovalStepException.class)
+    public ResponseEntity<String> handleNotCurrentApprovalStep(NotCurrentApprovalStepException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestItemNotFoundException.class)
+    public ResponseEntity<String> handlePurchaseRequestItemNotFound(PurchaseRequestItemNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestItemAlreadyConvertedException.class)
+    public ResponseEntity<String> handlePurchaseRequestItemAlreadyConverted(PurchaseRequestItemAlreadyConvertedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(MaterialNotFoundException.class)
+    public ResponseEntity<String> handleMaterialNotFound(MaterialNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(MaterialDeliveryStatusOrderException.class)
+    public ResponseEntity<String> handleMaterialDeliveryStatusOrder(MaterialDeliveryStatusOrderException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestNotFoundException.class)
+    public ResponseEntity<String> handlePurchaseRequestNotFound(PurchaseRequestNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(ItemsSpanMultiplePurchaseRequestsException.class)
+    public ResponseEntity<String> handleItemsSpanMultiplePurchaseRequests(ItemsSpanMultiplePurchaseRequestsException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(CnpjPrefixTooShortException.class)
+    public ResponseEntity<String> handleCnpjPrefixTooShort(CnpjPrefixTooShortException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 }

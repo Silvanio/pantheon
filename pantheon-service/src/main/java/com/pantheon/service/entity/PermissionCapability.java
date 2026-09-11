@@ -7,5 +7,6 @@ public enum PermissionCapability {
     EQUIPMENT,
     PURCHASE_REQUEST,
     ORCAMENTO_MANAGE,
-    TASKS
+    TASKS,
+    TEAM_MANAGE
 }

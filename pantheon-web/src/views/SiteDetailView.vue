@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useConstructionSites, type ConstructionSite } from '../composables/useConstructionSites'
+import { useCompanies } from '../composables/useCompanies'
 import SitePhoto from '../components/SitePhoto.vue'
 import SiteTeamPanel from '../components/SiteTeamPanel.vue'
 import SiteDocumentProjectsPanel from '../components/SiteDocumentProjectsPanel.vue'
@@ -19,10 +20,12 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { getSite, updateSitePhoto } = useConstructionSites()
+const { listMyCompanies } = useCompanies()
 
 const siteId = route.params.siteId as string
 const site = ref<ConstructionSite | null>(null)
 const loading = ref(false)
+const isCompanyAdmin = ref(false)
 
 type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('team')
@@ -31,6 +34,8 @@ async function load() {
   loading.value = true
   try {
     site.value = await getSite(siteId)
+    const memberships = await listMyCompanies()
+    isCompanyAdmin.value = memberships.some((m) => m.companyId === site.value?.companyId && m.role === 'ADMIN')
   } finally {
     loading.value = false
   }
@@ -156,6 +161,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.schedule') }}
           </button>
           <button
+            v-if="isCompanyAdmin"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'permissions' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -172,7 +178,7 @@ onMounted(load)
         <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests'" :site-id="siteId" />
         <OrcamentoListPanel v-if="activeTab === 'orcamentos'" :site-id="siteId" />
         <TasksBoardPanel v-if="activeTab === 'tasks'" :site-id="siteId" />
-        <template v-if="activeTab === 'permissions'">
+        <template v-if="activeTab === 'permissions' && isCompanyAdmin">
           <SitePermissionsPanel :site-id="siteId" />
           <SiteOrcamentoApprovalLevelsPanel :site-id="siteId" />
         </template>

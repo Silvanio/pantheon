@@ -17,4 +17,6 @@ public interface SitePermissionOverrideRepository extends JpaRepository<SitePerm
 
     Optional<SitePermissionOverride> findByConstructionSiteIdAndFunctionAndCapability(
             UUID constructionSiteId, ConstructionFunction function, PermissionCapability capability);
+
+    void deleteBySiteMembershipId(UUID siteMembershipId);
 }

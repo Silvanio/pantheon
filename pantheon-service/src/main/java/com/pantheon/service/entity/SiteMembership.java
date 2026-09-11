@@ -96,6 +96,13 @@ public class SiteMembership {
                 createdAt);
     }
 
+    /** The company admin who created the obra: auto-enrolled as its ADMIN member, active immediately. */
+    public static SiteMembership admin(UUID id, UUID constructionSiteId, UUID userId, Instant createdAt) {
+        return new SiteMembership(
+                id, constructionSiteId, userId, ConstructionFunction.ADMIN, null, MembershipStatus.ACTIVE, null,
+                null, null, createdAt);
+    }
+
     /** A service-provider member with no account: immediately usable, no invitation involved. */
     public static SiteMembership accountless(
             UUID id,

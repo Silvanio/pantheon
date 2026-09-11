@@ -6,12 +6,16 @@ import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.MembershipInvitation;
 import com.pantheon.service.entity.MembershipType;
+import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.MemberAlreadyActiveException;
 import com.pantheon.service.exception.NotSiteMemberException;
+import com.pantheon.service.exception.SiteMembershipNotFoundException;
 import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.repository.SitePermissionOverrideRepository;
+import com.pantheon.service.repository.TaskCardAssigneeRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -34,18 +38,27 @@ public class SiteMembershipService {
     private final AppUserRepository userRepository;
     private final MembershipInvitationIssuer invitationIssuer;
     private final SiteAccessService siteAccessService;
+    private final SitePermissionService permissionService;
+    private final SitePermissionOverrideRepository permissionOverrideRepository;
+    private final TaskCardAssigneeRepository taskCardAssigneeRepository;
 
     public SiteMembershipService(
             SiteMembershipRepository membershipRepository,
             MembershipInvitationRepository invitationRepository,
             AppUserRepository userRepository,
             MembershipInvitationIssuer invitationIssuer,
-            SiteAccessService siteAccessService) {
+            SiteAccessService siteAccessService,
+            SitePermissionService permissionService,
+            SitePermissionOverrideRepository permissionOverrideRepository,
+            TaskCardAssigneeRepository taskCardAssigneeRepository) {
         this.membershipRepository = membershipRepository;
         this.invitationRepository = invitationRepository;
         this.userRepository = userRepository;
         this.invitationIssuer = invitationIssuer;
         this.siteAccessService = siteAccessService;
+        this.permissionService = permissionService;
+        this.permissionOverrideRepository = permissionOverrideRepository;
+        this.taskCardAssigneeRepository = taskCardAssigneeRepository;
     }
 
     @Transactional
@@ -131,6 +144,22 @@ public class SiteMembershipService {
                             !m.isActive());
                 })
                 .toList();
+    }
+
+    @Transactional
+    public void removeMember(UUID constructionSiteId, UUID actingUserId, UUID membershipId) {
+        SiteAccessContext access = siteAccessService.requireAccess(constructionSiteId, actingUserId);
+        permissionService.requireManage(constructionSiteId, access, PermissionCapability.TEAM_MANAGE);
+
+        SiteMembership membership = membershipRepository.findById(membershipId)
+                .orElseThrow(() -> new SiteMembershipNotFoundException(membershipId));
+        if (!membership.getConstructionSiteId().equals(constructionSiteId)) {
+            throw new SiteMembershipNotFoundException(membershipId);
+        }
+
+        taskCardAssigneeRepository.deleteBySiteMembershipId(membershipId);
+        permissionOverrideRepository.deleteBySiteMembershipId(membershipId);
+        membershipRepository.delete(membership);
     }
 
     private void requireCompanyStaff(UUID constructionSiteId, UUID userId) {

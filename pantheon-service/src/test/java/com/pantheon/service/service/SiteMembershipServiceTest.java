@@ -3,7 +3,10 @@ package com.pantheon.service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.entity.AppUser;
@@ -11,12 +14,16 @@ import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.MembershipInvitation;
 import com.pantheon.service.entity.MembershipType;
+import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.MemberAlreadyActiveException;
 import com.pantheon.service.exception.NotSiteMemberException;
+import com.pantheon.service.exception.SiteMembershipNotFoundException;
 import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.repository.SitePermissionOverrideRepository;
+import com.pantheon.service.repository.TaskCardAssigneeRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -45,6 +52,15 @@ class SiteMembershipServiceTest {
     @Mock
     private SiteAccessService siteAccessService;
 
+    @Mock
+    private SitePermissionService permissionService;
+
+    @Mock
+    private SitePermissionOverrideRepository permissionOverrideRepository;
+
+    @Mock
+    private TaskCardAssigneeRepository taskCardAssigneeRepository;
+
     private SiteMembershipService service;
 
     private UUID siteId;
@@ -52,7 +68,9 @@ class SiteMembershipServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SiteMembershipService(membershipRepository, invitationRepository, userRepository, invitationIssuer, siteAccessService);
+        service = new SiteMembershipService(
+                membershipRepository, invitationRepository, userRepository, invitationIssuer, siteAccessService,
+                permissionService, permissionOverrideRepository, taskCardAssigneeRepository);
         lenient().when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         siteId = UUID.randomUUID();
         staffUserId = UUID.randomUUID();
@@ -144,5 +162,36 @@ class SiteMembershipServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).function()).isEqualTo(ConstructionFunction.CLIENT);
+    }
+
+    @Test
+    void removeMemberDeletesMembershipAndDependents() {
+        SiteMembership membership = SiteMembership.admin(UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now());
+        when(membershipRepository.findById(membership.getId())).thenReturn(Optional.of(membership));
+
+        service.removeMember(siteId, staffUserId, membership.getId());
+
+        verify(taskCardAssigneeRepository).deleteBySiteMembershipId(membership.getId());
+        verify(permissionOverrideRepository).deleteBySiteMembershipId(membership.getId());
+        verify(membershipRepository).delete(membership);
+    }
+
+    @Test
+    void removeMemberRejectsCallerWithoutTeamManagePermission() {
+        SiteMembership membership = SiteMembership.admin(UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now());
+        doThrow(new com.pantheon.service.exception.ForbiddenCapabilityException(siteId, PermissionCapability.TEAM_MANAGE))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TEAM_MANAGE));
+
+        assertThatThrownBy(() -> service.removeMember(siteId, staffUserId, membership.getId()))
+                .isInstanceOf(com.pantheon.service.exception.ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void removeMemberRejectsMembershipFromAnotherSite() {
+        SiteMembership membership = SiteMembership.admin(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now());
+        when(membershipRepository.findById(membership.getId())).thenReturn(Optional.of(membership));
+
+        assertThatThrownBy(() -> service.removeMember(siteId, staffUserId, membership.getId()))
+                .isInstanceOf(SiteMembershipNotFoundException.class);
     }
 }

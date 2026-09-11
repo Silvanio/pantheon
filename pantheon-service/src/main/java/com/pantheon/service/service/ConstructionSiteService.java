@@ -4,12 +4,14 @@ import com.pantheon.service.dto.ConstructionSiteRegistrationRequest;
 import com.pantheon.service.entity.CompanyMembership;
 import com.pantheon.service.entity.CompanyRole;
 import com.pantheon.service.entity.ConstructionSite;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.SiteStatus;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.NotCompanyAdminException;
 import com.pantheon.service.exception.NotCompanyMemberException;
 import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,16 +23,19 @@ public class ConstructionSiteService {
 
     private final ConstructionSiteRepository siteRepository;
     private final CompanyMembershipRepository membershipRepository;
+    private final SiteMembershipRepository siteMembershipRepository;
     private final PlanService planService;
     private final SiteAccessService siteAccessService;
 
     public ConstructionSiteService(
             ConstructionSiteRepository siteRepository,
             CompanyMembershipRepository membershipRepository,
+            SiteMembershipRepository siteMembershipRepository,
             PlanService planService,
             SiteAccessService siteAccessService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
+        this.siteMembershipRepository = siteMembershipRepository;
         this.planService = planService;
         this.siteAccessService = siteAccessService;
     }
@@ -40,6 +45,7 @@ public class ConstructionSiteService {
         requireAdmin(companyId, actingUserId);
         planService.requireCapacityForNewSite(companyId);
 
+        Instant now = Instant.now();
         ConstructionSite site = new ConstructionSite(
                 UUID.randomUUID(),
                 companyId,
@@ -48,8 +54,12 @@ public class ConstructionSiteService {
                 request.startDate(),
                 request.expectedEndDate(),
                 actingUserId,
-                Instant.now());
-        return siteRepository.save(site);
+                now);
+        siteRepository.save(site);
+
+        siteMembershipRepository.save(SiteMembership.admin(UUID.randomUUID(), site.getId(), actingUserId, now));
+
+        return site;
     }
 
     @Transactional

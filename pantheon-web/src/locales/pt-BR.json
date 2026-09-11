@@ -114,6 +114,9 @@
     "subtitle": "Clientes, prestadores de serviço, arquitetos, engenheiros e mestres de obra.",
     "empty": "Nenhum membro cadastrado ainda.",
     "newButton": "Adicionar membro",
+    "remove": "Remover",
+    "removeConfirm": "Remover este membro da equipe? Ele deixará de aparecer como responsável nos cards da obra.",
+    "removeError": "Não foi possível remover o membro. Tente novamente.",
     "form": {
       "email": "E-mail",
       "cpf": "CPF",
@@ -130,6 +133,7 @@
     },
     "function": {
       "label": "Função na obra",
+      "ADMIN": "Administrador",
       "CLIENT": "Cliente",
       "ARCHITECT": "Arquiteto",
       "ENGINEER": "Engenheiro",

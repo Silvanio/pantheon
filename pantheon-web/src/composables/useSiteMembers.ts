@@ -1,7 +1,7 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 
-export type ConstructionFunction = 'CLIENT' | 'ARCHITECT' | 'ENGINEER' | 'SITE_FOREMAN' | 'SERVICE_PROVIDER'
+export type ConstructionFunction = 'ADMIN' | 'CLIENT' | 'ARCHITECT' | 'ENGINEER' | 'SITE_FOREMAN' | 'SERVICE_PROVIDER'
 export type MembershipStatus = 'INVITED' | 'ACTIVE' | 'NONE'
 
 export interface SiteMember {
@@ -60,5 +60,9 @@ export function useSiteMembers() {
     return authFetch(`/api/sites/${siteId}/members`, { method: 'POST', body: JSON.stringify(data) })
   }
 
-  return { listMembers, addMember }
+  function removeMember(siteId: string, membershipId: string): Promise<void> {
+    return authFetch(`/api/sites/${siteId}/members/${membershipId}`, { method: 'DELETE' })
+  }
+
+  return { listMembers, addMember, removeMember }
 }

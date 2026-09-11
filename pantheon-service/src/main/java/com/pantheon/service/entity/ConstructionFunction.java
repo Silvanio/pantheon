@@ -6,6 +6,7 @@ package com.pantheon.service.entity;
  * key permission checks off it explicitly (see {@code SitePermissionService}).
  */
 public enum ConstructionFunction {
+    ADMIN,
     CLIENT,
     ENGINEER,
     ARCHITECT,

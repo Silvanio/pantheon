@@ -13,4 +13,6 @@ public interface TaskCardAssigneeRepository extends JpaRepository<TaskCardAssign
     Optional<TaskCardAssignee> findByCardIdAndSiteMembershipId(UUID cardId, UUID siteMembershipId);
 
     void deleteByCardId(UUID cardId);
+
+    void deleteBySiteMembershipId(UUID siteMembershipId);
 }

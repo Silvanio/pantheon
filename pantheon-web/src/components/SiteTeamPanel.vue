@@ -7,7 +7,7 @@ import { HttpError } from '../composables/useAuth'
 const props = defineProps<{ siteId: string }>()
 
 const { t } = useI18n()
-const { listMembers, addMember } = useSiteMembers()
+const { listMembers, addMember, removeMember } = useSiteMembers()
 
 const members = ref<SiteMember[]>([])
 const loading = ref(false)
@@ -15,6 +15,7 @@ const showForm = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const noticeMessage = ref('')
+const confirmingRemovalOf = ref<string | null>(null)
 
 const functions: ConstructionFunction[] = ['CLIENT', 'ARCHITECT', 'ENGINEER', 'SITE_FOREMAN', 'SERVICE_PROVIDER']
 const memberFunction = ref<ConstructionFunction>('CLIENT')
@@ -73,6 +74,18 @@ async function onSubmit() {
       error instanceof HttpError && error.status === 409 ? t('siteTeam.form.alreadyMember') : t('siteTeam.form.error')
   } finally {
     submitting.value = false
+  }
+}
+
+async function onRemove(membershipId: string) {
+  errorMessage.value = ''
+  try {
+    await removeMember(props.siteId, membershipId)
+    confirmingRemovalOf.value = null
+    await loadMembers()
+  } catch {
+    errorMessage.value = t('siteTeam.removeError')
+    confirmingRemovalOf.value = null
   }
 }
 
@@ -141,7 +154,7 @@ onMounted(loadMembers)
 
     <p v-if="!loading && members.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('siteTeam.empty') }}</p>
     <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      <li v-for="member in members" :key="member.membershipId" class="flex items-center justify-between rounded-lg border border-steel-200 px-4 py-3 dark:border-steel-700">
+      <li v-for="member in members" :key="member.membershipId" class="relative flex items-center justify-between rounded-lg border border-steel-200 px-4 py-3 dark:border-steel-700">
         <div class="min-w-0">
           <p class="flex items-center gap-2 truncate font-medium text-steel-800 dark:text-steel-50">
             <span class="truncate">{{ member.displayName ?? member.email }}</span>
@@ -149,9 +162,33 @@ onMounted(loadMembers)
           </p>
           <p v-if="member.email" class="truncate text-sm text-steel-500 dark:text-steel-400">{{ member.email }}</p>
         </div>
-        <div class="shrink-0 pl-3 text-right text-sm">
-          <p class="text-steel-700 dark:text-steel-200">{{ t(`siteTeam.function.${member.function}`) }}</p>
-          <p v-if="member.trade" class="text-steel-500 dark:text-steel-400">{{ member.trade }}</p>
+        <div class="flex shrink-0 items-start gap-2 pl-3">
+          <div class="text-right text-sm">
+            <p class="text-steel-700 dark:text-steel-200">{{ t(`siteTeam.function.${member.function}`) }}</p>
+            <p v-if="member.trade" class="text-steel-500 dark:text-steel-400">{{ member.trade }}</p>
+          </div>
+          <button
+            type="button"
+            class="btn-ghost px-2 py-1 text-xs text-safety-600 dark:text-safety-500"
+            @click="confirmingRemovalOf = member.membershipId"
+          >
+            {{ t('siteTeam.remove') }}
+          </button>
+        </div>
+
+        <div
+          v-if="confirmingRemovalOf === member.membershipId"
+          class="modal-panel absolute right-0 top-full z-10 mt-2 w-64 p-3 shadow-lg"
+        >
+          <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('siteTeam.removeConfirm') }}</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingRemovalOf = null">
+              {{ t('siteTeam.form.cancel') }}
+            </button>
+            <button type="button" class="btn-danger py-1 text-xs" @click="onRemove(member.membershipId)">
+              {{ t('siteTeam.remove') }}
+            </button>
+          </div>
         </div>
       </li>
     </ul>

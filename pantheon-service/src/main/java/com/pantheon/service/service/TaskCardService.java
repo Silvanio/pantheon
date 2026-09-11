@@ -5,16 +5,24 @@ import com.pantheon.service.dto.TaskCardCreationRequest;
 import com.pantheon.service.dto.UpdateTaskCardDueDateRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.TaskCard;
+import com.pantheon.service.entity.TaskCardAssignee;
 import com.pantheon.service.entity.TaskCardLabel;
 import com.pantheon.service.entity.TaskColumn;
+import com.pantheon.service.entity.TaskLabel;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.SiteMembershipNotFoundException;
 import com.pantheon.service.exception.TaskCardNotFoundException;
 import com.pantheon.service.exception.TaskColumnNotFoundException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.repository.TaskCardAssigneeRepository;
 import com.pantheon.service.repository.TaskCardLabelRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskColumnRepository;
+import com.pantheon.service.repository.TaskCommentRepository;
+import com.pantheon.service.repository.TaskLabelRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Obra-scoped Tasks board: cards placed into the columns shared by that obra's company. Read
- * access only requires site membership; create/move require {@code MANAGE} on
+ * access only requires site membership; create/move/assign/delete require {@code MANAGE} on
  * {@link PermissionCapability#TASKS}. See {@code obra-tasks-board}.
  */
 @Service
@@ -34,18 +42,28 @@ public class TaskCardService {
     private final TaskCardRepository cardRepository;
     private final TaskColumnRepository columnRepository;
     private final TaskCardLabelRepository cardLabelRepository;
+    private final TaskLabelRepository labelRepository;
+    private final TaskCommentRepository commentRepository;
+    private final TaskCardAssigneeRepository assigneeRepository;
     private final ConstructionSiteRepository siteRepository;
+    private final SiteMembershipRepository siteMembershipRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
 
     public TaskCardService(
             TaskCardRepository cardRepository, TaskColumnRepository columnRepository,
-            TaskCardLabelRepository cardLabelRepository, ConstructionSiteRepository siteRepository,
+            TaskCardLabelRepository cardLabelRepository, TaskLabelRepository labelRepository,
+            TaskCommentRepository commentRepository, TaskCardAssigneeRepository assigneeRepository,
+            ConstructionSiteRepository siteRepository, SiteMembershipRepository siteMembershipRepository,
             SiteAccessService siteAccessService, SitePermissionService permissionService) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
         this.cardLabelRepository = cardLabelRepository;
+        this.labelRepository = labelRepository;
+        this.commentRepository = commentRepository;
+        this.assigneeRepository = assigneeRepository;
         this.siteRepository = siteRepository;
+        this.siteMembershipRepository = siteMembershipRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
     }
@@ -56,8 +74,19 @@ public class TaskCardService {
 
         List<TaskColumn> columns = columnRepository.findByCompanyIdOrderBySortOrderAsc(site.getCompanyId());
         List<TaskCard> cards = cardRepository.findByConstructionSiteIdOrderBySortOrderAsc(siteId);
-        Map<UUID, List<UUID>> labelIdsByCard = labelIdsByCard(cards);
-        return new TaskBoard(columns, cards, labelIdsByCard);
+        List<UUID> cardIds = cards.stream().map(TaskCard::getId).toList();
+
+        Map<UUID, List<UUID>> labelIdsByCard = labelIdsByCard(cardIds);
+        Map<UUID, List<UUID>> assigneeIdsByCard = assigneeIdsByCard(cardIds);
+        Map<UUID, Long> commentCountByCard = commentRepository.countByCardIdIn(cardIds).stream()
+                .collect(Collectors.toMap(
+                        TaskCommentRepository.CardCommentCount::getCardId,
+                        TaskCommentRepository.CardCommentCount::getCommentCount));
+
+        List<UUID> attachedLabelIds = labelIdsByCard.values().stream().flatMap(List::stream).distinct().toList();
+        List<TaskLabel> labels = labelRepository.findAllById(attachedLabelIds);
+
+        return new TaskBoard(columns, cards, labelIdsByCard, assigneeIdsByCard, commentCountByCard, labels);
     }
 
     @Transactional
@@ -94,21 +123,76 @@ public class TaskCardService {
         return cardRepository.save(card);
     }
 
+    @Transactional
+    public void assign(UUID cardId, UUID actingUserId, UUID siteMembershipId) {
+        TaskCard card = requireCard(cardId);
+        requireManage(card.getConstructionSiteId(), actingUserId);
+        requireMembershipOnSite(siteMembershipId, card.getConstructionSiteId());
+
+        if (assigneeRepository.findByCardIdAndSiteMembershipId(cardId, siteMembershipId).isEmpty()) {
+            assigneeRepository.save(new TaskCardAssignee(UUID.randomUUID(), cardId, siteMembershipId, Instant.now()));
+        }
+    }
+
+    @Transactional
+    public void unassign(UUID cardId, UUID actingUserId, UUID siteMembershipId) {
+        TaskCard card = requireCard(cardId);
+        requireManage(card.getConstructionSiteId(), actingUserId);
+
+        assigneeRepository.findByCardIdAndSiteMembershipId(cardId, siteMembershipId)
+                .ifPresent(assigneeRepository::delete);
+    }
+
+    @Transactional
+    public void deleteCard(UUID cardId, UUID actingUserId) {
+        TaskCard card = requireCard(cardId);
+        requireManage(card.getConstructionSiteId(), actingUserId);
+
+        cardLabelRepository.deleteByCardId(cardId);
+        labelRepository.deleteByCardId(cardId);
+        commentRepository.deleteByCardId(cardId);
+        assigneeRepository.deleteByCardId(cardId);
+        cardRepository.delete(card);
+    }
+
     public List<UUID> labelIdsForCard(UUID cardId) {
         return cardLabelRepository.findByCardIdIn(List.of(cardId)).stream().map(TaskCardLabel::getLabelId).toList();
     }
 
-    private Map<UUID, List<UUID>> labelIdsByCard(List<TaskCard> cards) {
-        List<UUID> cardIds = cards.stream().map(TaskCard::getId).toList();
+    public List<UUID> assigneeIdsForCard(UUID cardId) {
+        return assigneeRepository.findByCardIdIn(List.of(cardId)).stream()
+                .map(TaskCardAssignee::getSiteMembershipId)
+                .toList();
+    }
+
+    public long commentCountForCard(UUID cardId) {
+        return commentRepository.findByCardIdOrderByCreatedAtAsc(cardId).size();
+    }
+
+    private Map<UUID, List<UUID>> labelIdsByCard(List<UUID> cardIds) {
         List<TaskCardLabel> cardLabels = cardLabelRepository.findByCardIdIn(cardIds);
         return cardLabels.stream().collect(Collectors.groupingBy(
                 TaskCardLabel::getCardId, Collectors.mapping(TaskCardLabel::getLabelId, Collectors.toList())));
+    }
+
+    private Map<UUID, List<UUID>> assigneeIdsByCard(List<UUID> cardIds) {
+        List<TaskCardAssignee> assignees = assigneeRepository.findByCardIdIn(cardIds);
+        return assignees.stream().collect(Collectors.groupingBy(
+                TaskCardAssignee::getCardId, Collectors.mapping(TaskCardAssignee::getSiteMembershipId, Collectors.toList())));
     }
 
     private void requireColumnBelongsToCompany(UUID columnId, UUID companyId) {
         TaskColumn column = columnRepository.findById(columnId).orElseThrow(() -> new TaskColumnNotFoundException(columnId));
         if (!column.getCompanyId().equals(companyId)) {
             throw new TaskColumnNotFoundException(columnId);
+        }
+    }
+
+    private void requireMembershipOnSite(UUID siteMembershipId, UUID siteId) {
+        SiteMembership membership = siteMembershipRepository.findById(siteMembershipId)
+                .orElseThrow(() -> new SiteMembershipNotFoundException(siteMembershipId));
+        if (!membership.getConstructionSiteId().equals(siteId)) {
+            throw new SiteMembershipNotFoundException(siteMembershipId);
         }
     }
 
@@ -125,7 +209,12 @@ public class TaskCardService {
         permissionService.requireManage(siteId, access, PermissionCapability.TASKS);
     }
 
-    /** A site's task board: the company's shared columns, that obra's cards, and each card's label ids. */
-    public record TaskBoard(List<TaskColumn> columns, List<TaskCard> cards, Map<UUID, List<UUID>> labelIdsByCard) {
+    /**
+     * A site's task board: the company's shared columns, that obra's cards, and each card's
+     * label ids, assignee (site membership) ids, and comment count.
+     */
+    public record TaskBoard(
+            List<TaskColumn> columns, List<TaskCard> cards, Map<UUID, List<UUID>> labelIdsByCard,
+            Map<UUID, List<UUID>> assigneeIdsByCard, Map<UUID, Long> commentCountByCard, List<TaskLabel> labels) {
     }
 }

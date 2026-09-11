@@ -9,6 +9,7 @@ import com.pantheon.service.entity.CompanyMembership;
 import com.pantheon.service.entity.CompanyRole;
 import com.pantheon.service.entity.MembershipInvitation;
 import com.pantheon.service.entity.MembershipType;
+import com.pantheon.service.entity.TaskLabel;
 import com.pantheon.service.exception.CompanyNotFoundException;
 import com.pantheon.service.exception.MemberAlreadyActiveException;
 import com.pantheon.service.exception.NotCompanyAdminException;
@@ -19,6 +20,7 @@ import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.CompanyRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.repository.TaskLabelRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +37,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CompanyService {
 
+    private static final String DEFAULT_LABEL_NAME = "Urgente";
+    private static final String DEFAULT_LABEL_COLOR = "#EF4444";
+
     private final CompanyRepository companyRepository;
     private final CompanyMembershipRepository membershipRepository;
     private final AppUserRepository userRepository;
     private final MembershipInvitationRepository invitationRepository;
     private final MembershipInvitationIssuer invitationIssuer;
     private final SiteMembershipRepository siteMembershipRepository;
+    private final TaskLabelRepository taskLabelRepository;
 
     public CompanyService(
             CompanyRepository companyRepository,
@@ -48,13 +54,15 @@ public class CompanyService {
             AppUserRepository userRepository,
             MembershipInvitationRepository invitationRepository,
             MembershipInvitationIssuer invitationIssuer,
-            SiteMembershipRepository siteMembershipRepository) {
+            SiteMembershipRepository siteMembershipRepository,
+            TaskLabelRepository taskLabelRepository) {
         this.companyRepository = companyRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.invitationRepository = invitationRepository;
         this.invitationIssuer = invitationIssuer;
         this.siteMembershipRepository = siteMembershipRepository;
+        this.taskLabelRepository = taskLabelRepository;
     }
 
     @Transactional
@@ -64,6 +72,9 @@ public class CompanyService {
         companyRepository.save(company);
 
         membershipRepository.save(new CompanyMembership(UUID.randomUUID(), company.getId(), creatorId, CompanyRole.ADMIN, now));
+
+        taskLabelRepository.save(
+                TaskLabel.predefined(UUID.randomUUID(), company.getId(), DEFAULT_LABEL_NAME, DEFAULT_LABEL_COLOR, now));
 
         return company;
     }

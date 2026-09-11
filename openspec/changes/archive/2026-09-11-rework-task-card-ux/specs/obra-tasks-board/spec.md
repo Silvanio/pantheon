@@ -1,47 +1,14 @@
-# obra-tasks-board Specification
+## REMOVED Requirements
 
-## Purpose
-Defines the per-obra Tasks board: a Trello-like board of cards placed into the columns shared by the obra's company, scoped to that construction site, with due dates, labels, comments, and assignees.
+### Requirement: Labels scoped to one obra
+**Reason**: Labels are no longer scoped to a single obra. They now split into company-scoped predefined labels (see the new `company-task-labels` capability) and card-only custom labels (see "Card-only custom labels" below).
+**Migration**: Existing per-obra `TaskLabel` rows are cleared as part of the rescoping migration; an obra now draws attachable labels from its company's predefined catalog instead of a per-obra list.
 
-## Requirements
-### Requirement: Tasks tab per obra
-`pantheon-web` SHALL provide a "Tasks" tab within each construction site's menu, rendering a board of the company's shared columns populated with that obra's own cards.
+### Requirement: Inline comment expansion on the card face
+**Reason**: Replaced by a discreet comment-count icon on the card face; comments are now read and posted only from the card's detail modal, never on a closed card.
+**Migration**: None needed — this was `pantheon-web`-only UI behavior with no persisted state to migrate.
 
-#### Scenario: Member opens the Tasks tab
-- **WHEN** a construction site member opens the "Tasks" tab
-- **THEN** `pantheon-web` shows the company's columns with that obra's cards placed inside them
-
-### Requirement: Cards scoped to one obra
-`pantheon-service` SHALL scope every `TaskCard` to exactly one `constructionSiteId`; creating, listing, or moving cards on one obra SHALL never expose or modify another obra's cards, even when both obras share the same columns.
-
-#### Scenario: Card created in one obra is invisible in another
-- **WHEN** a card is created on one construction site's task board
-- **THEN** requesting the task board of a different construction site under the same company does not include that card
-
-### Requirement: Card creation
-`pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` on a construction site to create a card on that obra's board, placed into one of the company's columns.
-
-#### Scenario: Member creates a card
-- **WHEN** a member with `MANAGE` access to `TASKS` creates a card with a title in a given column
-- **THEN** `pantheon-service` persists the card on that obra's board in the chosen column
-
-### Requirement: Card movement between columns
-`pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` on a construction site to move any of that obra's cards to any of the company's columns.
-
-#### Scenario: Card moved to another column
-- **WHEN** a member with `MANAGE` access to `TASKS` moves a card from one column to another
-- **THEN** `pantheon-service` updates the card's column and returns the updated board
-
-### Requirement: Comments on cards
-`pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` to add a comment to any card in that obra, and allow any member with at least `VIEW` access to `TASKS` to read a card's comments.
-
-#### Scenario: Member adds a comment
-- **WHEN** a member with `MANAGE` access to `TASKS` posts a comment on a card
-- **THEN** `pantheon-service` persists the comment attributed to that member
-
-#### Scenario: View-only member reads comments
-- **WHEN** a member with `VIEW`-only access to `TASKS` requests a card's comments
-- **THEN** `pantheon-service` returns the existing comments
+## MODIFIED Requirements
 
 ### Requirement: Card due date
 `pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` to set or clear a `TaskCard`'s due date (an optional, day-granularity date with no associated time), both at creation and afterward; `pantheon-web` SHALL display a card's due date as a small, discreet marker in the top-right corner of the card face when set, rendered in a distinct color once the due date has been reached or passed.
@@ -72,6 +39,8 @@ Defines the per-obra Tasks board: a Trello-like board of cards placed into the c
 #### Scenario: Card with labels shown on the board
 - **WHEN** a card has one or more labels attached
 - **THEN** `pantheon-web` shows each attached label's name and color as a small pill directly on the card face
+
+## ADDED Requirements
 
 ### Requirement: Predefined labels attachable to cards
 `pantheon-service` SHALL allow a member with `MANAGE` access to `TASKS` on a construction site to attach or detach any of that site's company's predefined labels (see `company-task-labels`) to or from a card on that obra's board.

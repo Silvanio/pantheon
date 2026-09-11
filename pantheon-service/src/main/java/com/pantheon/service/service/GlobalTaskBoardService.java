@@ -68,7 +68,7 @@ public class GlobalTaskBoardService {
         Map<UUID, List<UUID>> labelIdsByCard = cardLabelRepository.findByCardIdIn(cardIds).stream()
                 .collect(Collectors.groupingBy(TaskCardLabel::getCardId, Collectors.mapping(TaskCardLabel::getLabelId, Collectors.toList())));
 
-        List<TaskLabel> labels = labelRepository.findByConstructionSiteIdIn(siteById.keySet().stream().toList());
+        List<TaskLabel> labels = labelRepository.findByCompanyIdOrderByNameAsc(companyId);
 
         return new GlobalTaskBoard(columns, cards, siteById, labelIdsByCard, labels);
     }

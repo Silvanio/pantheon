@@ -58,6 +58,13 @@
       "delete": "Excluir",
       "error": "Não foi possível salvar a coluna. Tente novamente.",
       "inUseError": "Esta coluna ainda tem cards em alguma obra e não pode ser excluída."
+    },
+    "taskLabels": {
+      "title": "Labels predefinidas do quadro de Tasks",
+      "subtitle": "Estas labels ficam disponíveis para todas as obras da empresa. Apenas administradores podem configurá-las.",
+      "newPlaceholder": "Nome da label",
+      "newButton": "Adicionar label",
+      "error": "Não foi possível salvar a label. Tente novamente."
     }
   },
   "dashboard": {
@@ -183,7 +190,10 @@
     "comments": "Comentários",
     "noComments": "Nenhum comentário ainda.",
     "newCommentPlaceholder": "Escreva um comentário",
-    "addComment": "Comentar"
+    "addComment": "Comentar",
+    "assignees": "Responsáveis",
+    "deleteCard": "Excluir card",
+    "deleteCardConfirm": "Tem certeza que deseja excluir este card? Esta ação não pode ser desfeita."
   },
   "globalTasksBoard": {
     "back": "Voltar ao painel",

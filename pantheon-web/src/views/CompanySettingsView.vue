@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useCompanies } from '../composables/useCompanies'
 import CompanyStaffPanel from '../components/CompanyStaffPanel.vue'
 import CompanyTaskColumnsPanel from '../components/CompanyTaskColumnsPanel.vue'
+import CompanyTaskLabelsPanel from '../components/CompanyTaskLabelsPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 
 const route = useRoute()
@@ -116,6 +117,7 @@ onMounted(async () => {
 
       <CompanyStaffPanel :company-id="companyId" />
       <CompanyTaskColumnsPanel :company-id="companyId" />
+      <CompanyTaskLabelsPanel :company-id="companyId" />
     </main>
   </div>
 </template>

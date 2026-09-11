@@ -80,6 +80,10 @@ body {
   .card-pad {
     @apply p-6;
   }
+  /* Fully opaque surface for dialogs/modals — unlike .card, never lets content behind it show through. */
+  .modal-panel {
+    @apply rounded-2xl border border-steel-200 bg-white shadow-sm dark:border-steel-800 dark:bg-steel-900;
+  }
 
   /* Buttons */
   .btn-primary {

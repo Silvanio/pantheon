@@ -21,6 +21,7 @@ import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.CompanyRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.repository.TaskLabelRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -52,15 +53,19 @@ class CompanyServiceTest {
     @Mock
     private SiteMembershipRepository siteMembershipRepository;
 
+    @Mock
+    private TaskLabelRepository taskLabelRepository;
+
     private CompanyService service;
 
     @BeforeEach
     void setUp() {
         service = new CompanyService(
                 companyRepository, membershipRepository, userRepository, invitationRepository, invitationIssuer,
-                siteMembershipRepository);
+                siteMembershipRepository, taskLabelRepository);
         lenient().when(companyRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(taskLabelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(siteMembershipRepository.findByUserId(any())).thenReturn(List.of());
     }
 
@@ -73,6 +78,18 @@ class CompanyServiceTest {
         assertThat(company.getName()).isEqualTo("Construtora Teste");
         assertThat(company.getPlanId()).isNull();
         assertThat(company.getOnboardingStatus()).isEqualTo(CompanyOnboardingStatus.PLAN_PENDING);
+    }
+
+    @Test
+    void createSeedsPredefinedUrgenteLabel() {
+        Company company = service.create(UUID.randomUUID(), "Construtora Teste");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(com.pantheon.service.entity.TaskLabel.class);
+        org.mockito.Mockito.verify(taskLabelRepository).save(captor.capture());
+        var label = captor.getValue();
+        assertThat(label.getName()).isEqualTo("Urgente");
+        assertThat(label.getCompanyId()).isEqualTo(company.getId());
+        assertThat(label.isPredefined()).isTrue();
     }
 
     @Test

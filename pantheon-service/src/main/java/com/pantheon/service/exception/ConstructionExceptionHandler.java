@@ -117,4 +117,9 @@ public class ConstructionExceptionHandler {
     public ResponseEntity<String> handleTaskLabelNotFound(TaskLabelNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
+
+    @ExceptionHandler(SiteMembershipNotFoundException.class)
+    public ResponseEntity<String> handleSiteMembershipNotFound(SiteMembershipNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
 }

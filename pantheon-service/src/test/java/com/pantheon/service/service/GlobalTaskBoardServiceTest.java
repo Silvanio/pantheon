@@ -85,7 +85,7 @@ class GlobalTaskBoardServiceTest {
         TaskCard cardB = new TaskCard(UUID.randomUUID(), siteBId, UUID.randomUUID(), "Card B", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
         when(cardRepository.findByConstructionSiteIdInOrderBySortOrderAsc(any())).thenReturn(List.of(cardA, cardB));
         when(cardLabelRepository.findByCardIdIn(any())).thenReturn(List.of());
-        when(labelRepository.findByConstructionSiteIdIn(any())).thenReturn(List.of());
+        when(labelRepository.findByCompanyIdOrderByNameAsc(companyId)).thenReturn(List.of());
 
         var board = service.build(companyId, adminUserId);
 
@@ -100,8 +100,9 @@ class GlobalTaskBoardServiceTest {
         when(columnRepository.findByCompanyIdOrderBySortOrderAsc(companyId)).thenReturn(List.of());
         when(cardRepository.findByConstructionSiteIdInOrderBySortOrderAsc(any())).thenReturn(List.of());
         when(cardLabelRepository.findByCardIdIn(any())).thenReturn(List.of());
-        var label = new com.pantheon.service.entity.TaskLabel(UUID.randomUUID(), siteAId, "Urgente", "#EF4444", Instant.now());
-        when(labelRepository.findByConstructionSiteIdIn(any())).thenReturn(List.of(label));
+        var label = com.pantheon.service.entity.TaskLabel.predefined(
+                UUID.randomUUID(), companyId, "Urgente", "#EF4444", Instant.now());
+        when(labelRepository.findByCompanyIdOrderByNameAsc(companyId)).thenReturn(List.of(label));
 
         var board = service.build(companyId, adminUserId);
 

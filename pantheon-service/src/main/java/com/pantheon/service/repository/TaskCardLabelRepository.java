@@ -11,4 +11,8 @@ public interface TaskCardLabelRepository extends JpaRepository<TaskCardLabel, UU
     List<TaskCardLabel> findByCardIdIn(List<UUID> cardIds);
 
     Optional<TaskCardLabel> findByCardIdAndLabelId(UUID cardId, UUID labelId);
+
+    List<TaskCardLabel> findByLabelId(UUID labelId);
+
+    void deleteByCardId(UUID cardId);
 }

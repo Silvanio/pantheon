@@ -8,12 +8,13 @@ import java.util.UUID;
 
 public record TaskCardResponse(
         UUID id, UUID constructionSiteId, UUID columnId, String title, String description, LocalDate dueDate,
-        int sortOrder, List<UUID> labelIds, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        int sortOrder, List<UUID> labelIds, List<UUID> assigneeIds, long commentCount, UUID createdBy,
+        Instant createdAt, Instant updatedAt) {
 
-    public static TaskCardResponse from(TaskCard card, List<UUID> labelIds) {
+    public static TaskCardResponse from(TaskCard card, List<UUID> labelIds, List<UUID> assigneeIds, long commentCount) {
         return new TaskCardResponse(
                 card.getId(), card.getConstructionSiteId(), card.getColumnId(), card.getTitle(), card.getDescription(),
-                card.getDueDate(), card.getSortOrder(), labelIds, card.getCreatedBy(), card.getCreatedAt(),
-                card.getUpdatedAt());
+                card.getDueDate(), card.getSortOrder(), labelIds, assigneeIds, commentCount, card.getCreatedBy(),
+                card.getCreatedAt(), card.getUpdatedAt());
     }
 }

@@ -7,7 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TaskLabelRepository extends JpaRepository<TaskLabel, UUID> {
 
-    List<TaskLabel> findByConstructionSiteIdOrderByNameAsc(UUID constructionSiteId);
+    List<TaskLabel> findByCompanyIdOrderByNameAsc(UUID companyId);
 
-    List<TaskLabel> findByConstructionSiteIdIn(List<UUID> constructionSiteIds);
+    List<TaskLabel> findByCompanyIdIn(List<UUID> companyIds);
+
+    List<TaskLabel> findByCardId(UUID cardId);
+
+    void deleteByCardId(UUID cardId);
 }

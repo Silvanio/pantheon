@@ -11,6 +11,8 @@ export interface TaskCard {
   dueDate: string | null
   sortOrder: number
   labelIds: string[]
+  assigneeIds: string[]
+  commentCount: number
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -19,11 +21,13 @@ export interface TaskCard {
 export interface TaskBoard {
   columns: TaskColumn[]
   cards: TaskCard[]
+  labels: TaskLabel[]
 }
 
 export interface TaskLabel {
   id: string
-  constructionSiteId: string
+  companyId: string | null
+  cardId: string | null
   name: string
   colorHex: string
 }
@@ -87,12 +91,12 @@ export function useTaskCards() {
     })
   }
 
-  function listLabels(siteId: string): Promise<TaskLabel[]> {
-    return authFetch(`/api/construction-sites/${siteId}/task-labels`)
+  function deleteCard(cardId: string): Promise<void> {
+    return authFetch(`/api/task-cards/${cardId}`, { method: 'DELETE' })
   }
 
-  function createLabel(siteId: string, name: string, colorHex: string): Promise<TaskLabel> {
-    return authFetch(`/api/construction-sites/${siteId}/task-labels`, {
+  function createCustomLabel(cardId: string, name: string, colorHex: string): Promise<TaskLabel> {
+    return authFetch(`/api/task-cards/${cardId}/custom-labels`, {
       method: 'POST',
       body: JSON.stringify({ name, colorHex }),
     })
@@ -104,6 +108,14 @@ export function useTaskCards() {
 
   function detachLabel(cardId: string, labelId: string): Promise<void> {
     return authFetch(`/api/task-cards/${cardId}/labels/${labelId}`, { method: 'DELETE' })
+  }
+
+  function assignMember(cardId: string, siteMembershipId: string): Promise<void> {
+    return authFetch(`/api/task-cards/${cardId}/assignees/${siteMembershipId}`, { method: 'POST' })
+  }
+
+  function unassignMember(cardId: string, siteMembershipId: string): Promise<void> {
+    return authFetch(`/api/task-cards/${cardId}/assignees/${siteMembershipId}`, { method: 'DELETE' })
   }
 
   function listComments(cardId: string): Promise<TaskComment[]> {
@@ -122,10 +134,12 @@ export function useTaskCards() {
     createCard,
     moveCard,
     updateDueDate,
-    listLabels,
-    createLabel,
+    deleteCard,
+    createCustomLabel,
     attachLabel,
     detachLabel,
+    assignMember,
+    unassignMember,
     listComments,
     addComment,
   }

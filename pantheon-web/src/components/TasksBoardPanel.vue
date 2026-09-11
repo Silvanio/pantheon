@@ -440,7 +440,10 @@ onMounted(load)
 
         <div class="mb-4">
           <p class="field-label mb-2">{{ t('tasks.assignees') }}</p>
-          <div class="flex flex-wrap gap-2">
+          <p v-if="siteMembers.length === 0" class="text-xs text-steel-500 dark:text-steel-400">
+            {{ t('tasks.noMembers') }}
+          </p>
+          <div v-else class="flex flex-wrap gap-2">
             <button
               v-for="member in siteMembers"
               :key="member.membershipId"

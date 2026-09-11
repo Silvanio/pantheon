@@ -193,6 +193,7 @@
     "newCommentPlaceholder": "Escreva um comentário",
     "addComment": "Comentar",
     "assignees": "Responsáveis",
+    "noMembers": "Nenhum membro cadastrado nesta obra ainda. Adicione membros na aba Equipe para poder atribuí-los a cards.",
     "deleteCard": "Excluir card",
     "deleteCardConfirm": "Tem certeza que deseja excluir este card? Esta ação não pode ser desfeita."
   },

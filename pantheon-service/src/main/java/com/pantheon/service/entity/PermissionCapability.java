@@ -6,5 +6,6 @@ public enum PermissionCapability {
     DAILY_REPORT,
     EQUIPMENT,
     PURCHASE_REQUEST,
-    ORCAMENTO_MANAGE
+    ORCAMENTO_MANAGE,
+    TASKS
 }

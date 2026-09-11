@@ -19,6 +19,7 @@ const { status, activeCompany } = useCompanyOnboarding()
 const { listSites, createSite } = useConstructionSites()
 
 const companyId = computed(() => (status.value ? activeCompany(status.value)?.companyId ?? null : null))
+const isCompanyAdmin = computed(() => (status.value ? activeCompany(status.value)?.role === 'ADMIN' : false))
 const sites = ref<ConstructionSite[]>([])
 const loading = ref(false)
 const showForm = ref(false)
@@ -135,12 +136,21 @@ onMounted(loadSites)
           <h1 class="text-3xl font-semibold tracking-tight text-steel-800 dark:text-steel-50">{{ t('dashboard.title') }}</h1>
           <p class="mt-1.5 text-steel-500 dark:text-steel-400">{{ t('dashboard.subtitle') }}</p>
         </div>
-        <button type="button" class="btn-primary" @click="showForm = !showForm">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
-          </svg>
-          {{ t('dashboard.newSiteButton') }}
-        </button>
+        <div class="flex gap-2">
+          <router-link
+            v-if="isCompanyAdmin && companyId"
+            :to="`/companies/${companyId}/tasks-board`"
+            class="btn-secondary"
+          >
+            {{ t('dashboard.globalTasksBoardButton') }}
+          </router-link>
+          <button type="button" class="btn-primary" @click="showForm = !showForm">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
+            </svg>
+            {{ t('dashboard.newSiteButton') }}
+          </button>
+        </div>
       </div>
 
       <form v-if="showForm" class="card card-pad space-y-4" @submit.prevent="onSubmit">

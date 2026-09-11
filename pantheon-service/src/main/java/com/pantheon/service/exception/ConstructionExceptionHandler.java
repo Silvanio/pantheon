@@ -97,4 +97,24 @@ public class ConstructionExceptionHandler {
     public ResponseEntity<String> handleCnpjPrefixTooShort(CnpjPrefixTooShortException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
+
+    @ExceptionHandler(TaskColumnNotFoundException.class)
+    public ResponseEntity<String> handleTaskColumnNotFound(TaskColumnNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(TaskColumnInUseException.class)
+    public ResponseEntity<String> handleTaskColumnInUse(TaskColumnInUseException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(TaskCardNotFoundException.class)
+    public ResponseEntity<String> handleTaskCardNotFound(TaskCardNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(TaskLabelNotFoundException.class)
+    public ResponseEntity<String> handleTaskLabelNotFound(TaskLabelNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
 }

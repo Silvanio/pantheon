@@ -12,6 +12,7 @@ import EquipmentPanel from '../components/EquipmentPanel.vue'
 import PurchaseRequestPanel from '../components/PurchaseRequestPanel.vue'
 import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
 import DailyReportsPanel from '../components/DailyReportsPanel.vue'
+import TasksBoardPanel from '../components/TasksBoardPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 
 const route = useRoute()
@@ -23,7 +24,7 @@ const siteId = route.params.siteId as string
 const site = ref<ConstructionSite | null>(null)
 const loading = ref(false)
 
-type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'schedule' | 'permissions'
+type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('team')
 
 async function load() {
@@ -140,6 +141,14 @@ onMounted(load)
           </button>
           <button
             type="button"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'tasks' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'tasks'"
+          >
+            {{ t('siteDetail.tabs.tasks') }}
+          </button>
+          <button
+            type="button"
             disabled
             class="cursor-not-allowed rounded-lg px-3.5 py-2 text-sm font-medium text-steel-400 dark:text-steel-600"
             :title="t('siteDetail.tabs.scheduleDisabled')"
@@ -162,6 +171,7 @@ onMounted(load)
         <EquipmentPanel v-if="activeTab === 'equipment'" :site-id="siteId" />
         <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests'" :site-id="siteId" />
         <OrcamentoListPanel v-if="activeTab === 'orcamentos'" :site-id="siteId" />
+        <TasksBoardPanel v-if="activeTab === 'tasks'" :site-id="siteId" />
         <template v-if="activeTab === 'permissions'">
           <SitePermissionsPanel :site-id="siteId" />
           <SiteOrcamentoApprovalLevelsPanel :site-id="siteId" />

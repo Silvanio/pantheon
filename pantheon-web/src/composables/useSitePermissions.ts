@@ -5,9 +5,10 @@ import type { ConstructionFunction } from './useSiteMembers'
 export type PermissionCapability =
   | 'DOCUMENT_PROJECTS'
   | 'DAILY_REPORT'
-  | 'EQUIPMENT_MATERIAL'
-  | 'MATERIAL_REQUEST'
-  | 'MATERIAL_APPROVAL'
+  | 'EQUIPMENT'
+  | 'PURCHASE_REQUEST'
+  | 'ORCAMENTO_MANAGE'
+  | 'TASKS'
 export type AccessLevel = 'VIEW' | 'MANAGE'
 
 export interface SitePermissionOverride {

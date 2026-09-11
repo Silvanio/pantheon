@@ -13,6 +13,7 @@ import InvitationView from '../views/InvitationView.vue'
 import DailyReportDetailView from '../views/DailyReportDetailView.vue'
 import OrcamentoDetailView from '../views/OrcamentoDetailView.vue'
 import PurchaseRequestDetailView from '../views/PurchaseRequestDetailView.vue'
+import GlobalTasksBoardView from '../views/GlobalTasksBoardView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -57,6 +58,12 @@ const router = createRouter({
       path: '/purchase-requests/:id',
       name: 'purchase-request-detail',
       component: PurchaseRequestDetailView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/companies/:companyId/tasks-board',
+      name: 'global-tasks-board',
+      component: GlobalTasksBoardView,
       meta: { requiresAuth: true },
     },
   ],

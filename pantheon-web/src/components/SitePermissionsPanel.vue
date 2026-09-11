@@ -18,9 +18,10 @@ const functions: ConstructionFunction[] = ['CLIENT', 'ARCHITECT', 'ENGINEER', 'S
 const capabilities: PermissionCapability[] = [
   'DOCUMENT_PROJECTS',
   'DAILY_REPORT',
-  'EQUIPMENT_MATERIAL',
-  'MATERIAL_REQUEST',
-  'MATERIAL_APPROVAL',
+  'EQUIPMENT',
+  'PURCHASE_REQUEST',
+  'ORCAMENTO_MANAGE',
+  'TASKS',
 ]
 
 const overrides = ref<SitePermissionOverride[]>([])

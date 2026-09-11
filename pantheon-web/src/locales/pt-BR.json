@@ -46,12 +46,25 @@
         "alreadyMember": "Este e-mail já é um funcionário ativo desta empresa.",
         "invited": "Convite enviado para {email}. A pessoa aparecerá como \"Convite\" até aceitar."
       }
+    },
+    "taskColumns": {
+      "title": "Colunas do quadro de Tasks",
+      "subtitle": "Estas colunas valem para o quadro de Tasks de todas as obras da empresa. Apenas administradores podem configurá-las.",
+      "newPlaceholder": "Nome da coluna",
+      "newButton": "Adicionar coluna",
+      "rename": "Renomear",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "delete": "Excluir",
+      "error": "Não foi possível salvar a coluna. Tente novamente.",
+      "inUseError": "Esta coluna ainda tem cards em alguma obra e não pode ser excluída."
     }
   },
   "dashboard": {
     "title": "Obras",
     "subtitle": "Obras da sua empresa.",
     "newSiteButton": "Nova obra",
+    "globalTasksBoardButton": "Quadro global de Tasks",
     "form": {
       "error": "Não foi possível criar a obra. Verifique os dados e tente novamente."
     },
@@ -83,6 +96,7 @@
       "equipment": "Equipamentos",
       "purchaseRequests": "Pedido de Compra",
       "orcamentos": "Orçamentos",
+      "tasks": "Tasks",
       "schedule": "Cronograma",
       "scheduleDisabled": "Em breve",
       "permissions": "Permissões"
@@ -142,14 +156,38 @@
     "capability": {
       "DOCUMENT_PROJECTS": "Projetos",
       "DAILY_REPORT": "Diário de obra",
-      "EQUIPMENT_MATERIAL": "Equipamentos e materiais",
-      "MATERIAL_REQUEST": "Pedido de orçamento",
-      "MATERIAL_APPROVAL": "Aprovação de orçamento"
+      "EQUIPMENT": "Equipamentos",
+      "PURCHASE_REQUEST": "Pedido de compra",
+      "ORCAMENTO_MANAGE": "Orçamentos",
+      "TASKS": "Tasks"
     },
     "accessLevel": {
       "VIEW": "Apenas ver",
       "MANAGE": "Gerenciar"
     }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "Acompanhe as entregas desta obra.",
+    "error": "Não foi possível concluir a ação. Tente novamente.",
+    "noColumns": "Nenhuma coluna configurada ainda. Peça a um administrador para configurar as colunas em Configurações da empresa.",
+    "newCardPlaceholder": "Título do card",
+    "addCard": "Adicionar card",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "labels": "Labels",
+    "newLabelPlaceholder": "Nova label",
+    "newLabelButton": "Criar label",
+    "comments": "Comentários",
+    "noComments": "Nenhum comentário ainda.",
+    "newCommentPlaceholder": "Escreva um comentário",
+    "addComment": "Comentar"
+  },
+  "globalTasksBoard": {
+    "back": "Voltar ao painel",
+    "title": "Quadro global de Tasks",
+    "subtitle": "Todas as tasks de todas as obras da empresa, em um só quadro.",
+    "noColumns": "Nenhuma coluna configurada ainda."
   },
   "equipment": {
     "title": "Equipamentos",

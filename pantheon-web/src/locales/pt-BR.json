@@ -456,6 +456,7 @@
     "backToList": "Voltar aos pedidos",
     "detailTitle": "Itens do pedido",
     "pendingTitle": "Pendentes",
+    "noPendingItems": "Nenhum item pendente. Todos os itens deste pedido já foram convertidos em orçamento.",
     "convertedTitle": "Convertidos em orçamento",
     "convertButton": "Criar orçamento",
     "convertError": "Não foi possível criar o orçamento a partir dos itens selecionados.",

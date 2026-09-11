@@ -341,4 +341,37 @@ class OrcamentoServiceTest {
         assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.COMPLETED);
         verify(materialService).createFromOrcamento(orcamento, items);
     }
+
+    @Test
+    void listWithNoFiltersUsesUnfilteredQuery() {
+        service.list(siteId, UUID.randomUUID(), null, null);
+
+        verify(orcamentoRepository).findByConstructionSiteIdOrderByCreatedAtDesc(siteId);
+    }
+
+    @Test
+    void listWithDateFilterOnlyUsesDateRangeQuery() {
+        service.list(siteId, UUID.randomUUID(), LocalDate.now(), null);
+
+        verify(orcamentoRepository).findByConstructionSiteIdAndCreatedAtBetweenOrderByCreatedAtDesc(eq(siteId), any(), any());
+    }
+
+    @Test
+    void listWithPurchaseRequestFilterOnlyUsesSourceQuery() {
+        UUID purchaseRequestId = UUID.randomUUID();
+
+        service.list(siteId, UUID.randomUUID(), null, purchaseRequestId);
+
+        verify(orcamentoRepository).findByConstructionSiteIdAndSourcePurchaseRequestIdOrderByCreatedAtDesc(siteId, purchaseRequestId);
+    }
+
+    @Test
+    void listWithBothFiltersUsesCombinedQuery() {
+        UUID purchaseRequestId = UUID.randomUUID();
+
+        service.list(siteId, UUID.randomUUID(), LocalDate.now(), purchaseRequestId);
+
+        verify(orcamentoRepository).findByConstructionSiteIdAndCreatedAtBetweenAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
+                eq(siteId), any(), any(), eq(purchaseRequestId));
+    }
 }

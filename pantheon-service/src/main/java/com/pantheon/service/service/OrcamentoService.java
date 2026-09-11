@@ -246,9 +246,22 @@ public class OrcamentoService {
     public List<Orcamento> list(UUID siteId, UUID actingUserId, LocalDate dateFilter, UUID purchaseRequestIdFilter) {
         requireSite(siteId);
         siteAccessService.requireAccess(siteId, actingUserId);
-        Instant dayStart = dateFilter == null ? null : dateFilter.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant dayEnd = dateFilter == null ? null : dateFilter.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return orcamentoRepository.findFiltered(siteId, dayStart, dayEnd, purchaseRequestIdFilter);
+
+        if (dateFilter == null && purchaseRequestIdFilter == null) {
+            return orcamentoRepository.findByConstructionSiteIdOrderByCreatedAtDesc(siteId);
+        }
+        if (dateFilter == null) {
+            return orcamentoRepository.findByConstructionSiteIdAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
+                    siteId, purchaseRequestIdFilter);
+        }
+        Instant dayStart = dateFilter.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant dayEnd = dateFilter.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        if (purchaseRequestIdFilter == null) {
+            return orcamentoRepository.findByConstructionSiteIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                    siteId, dayStart, dayEnd);
+        }
+        return orcamentoRepository.findByConstructionSiteIdAndCreatedAtBetweenAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
+                siteId, dayStart, dayEnd, purchaseRequestIdFilter);
     }
 
     public Orcamento get(UUID orcamentoId, UUID actingUserId) {

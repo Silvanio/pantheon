@@ -60,6 +60,6 @@
 
 - [x] 9.1 `pantheon-service`: `mvn -q -o compile`, `mvn -q -o test-compile`, and `mvn -q -o test` all pass (real Postgres + Flyway V40-43 applied cleanly)
 - [x] 9.2 `pantheon-web`: `vue-tsc -b --force` and `vite build` both pass clean
-- [ ] 9.3 Manual QA in a live browser: create a Pedido de Compra with two items, convert one item into an Orçamento with a brand-new CNPJ (verify it registers a Fornecedor), convert the remaining item from the same Pedido de Compra into a second Orçamento reusing the same CNPJ (verify no duplicate Fornecedor and autocomplete surfaces it from the 5th digit), filter the Orçamento list by that Pedido de Compra and by date, open the redesigned Orçamento detail view and confirm the supplier card, origin link, and totals render correctly
+- [x] 9.3 Manual QA in a live browser: create a Pedido de Compra with two items, convert one item into an Orçamento with a brand-new CNPJ (verify it registers a Fornecedor), convert the remaining item from the same Pedido de Compra into a second Orçamento reusing the same CNPJ (verify no duplicate Fornecedor and autocomplete surfaces it from the 5th digit), filter the Orçamento list by that Pedido de Compra and by date, open the redesigned Orçamento detail view and confirm the supplier card, origin link, and totals render correctly
 - [x] 9.4 Update this file's checkboxes to reflect actual completion as work proceeds
-- [ ] 9.5 Run `openspec archive` once implemented and verified, updating `openspec/specs/` accordingly
+- [x] 9.5 Run `openspec archive` once implemented and verified, updating `openspec/specs/` accordingly

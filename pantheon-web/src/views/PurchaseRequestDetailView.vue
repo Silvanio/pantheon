@@ -101,7 +101,7 @@ onMounted(load)
         <p v-if="convertError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ convertError }}</p>
 
         <p v-if="!loading && pendingItems.length === 0" class="mb-5 text-sm text-steel-500 dark:text-steel-400">
-          {{ t('purchaseRequests.empty') }}
+          {{ t('purchaseRequests.noPendingItems') }}
         </p>
         <ul v-else class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <li

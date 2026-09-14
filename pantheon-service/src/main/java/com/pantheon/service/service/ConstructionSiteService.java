@@ -1,20 +1,26 @@
 package com.pantheon.service.service;
 
 import com.pantheon.service.dto.ConstructionSiteRegistrationRequest;
+import com.pantheon.service.dto.MySiteResponse;
+import com.pantheon.service.entity.Company;
 import com.pantheon.service.entity.CompanyMembership;
 import com.pantheon.service.entity.CompanyRole;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.SiteStatus;
+import com.pantheon.service.exception.CompanyNotFoundException;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.NotCompanyAdminException;
 import com.pantheon.service.exception.NotCompanyMemberException;
 import com.pantheon.service.repository.CompanyMembershipRepository;
+import com.pantheon.service.repository.CompanyRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +30,7 @@ public class ConstructionSiteService {
     private final ConstructionSiteRepository siteRepository;
     private final CompanyMembershipRepository membershipRepository;
     private final SiteMembershipRepository siteMembershipRepository;
+    private final CompanyRepository companyRepository;
     private final PlanService planService;
     private final SiteAccessService siteAccessService;
 
@@ -31,11 +38,13 @@ public class ConstructionSiteService {
             ConstructionSiteRepository siteRepository,
             CompanyMembershipRepository membershipRepository,
             SiteMembershipRepository siteMembershipRepository,
+            CompanyRepository companyRepository,
             PlanService planService,
             SiteAccessService siteAccessService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
         this.siteMembershipRepository = siteMembershipRepository;
+        this.companyRepository = companyRepository;
         this.planService = planService;
         this.siteAccessService = siteAccessService;
     }
@@ -92,6 +101,37 @@ public class ConstructionSiteService {
                 siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
         siteAccessService.requireAccess(siteId, actingUserId);
         return site;
+    }
+
+    /**
+     * Every obra {@code actingUserId} has active site membership on, across every company —
+     * for a site-only member (client, architect, engineer, site foreman, service provider) with
+     * no {@code CompanyMembership} of their own, this is the only way to see all their obras at
+     * once. See design.md (add-site-only-member-dashboard) decision 1.
+     */
+    public List<MySiteResponse> listMine(UUID actingUserId) {
+        List<UUID> siteIds = siteMembershipRepository.findByUserId(actingUserId).stream()
+                .filter(SiteMembership::isActive)
+                .map(SiteMembership::getConstructionSiteId)
+                .distinct()
+                .toList();
+        List<ConstructionSite> sites = siteRepository.findAllById(siteIds);
+
+        List<UUID> companyIds = sites.stream().map(ConstructionSite::getCompanyId).distinct().toList();
+        Map<UUID, String> companyNamesById = companyRepository.findAllById(companyIds).stream()
+                .collect(Collectors.toMap(Company::getId, Company::getName));
+
+        return sites.stream()
+                .map(site -> MySiteResponse.from(site, companyNamesById.get(site.getCompanyId())))
+                .toList();
+    }
+
+    /** Resolves a site's own company's logo, gated by site access rather than company staff membership. */
+    public String getCompanyLogoObjectKey(UUID siteId, UUID actingUserId) {
+        ConstructionSite site = get(siteId, actingUserId);
+        Company company = companyRepository.findById(site.getCompanyId())
+                .orElseThrow(() -> new CompanyNotFoundException(site.getCompanyId()));
+        return company.getLogoObjectKey();
     }
 
     private void requireAdmin(UUID companyId, UUID userId) {

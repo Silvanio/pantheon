@@ -13,6 +13,7 @@ import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.repository.CompanyMembershipRepository;
+import com.pantheon.service.repository.CompanyRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import java.time.Instant;
@@ -39,6 +40,9 @@ class ConstructionSiteServiceTest {
     private SiteMembershipRepository siteMembershipRepository;
 
     @Mock
+    private CompanyRepository companyRepository;
+
+    @Mock
     private PlanService planService;
 
     @Mock
@@ -52,7 +56,8 @@ class ConstructionSiteServiceTest {
     @BeforeEach
     void setUp() {
         service = new ConstructionSiteService(
-                siteRepository, membershipRepository, siteMembershipRepository, planService, siteAccessService);
+                siteRepository, membershipRepository, siteMembershipRepository, companyRepository, planService,
+                siteAccessService);
         companyId = UUID.randomUUID();
         adminUserId = UUID.randomUUID();
 
@@ -74,5 +79,57 @@ class ConstructionSiteServiceTest {
         assertThat(membership.getUserId()).isEqualTo(adminUserId);
         assertThat(membership.getFunction()).isEqualTo(ConstructionFunction.ADMIN);
         assertThat(membership.isActive()).isTrue();
+    }
+
+    @Test
+    void listMineAggregatesActiveSiteMembershipsAcrossCompaniesWithCompanyNames() {
+        UUID userId = UUID.randomUUID();
+        UUID companyA = UUID.randomUUID();
+        UUID companyB = UUID.randomUUID();
+        UUID siteA = UUID.randomUUID();
+        UUID siteB = UUID.randomUUID();
+        UUID inactiveSite = UUID.randomUUID();
+
+        SiteMembership activeOnA = com.pantheon.service.entity.SiteMembership.invited(
+                UUID.randomUUID(), siteA, userId, ConstructionFunction.CLIENT, null, null, Instant.now());
+        activeOnA.accept();
+        SiteMembership activeOnB = com.pantheon.service.entity.SiteMembership.invited(
+                UUID.randomUUID(), siteB, userId, ConstructionFunction.ENGINEER, null, null, Instant.now());
+        activeOnB.accept();
+        SiteMembership stillInvited = com.pantheon.service.entity.SiteMembership.invited(
+                UUID.randomUUID(), inactiveSite, userId, ConstructionFunction.ARCHITECT, null, null, Instant.now());
+
+        when(siteMembershipRepository.findByUserId(userId)).thenReturn(java.util.List.of(activeOnA, activeOnB, stillInvited));
+        when(siteRepository.findAllById(java.util.List.of(siteA, siteB))).thenReturn(java.util.List.of(
+                new ConstructionSite(siteA, companyA, "Obra A", "Endereco A", LocalDate.now(), null, userId, Instant.now()),
+                new ConstructionSite(siteB, companyB, "Obra B", "Endereco B", LocalDate.now(), null, userId, Instant.now())));
+        when(companyRepository.findAllById(any())).thenReturn(java.util.List.of(
+                newCompany(companyA, "Empresa A"), newCompany(companyB, "Empresa B")));
+
+        var result = service.listMine(userId);
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting("companyName").containsExactlyInAnyOrder("Empresa A", "Empresa B");
+    }
+
+    @Test
+    void getCompanyLogoObjectKeyResolvesThroughTheSitesOwnCompany() {
+        UUID siteId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        ConstructionSite site =
+                new ConstructionSite(siteId, companyId, "Obra", "Endereco", LocalDate.now(), null, userId, Instant.now());
+        when(siteRepository.findById(siteId)).thenReturn(Optional.of(site));
+        com.pantheon.service.entity.Company company = newCompany(companyId, "Empresa");
+        when(companyRepository.findById(companyId)).thenReturn(Optional.of(company));
+
+        String logoKey = service.getCompanyLogoObjectKey(siteId, userId);
+
+        assertThat(logoKey).isEqualTo(company.getLogoObjectKey());
+        verify(siteAccessService).requireAccess(siteId, userId);
+    }
+
+    private com.pantheon.service.entity.Company newCompany(UUID id, String name) {
+        com.pantheon.service.entity.Company company = new com.pantheon.service.entity.Company(id, name, UUID.randomUUID(), Instant.now());
+        return company;
     }
 }

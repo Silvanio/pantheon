@@ -1,6 +1,7 @@
 package com.pantheon.service.service;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,10 @@ public class UserProfileService {
 
     public UserProfileService(UserProfileRepository repository) {
         this.repository = repository;
+    }
+
+    public Optional<UserProfile> get(UUID userId) {
+        return repository.findByUserId(userId);
     }
 
     @Transactional

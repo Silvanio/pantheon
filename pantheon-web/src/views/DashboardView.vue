@@ -5,9 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { useAuth } from '../composables/useAuth'
 import { useCompanyOnboarding } from '../composables/useCompanyOnboarding'
 import { useConstructionSites, type ConstructionSite } from '../composables/useConstructionSites'
+import { useMySites } from '../composables/useMySites'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import EventLog from '../components/EventLog.vue'
 import CompanyLogo from '../components/CompanyLogo.vue'
+import SiteCompanyBadge from '../components/SiteCompanyBadge.vue'
 import SitePhoto from '../components/SitePhoto.vue'
 import AppHeader from '../components/AppHeader.vue'
 import { vDatePicker } from '../lib/datePicker'
@@ -18,11 +20,12 @@ const { t } = useI18n()
 const { logout } = useAuth()
 const { status, activeCompany } = useCompanyOnboarding()
 const { listSites, createSite } = useConstructionSites()
+const { listMine } = useMySites()
 
 const companyId = computed(() => (status.value ? activeCompany(status.value)?.companyId ?? null : null))
 const companyName = computed(() => (status.value ? activeCompany(status.value)?.companyName ?? null : null))
 const isCompanyAdmin = computed(() => (status.value ? activeCompany(status.value)?.role === 'ADMIN' : false))
-const sites = ref<ConstructionSite[]>([])
+const sites = ref<(ConstructionSite & { companyName?: string | null })[]>([])
 const loading = ref(false)
 const showForm = ref(false)
 const submitting = ref(false)
@@ -34,11 +37,12 @@ const address = ref('')
 const startDate = ref('')
 const expectedEndDate = ref('')
 
+// A site-only member (no CompanyMembership at all) has no single company to scope the board
+// to — their obras are gathered across every company they have SiteMembership access to.
 async function loadSites() {
-  if (!companyId.value) return
   loading.value = true
   try {
-    sites.value = await listSites(companyId.value)
+    sites.value = companyId.value ? await listSites(companyId.value) : await listMine()
   } finally {
     loading.value = false
   }
@@ -123,6 +127,13 @@ onMounted(loadSites)
             >
               {{ t('dashboard.profileMenu.editCompany') }}
             </router-link>
+            <router-link
+              v-else
+              to="/profile"
+              class="block px-4 py-2 text-sm text-steel-700 hover:bg-steel-50 dark:text-steel-200 dark:hover:bg-steel-700"
+            >
+              {{ t('dashboard.profileMenu.editRegistration') }}
+            </router-link>
             <button type="button" class="block w-full px-4 py-2 text-left text-sm text-steel-700 hover:bg-steel-50 dark:text-steel-200 dark:hover:bg-steel-700" @click="onLogout">
               {{ t('dashboard.profileMenu.logout') }}
             </button>
@@ -146,7 +157,7 @@ onMounted(loadSites)
           >
             {{ t('dashboard.globalTasksBoardButton') }}
           </router-link>
-          <button type="button" class="btn-primary" @click="showForm = !showForm">
+          <button v-if="companyId" type="button" class="btn-primary" @click="showForm = !showForm">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
             </svg>
@@ -155,7 +166,7 @@ onMounted(loadSites)
         </div>
       </div>
 
-      <form v-if="showForm" class="card card-pad space-y-4" @submit.prevent="onSubmit">
+      <form v-if="companyId && showForm" class="card card-pad space-y-4" @submit.prevent="onSubmit">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label class="field-label">{{ t('constructionSites.form.name') }}</label>
@@ -205,6 +216,12 @@ onMounted(loadSites)
           <div class="relative h-40 w-full overflow-hidden">
             <SitePhoto :site-id="site.id" :has-photo="!!site.photoObjectKey" />
             <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+            <SiteCompanyBadge
+              v-if="site.companyName"
+              :site-id="site.id"
+              :company-name="site.companyName"
+              class="absolute left-2 top-2 max-w-[calc(100%-1rem)]"
+            />
           </div>
           <div class="p-4">
             <p class="truncate font-semibold text-steel-800 dark:text-steel-50">{{ site.name }}</p>

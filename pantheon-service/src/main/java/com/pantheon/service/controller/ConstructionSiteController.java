@@ -3,6 +3,7 @@ package com.pantheon.service.controller;
 import com.pantheon.service.dto.ConstructionSiteRegistrationRequest;
 import com.pantheon.service.dto.ConstructionSiteResponse;
 import com.pantheon.service.dto.ConstructionSiteStatusUpdateRequest;
+import com.pantheon.service.dto.MySiteResponse;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.service.ConstructionSiteService;
@@ -57,6 +58,12 @@ public class ConstructionSiteController {
         return ResponseEntity.ok(sites);
     }
 
+    // Static "mine" segment resolved before Spring MVC ever tries the "{id}" mapping below.
+    @GetMapping("/api/construction-sites/mine")
+    public ResponseEntity<List<MySiteResponse>> mine(@AuthenticationPrincipal AppUser user) {
+        return ResponseEntity.ok(constructionSiteService.listMine(user.getId()));
+    }
+
     @GetMapping("/api/construction-sites/{id}")
     public ResponseEntity<ConstructionSiteResponse> get(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
         return ResponseEntity.ok(ConstructionSiteResponse.from(constructionSiteService.get(id, user.getId())));
@@ -66,6 +73,15 @@ public class ConstructionSiteController {
     public ResponseEntity<byte[]> getPhotoContent(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
         ConstructionSite site = constructionSiteService.get(id, user.getId());
         byte[] content = storageService.getObject(site.getPhotoObjectKey());
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(content);
+    }
+
+    // Gated by site access (company staff OR SiteMembership), not company-staff membership —
+    // a site-only member has no CompanyMembership to authorize a plain /companies/{id}/logo call.
+    @GetMapping("/api/construction-sites/{id}/company-logo")
+    public ResponseEntity<byte[]> getCompanyLogo(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        String logoObjectKey = constructionSiteService.getCompanyLogoObjectKey(id, user.getId());
+        byte[] content = storageService.getObject(logoObjectKey);
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(content);
     }
 

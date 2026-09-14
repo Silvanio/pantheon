@@ -94,7 +94,7 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 - **THEN** `pantheon-service` periodically sends a keep-alive frame on that connection so intermediary proxies or load balancers do not close it as idle
 
 ### Requirement: User profile registration
-`pantheon-service` SHALL allow an authenticated user to record their CNPJ/CPF, legal name (Nome/Razão Social), address, and postal code (CEP) as their own profile data, independent of any specific project. Submitting this data again SHALL update the user's existing profile rather than creating a duplicate.
+`pantheon-service` SHALL allow an authenticated user to record their CNPJ/CPF, legal name (Nome/Razão Social), address, and postal code (CEP) as their own profile data, independent of any specific project. Submitting this data again SHALL update the user's existing profile rather than creating a duplicate. `pantheon-service` SHALL also allow an authenticated user to retrieve their own profile data.
 
 #### Scenario: Profile created on first submission
 - **WHEN** an authenticated user with no existing profile submits CNPJ/CPF, legal name, address, and CEP
@@ -103,6 +103,14 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 #### Scenario: Profile updated on subsequent submission
 - **WHEN** an authenticated user who already has a profile submits CNPJ/CPF, legal name, address, and CEP again
 - **THEN** `pantheon-service` updates the existing profile record for that user rather than creating a second one
+
+#### Scenario: Profile retrieved
+- **WHEN** an authenticated user with an existing profile requests their own profile data
+- **THEN** `pantheon-service` returns their account email alongside their CNPJ/CPF, legal name, address, and CEP
+
+#### Scenario: No profile yet
+- **WHEN** an authenticated user with no existing profile requests their own profile data
+- **THEN** `pantheon-service` returns their account email with the other fields empty, rather than an error or an empty response
 
 ### Requirement: Project creation
 `pantheon-service` SHALL allow an authenticated user with no company to create a `Company` by supplying a company name. The creating user SHALL be recorded as that company's `ADMIN`. The company SHALL start with no plan assigned; plan selection and the company's commercial profile (Razão Social, Nome Fantasia, CNPJ, address, logo) are handled separately (see `company-onboarding`, `company-plan-catalog`).

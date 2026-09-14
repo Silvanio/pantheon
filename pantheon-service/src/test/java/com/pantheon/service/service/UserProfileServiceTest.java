@@ -47,4 +47,26 @@ class UserProfileServiceTest {
         assertThat(updated.getCnpjCpf()).isEqualTo("new-doc");
         assertThat(updated.getLegalName()).isEqualTo("New Name");
     }
+
+    @Test
+    void getReturnsEmptyWhenNoProfileExists() {
+        UUID userId = UUID.randomUUID();
+        when(repository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        UserProfileService service = new UserProfileService(repository);
+
+        assertThat(service.get(userId)).isEmpty();
+    }
+
+    @Test
+    void getReturnsExistingProfile() {
+        UUID userId = UUID.randomUUID();
+        UserProfile existing = new UserProfile(
+                UUID.randomUUID(), userId, "doc", "Name", "Address", "00000-000", Instant.now());
+        when(repository.findByUserId(userId)).thenReturn(Optional.of(existing));
+
+        UserProfileService service = new UserProfileService(repository);
+
+        assertThat(service.get(userId)).contains(existing);
+    }
 }

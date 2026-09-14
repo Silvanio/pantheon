@@ -79,6 +79,7 @@
       "toggle": "Perfil",
       "changePlan": "Alterar plano",
       "editCompany": "Editar dados da empresa",
+      "editRegistration": "Editar dados do cadastro",
       "logout": "Sair"
     }
   },
@@ -92,6 +93,19 @@
       "submit": "Criar obra",
       "cancel": "Cancelar"
     }
+  },
+  "userProfile": {
+    "back": "Voltar",
+    "title": "Meus dados de cadastro",
+    "subtitle": "Esses dados são seus, independente de qualquer empresa ou obra.",
+    "email": "E-mail",
+    "cnpjCpf": "CNPJ/CPF",
+    "legalName": "Nome / Razão Social",
+    "address": "Endereço",
+    "postalCode": "CEP",
+    "submit": "Salvar",
+    "saved": "Dados salvos.",
+    "error": "Não foi possível salvar. Verifique os dados e tente novamente."
   },
   "siteDetail": {
     "back": "Voltar ao painel",

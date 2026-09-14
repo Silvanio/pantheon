@@ -122,7 +122,7 @@ class OrcamentoServiceTest {
     }
 
     private SiteMembership activeMember(UUID userId, ConstructionFunction function) {
-        SiteMembership member = SiteMembership.invited(UUID.randomUUID(), siteId, userId, function, null, Instant.now());
+        SiteMembership member = SiteMembership.invited(UUID.randomUUID(), siteId, userId, function, null, null, Instant.now());
         member.accept();
         return member;
     }

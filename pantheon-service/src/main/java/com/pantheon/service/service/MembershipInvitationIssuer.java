@@ -40,11 +40,21 @@ public class MembershipInvitationIssuer {
 
     /** Finds the account for {@code email}, or creates a pre-registration one if none exists. */
     public ResolvedUser resolveOrCreateUser(String email, Instant now) {
+        return resolveOrCreateUser(email, null, now);
+    }
+
+    /**
+     * Same as {@link #resolveOrCreateUser(String, Instant)}, but a newly-created pre-registration
+     * account uses {@code displayNameOverride} instead of guessing a name from the email — an
+     * already-existing account's own name is never touched.
+     */
+    public ResolvedUser resolveOrCreateUser(String email, String displayNameOverride, Instant now) {
         AppUser existing = userRepository.findByEmail(email).orElse(null);
         if (existing != null) {
             return new ResolvedUser(existing, false);
         }
-        AppUser preRegistered = userRepository.save(AppUser.preRegistration(UUID.randomUUID(), email, now));
+        AppUser preRegistered = userRepository.save(
+                AppUser.preRegistration(UUID.randomUUID(), email, displayNameOverride, now));
         return new ResolvedUser(preRegistered, true);
     }
 

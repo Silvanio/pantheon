@@ -12,6 +12,7 @@ public record SiteMemberResponse(
         ConstructionFunction function,
         String trade,
         String cpf,
+        String phone,
         MembershipStatus status,
         boolean invited) {
 }

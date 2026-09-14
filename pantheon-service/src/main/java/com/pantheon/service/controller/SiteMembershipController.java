@@ -7,6 +7,7 @@ import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.MembershipInvitation;
 import com.pantheon.service.entity.SiteMembership;
+import com.pantheon.service.exception.EmailRequiredException;
 import com.pantheon.service.service.SiteMembershipService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -37,14 +38,20 @@ public class SiteMembershipController {
             @AuthenticationPrincipal AppUser user,
             @PathVariable UUID siteId,
             @Valid @RequestBody AddSiteMemberRequest request) {
-        if (request.function() == ConstructionFunction.SERVICE_PROVIDER && request.email() == null) {
+        boolean accountless = request.function() == ConstructionFunction.SERVICE_PROVIDER && request.email() == null;
+        if (accountless) {
             SiteMembership membership = siteMembershipService.addAccountlessServiceProvider(
-                    siteId, user.getId(), request.displayName(), request.trade(), request.contactEmail());
+                    siteId, user.getId(), request.displayName(), request.trade(), request.contactEmail(),
+                    request.cpf(), request.phone());
             return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(membership));
+        }
+        if (request.email() == null || request.email().isBlank()) {
+            throw new EmailRequiredException();
         }
 
         MembershipInvitation invitation = siteMembershipService.inviteMember(
-                siteId, user.getId(), request.function(), request.email(), request.cpf());
+                siteId, user.getId(), request.function(), request.displayName(), request.email(), request.cpf(),
+                request.phone());
         return ResponseEntity.status(HttpStatus.CREATED).body(new MemberInvitationResponse(
                 invitation.getId(), invitation.getMembershipId(), invitation.getEmail(),
                 invitation.isRequiresRegistration()));
@@ -65,6 +72,6 @@ public class SiteMembershipController {
     private SiteMemberResponse toResponse(SiteMembership m) {
         return new SiteMemberResponse(
                 m.getId(), m.getUserId(), m.getContactEmail(), m.getDisplayName(), m.getFunction(),
-                m.getServiceProviderTrade(), m.getClientCpf(), m.getStatus(), false);
+                m.getServiceProviderTrade(), m.getCpf(), m.getPhone(), m.getStatus(), false);
     }
 }

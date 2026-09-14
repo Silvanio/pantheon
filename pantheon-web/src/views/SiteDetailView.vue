@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useConstructionSites, type ConstructionSite } from '../composables/useConstructionSites'
 import { useCompanies } from '../composables/useCompanies'
+import { useSiteHeroCollapse } from '../composables/useSiteHeroCollapse'
 import SitePhoto from '../components/SitePhoto.vue'
 import SiteTeamPanel from '../components/SiteTeamPanel.vue'
 import SiteDocumentProjectsPanel from '../components/SiteDocumentProjectsPanel.vue'
@@ -15,12 +16,14 @@ import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
 import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import TasksBoardPanel from '../components/TasksBoardPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { getSite, updateSitePhoto } = useConstructionSites()
 const { listMyCompanies } = useCompanies()
+const { collapsed: heroCollapsed, toggle: toggleHero } = useSiteHeroCollapse()
 
 const siteId = route.params.siteId as string
 const site = ref<ConstructionSite | null>(null)
@@ -60,13 +63,41 @@ onMounted(load)
           </svg>
           {{ t('siteDetail.back') }}
         </button>
+        <template v-if="site && heroCollapsed">
+          <span class="mx-1 h-5 w-px shrink-0 bg-steel-200 dark:bg-steel-700"></span>
+          <h1 class="truncate text-sm font-semibold text-steel-800 dark:text-steel-100">{{ site.name }}</h1>
+        </template>
+      </template>
+      <template #right>
+        <ThemeToggle />
+        <button
+          v-if="site && heroCollapsed"
+          type="button"
+          class="flex h-9 w-9 items-center justify-center rounded-md border border-steel-300 text-steel-600 transition hover:bg-steel-100 dark:border-steel-600 dark:text-steel-300 dark:hover:bg-steel-700"
+          :title="t('siteDetail.expandPhoto')"
+          @click="toggleHero"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
       </template>
     </AppHeader>
 
     <template v-if="site">
-      <div class="relative h-56 w-full overflow-hidden sm:h-72">
+      <div v-if="!heroCollapsed" class="relative h-56 w-full overflow-hidden sm:h-72">
         <SitePhoto :site-id="site.id" :has-photo="!!site.photoObjectKey" />
         <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+        <button
+          type="button"
+          class="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55"
+          :title="t('siteDetail.collapsePhoto')"
+          @click="toggleHero"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
         <div class="app-container absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 pb-6">
           <div class="min-w-0">
             <h1 class="truncate text-2xl font-semibold text-white drop-shadow sm:text-3xl">{{ site.name }}</h1>

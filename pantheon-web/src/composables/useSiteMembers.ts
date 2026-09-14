@@ -12,16 +12,18 @@ export interface SiteMember {
   function: ConstructionFunction
   trade: string | null
   cpf: string | null
+  phone: string | null
   status: MembershipStatus
   invited: boolean
 }
 
 export interface AddSiteMemberData {
   function: ConstructionFunction
+  displayName: string
   email?: string | null
   cpf?: string | null
+  phone?: string | null
   trade?: string | null
-  displayName?: string | null
   contactEmail?: string | null
 }
 
@@ -30,6 +32,18 @@ export interface MemberInvitation {
   membershipId: string
   email: string
   requiresRegistration: boolean
+}
+
+export interface PersonSearchResult {
+  name: string | null
+  email: string | null
+  cpf: string | null
+  phone: string | null
+}
+
+export interface EmailConflictCheck {
+  activeOnThisSite: boolean
+  existsInAnotherCompany: boolean
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -64,5 +78,13 @@ export function useSiteMembers() {
     return authFetch(`/api/sites/${siteId}/members/${membershipId}`, { method: 'DELETE' })
   }
 
-  return { listMembers, addMember, removeMember }
+  function searchPeople(siteId: string, query: string): Promise<PersonSearchResult[]> {
+    return authFetch(`/api/sites/${siteId}/people/search?q=${encodeURIComponent(query)}`)
+  }
+
+  function checkEmailConflicts(siteId: string, email: string): Promise<EmailConflictCheck> {
+    return authFetch(`/api/sites/${siteId}/people/email-check?email=${encodeURIComponent(email)}`)
+  }
+
+  return { listMembers, addMember, removeMember, searchPeople, checkEmailConflicts }
 }

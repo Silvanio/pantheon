@@ -68,7 +68,7 @@ class SiteAccessServiceTest {
         UUID clientUserId = UUID.randomUUID();
         when(companyMembershipRepository.findByCompanyIdAndUserId(companyId, clientUserId)).thenReturn(Optional.empty());
         SiteMembership membership = SiteMembership.invited(
-                UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, "123.456.789-00", Instant.now());
+                UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, "123.456.789-00", null, Instant.now());
         membership.accept();
         when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, clientUserId))
                 .thenReturn(Optional.of(membership));
@@ -84,7 +84,7 @@ class SiteAccessServiceTest {
         UUID invitedUserId = UUID.randomUUID();
         when(companyMembershipRepository.findByCompanyIdAndUserId(companyId, invitedUserId)).thenReturn(Optional.empty());
         SiteMembership stillInvited = SiteMembership.invited(
-                UUID.randomUUID(), siteId, invitedUserId, ConstructionFunction.ENGINEER, null, Instant.now());
+                UUID.randomUUID(), siteId, invitedUserId, ConstructionFunction.ENGINEER, null, null, Instant.now());
         when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, invitedUserId))
                 .thenReturn(Optional.of(stillInvited));
 

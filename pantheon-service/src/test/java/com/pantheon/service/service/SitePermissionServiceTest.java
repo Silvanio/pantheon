@@ -37,7 +37,7 @@ class SitePermissionServiceTest {
         service = new SitePermissionService(overrideRepository);
         siteId = UUID.randomUUID();
         clientMembership = SiteMembership.invited(
-                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.CLIENT, null, Instant.now());
+                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.CLIENT, null, null, Instant.now());
         clientMembership.accept();
         clientAccess = new SiteAccessContext(false, clientMembership);
     }
@@ -106,7 +106,7 @@ class SitePermissionServiceTest {
     @Test
     void engineerCanManageOrcamentoByDefault() {
         SiteMembership engineer = SiteMembership.invited(
-                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.ENGINEER, null, Instant.now());
+                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.ENGINEER, null, null, Instant.now());
         engineer.accept();
         SiteAccessContext engineerAccess = new SiteAccessContext(false, engineer);
         when(overrideRepository.findBySiteMembershipIdAndCapability(engineer.getId(), PermissionCapability.ORCAMENTO_MANAGE))

@@ -122,4 +122,19 @@ public class ConstructionExceptionHandler {
     public ResponseEntity<String> handleSiteMembershipNotFound(SiteMembershipNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
+
+    @ExceptionHandler(InvalidCpfException.class)
+    public ResponseEntity<String> handleInvalidCpf(InvalidCpfException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(EmailRequiredException.class)
+    public ResponseEntity<String> handleEmailRequired(EmailRequiredException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PersonBelongsToAnotherCompanyException.class)
+    public ResponseEntity<String> handlePersonBelongsToAnotherCompany(PersonBelongsToAnotherCompanyException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
 }

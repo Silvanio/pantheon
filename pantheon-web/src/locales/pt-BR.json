@@ -96,6 +96,8 @@
   "siteDetail": {
     "back": "Voltar ao painel",
     "changePhoto": "Alterar foto",
+    "collapsePhoto": "Recolher foto de capa",
+    "expandPhoto": "Expandir foto de capa",
     "tabs": {
       "team": "Equipe",
       "dailyReport": "Diário de Obra",
@@ -119,17 +121,23 @@
     "removeError": "Não foi possível remover o membro. Tente novamente.",
     "form": {
       "email": "E-mail",
-      "cpf": "CPF",
+      "emailOptionalHint": "Opcional para prestador de serviço sem login",
+      "cpf": "CPF (opcional)",
+      "phone": "Telefone (opcional)",
       "displayName": "Nome",
       "trade": "Especialidade",
       "tradePlaceholder": "Ex: Pedreiro, Encanador, Eletricista",
       "contactEmail": "E-mail de contato (opcional)",
       "submit": "Adicionar",
+      "sendInvite": "Enviar convite",
       "cancel": "Cancelar",
       "added": "Membro adicionado.",
       "invited": "Convite enviado para {email}.",
       "alreadyMember": "Este e-mail já é um membro ativo desta obra.",
-      "error": "Não foi possível adicionar o membro. Verifique os dados e tente novamente."
+      "emailInAnotherCompany": "Este e-mail já pertence a uma pessoa de outra empresa.",
+      "error": "Não foi possível adicionar o membro. Verifique os dados e tente novamente.",
+      "invalidCpf": "CPF inválido.",
+      "knownPerson": "Pessoa já cadastrada na empresa"
     },
     "function": {
       "label": "Função na obra",

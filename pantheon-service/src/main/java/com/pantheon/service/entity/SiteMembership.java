@@ -42,9 +42,9 @@ public class SiteMembership {
     @Column(nullable = false)
     private MembershipStatus status;
 
-    /** Only meaningful when {@link #function} is CLIENT. */
-    @Column(name = "client_cpf")
-    private String clientCpf;
+    /** Optional, any function. Validated (format + check digits) when supplied — see {@code CpfValidator}. */
+    @Column(name = "cpf")
+    private String cpf;
 
     /** Used in place of a linked {@link AppUser} when {@link #userId} is null. */
     @Column(name = "display_name")
@@ -52,6 +52,10 @@ public class SiteMembership {
 
     @Column(name = "contact_email")
     private String contactEmail;
+
+    /** Optional, any function. */
+    @Column(name = "phone")
+    private String phone;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -67,9 +71,10 @@ public class SiteMembership {
             ConstructionFunction function,
             String serviceProviderTrade,
             MembershipStatus status,
-            String clientCpf,
+            String cpf,
             String displayName,
             String contactEmail,
+            String phone,
             Instant createdAt) {
         this.id = id;
         this.constructionSiteId = constructionSiteId;
@@ -77,9 +82,10 @@ public class SiteMembership {
         this.function = function;
         this.serviceProviderTrade = serviceProviderTrade;
         this.status = status;
-        this.clientCpf = clientCpf;
+        this.cpf = cpf;
         this.displayName = displayName;
         this.contactEmail = contactEmail;
+        this.phone = phone;
         this.createdAt = createdAt;
     }
 
@@ -89,10 +95,11 @@ public class SiteMembership {
             UUID constructionSiteId,
             UUID userId,
             ConstructionFunction function,
-            String clientCpf,
+            String cpf,
+            String phone,
             Instant createdAt) {
         return new SiteMembership(
-                id, constructionSiteId, userId, function, null, MembershipStatus.INVITED, clientCpf, null, null,
+                id, constructionSiteId, userId, function, null, MembershipStatus.INVITED, cpf, null, null, phone,
                 createdAt);
     }
 
@@ -100,7 +107,7 @@ public class SiteMembership {
     public static SiteMembership admin(UUID id, UUID constructionSiteId, UUID userId, Instant createdAt) {
         return new SiteMembership(
                 id, constructionSiteId, userId, ConstructionFunction.ADMIN, null, MembershipStatus.ACTIVE, null,
-                null, null, createdAt);
+                null, null, null, createdAt);
     }
 
     /** A service-provider member with no account: immediately usable, no invitation involved. */
@@ -110,10 +117,12 @@ public class SiteMembership {
             String trade,
             String displayName,
             String contactEmail,
+            String cpf,
+            String phone,
             Instant createdAt) {
         return new SiteMembership(
                 id, constructionSiteId, null, ConstructionFunction.SERVICE_PROVIDER, trade, MembershipStatus.NONE,
-                null, displayName, contactEmail, createdAt);
+                cpf, displayName, contactEmail, phone, createdAt);
     }
 
     /** Transitions an {@code INVITED} membership to {@code ACTIVE}. Idempotent. */
@@ -155,8 +164,8 @@ public class SiteMembership {
         return status == MembershipStatus.ACTIVE || status == MembershipStatus.NONE;
     }
 
-    public String getClientCpf() {
-        return clientCpf;
+    public String getCpf() {
+        return cpf;
     }
 
     public String getDisplayName() {
@@ -165,6 +174,10 @@ public class SiteMembership {
 
     public String getContactEmail() {
         return contactEmail;
+    }
+
+    public String getPhone() {
+        return phone;
     }
 
     public Instant getCreatedAt() {

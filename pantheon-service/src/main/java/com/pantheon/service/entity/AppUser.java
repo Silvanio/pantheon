@@ -64,7 +64,13 @@ public class AppUser {
      * a display name derived from the email local-part, {@code PENDING_REGISTRATION}.
      */
     public static AppUser preRegistration(UUID id, String email, Instant now) {
-        AppUser user = new AppUser(id, email, displayNameFromEmail(email), null, null, now, now);
+        return preRegistration(id, email, null, now);
+    }
+
+    /** Same as {@link #preRegistration(UUID, String, Instant)}, but with a known display name instead of guessing one from the email. */
+    public static AppUser preRegistration(UUID id, String email, String displayName, Instant now) {
+        String name = displayName != null && !displayName.isBlank() ? displayName : displayNameFromEmail(email);
+        AppUser user = new AppUser(id, email, name, null, null, now, now);
         user.registrationStatus = RegistrationStatus.PENDING_REGISTRATION;
         return user;
     }

@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSiteMembers, type ConstructionFunction, type SiteMember } from '../composables/useSiteMembers'
+import {
+  useSiteMembers,
+  type ConstructionFunction,
+  type EmailConflictCheck,
+  type PersonSearchResult,
+  type SiteMember,
+} from '../composables/useSiteMembers'
 import { HttpError } from '../composables/useAuth'
 
 const props = defineProps<{ siteId: string }>()
 
 const { t } = useI18n()
-const { listMembers, addMember, removeMember } = useSiteMembers()
+const { listMembers, addMember, removeMember, searchPeople, checkEmailConflicts } = useSiteMembers()
 
 const members = ref<SiteMember[]>([])
 const loading = ref(false)
@@ -21,12 +27,75 @@ const functions: ConstructionFunction[] = ['CLIENT', 'ARCHITECT', 'ENGINEER', 'S
 const memberFunction = ref<ConstructionFunction>('CLIENT')
 const email = ref('')
 const cpf = ref('')
+const phone = ref('')
 const trade = ref('')
 const displayName = ref('')
 const contactEmail = ref('')
 
 const isServiceProvider = computed(() => memberFunction.value === 'SERVICE_PROVIDER')
-const isClient = computed(() => memberFunction.value === 'CLIENT')
+
+// Autocomplete: as the admin types a CPF or email, offer people already known to the
+// company (other obras' team, company staff) so their data doesn't need retyping.
+const suggestions = ref<PersonSearchResult[]>([])
+const matchedExisting = ref(false)
+const MIN_SEARCH_LENGTH = 3
+const SEARCH_DEBOUNCE_MS = 300
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleSearch(query: string) {
+  matchedExisting.value = false
+  if (searchTimer) clearTimeout(searchTimer)
+  const trimmed = query.trim()
+  if (trimmed.length < MIN_SEARCH_LENGTH) {
+    suggestions.value = []
+    return
+  }
+  searchTimer = setTimeout(async () => {
+    try {
+      suggestions.value = await searchPeople(props.siteId, trimmed)
+    } catch {
+      suggestions.value = []
+    }
+  }, SEARCH_DEBOUNCE_MS)
+}
+
+function selectSuggestion(person: PersonSearchResult) {
+  displayName.value = person.name ?? ''
+  email.value = person.email ?? ''
+  cpf.value = person.cpf ?? ''
+  phone.value = person.phone ?? ''
+  matchedExisting.value = true
+  suggestions.value = []
+  scheduleEmailCheck(email.value)
+}
+
+// Blocks submit when the email is already an active member of *this* obra, or already tied to
+// a person with a membership in a *different* company. Reusing a person already known to this
+// same company from a different obra (the whole point of the autocomplete above) stays allowed.
+const emailConflict = ref<EmailConflictCheck | null>(null)
+let emailCheckTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleEmailCheck(value: string) {
+  emailConflict.value = null
+  if (emailCheckTimer) clearTimeout(emailCheckTimer)
+  if (!value.includes('@')) return
+  emailCheckTimer = setTimeout(async () => {
+    try {
+      emailConflict.value = await checkEmailConflicts(props.siteId, value.trim())
+    } catch {
+      emailConflict.value = null
+    }
+  }, SEARCH_DEBOUNCE_MS)
+}
+
+const submitBlocked = computed(
+  () => !!emailConflict.value && (emailConflict.value.activeOnThisSite || emailConflict.value.existsInAnotherCompany),
+)
+
+function onEmailInput() {
+  scheduleSearch(email.value)
+  scheduleEmailCheck(email.value)
+}
 
 async function loadMembers() {
   loading.value = true
@@ -40,12 +109,17 @@ async function loadMembers() {
 function resetForm() {
   email.value = ''
   cpf.value = ''
+  phone.value = ''
   trade.value = ''
   displayName.value = ''
   contactEmail.value = ''
+  suggestions.value = []
+  matchedExisting.value = false
+  emailConflict.value = null
 }
 
 async function onSubmit() {
+  if (submitBlocked.value) return
   errorMessage.value = ''
   noticeMessage.value = ''
   submitting.value = true
@@ -53,16 +127,20 @@ async function onSubmit() {
     if (isServiceProvider.value && !email.value) {
       await addMember(props.siteId, {
         function: memberFunction.value,
+        displayName: displayName.value,
         trade: trade.value || null,
-        displayName: displayName.value || null,
         contactEmail: contactEmail.value || null,
+        cpf: cpf.value || null,
+        phone: phone.value || null,
       })
       noticeMessage.value = t('siteTeam.form.added')
     } else {
       await addMember(props.siteId, {
         function: memberFunction.value,
+        displayName: displayName.value,
         email: email.value,
-        cpf: isClient.value ? cpf.value || null : null,
+        cpf: cpf.value || null,
+        phone: phone.value || null,
       })
       noticeMessage.value = t('siteTeam.form.invited', { email: email.value })
     }
@@ -70,8 +148,13 @@ async function onSubmit() {
     showForm.value = false
     await loadMembers()
   } catch (error) {
-    errorMessage.value =
-      error instanceof HttpError && error.status === 409 ? t('siteTeam.form.alreadyMember') : t('siteTeam.form.error')
+    if (error instanceof HttpError && error.status === 409) {
+      errorMessage.value = t('siteTeam.form.alreadyMember')
+    } else if (error instanceof HttpError && error.status === 400) {
+      errorMessage.value = t('siteTeam.form.invalidCpf')
+    } else {
+      errorMessage.value = t('siteTeam.form.error')
+    }
   } finally {
     submitting.value = false
   }
@@ -112,35 +195,70 @@ onMounted(loadMembers)
         </select>
       </div>
 
+      <div class="sm:col-span-2">
+        <label class="field-label">{{ t('siteTeam.form.displayName') }}</label>
+        <input v-model="displayName" type="text" required class="field-input" />
+      </div>
+
+      <div class="relative">
+        <label class="field-label">
+          {{ t('siteTeam.form.email') }}
+          <span v-if="isServiceProvider" class="font-normal text-steel-400">— {{ t('siteTeam.form.emailOptionalHint') }}</span>
+        </label>
+        <input
+          v-model="email"
+          type="email"
+          :required="!isServiceProvider"
+          class="field-input"
+          autocomplete="off"
+          @input="onEmailInput"
+        />
+        <ul v-if="suggestions.length > 0" class="modal-panel absolute z-10 mt-1 w-full py-1 shadow-lg">
+          <li v-for="person in suggestions" :key="`${person.email}-${person.cpf}`">
+            <button
+              type="button"
+              class="block w-full px-3 py-2 text-left text-sm hover:bg-steel-50 dark:hover:bg-steel-700"
+              @click="selectSuggestion(person)"
+            >
+              <span class="block font-medium text-steel-800 dark:text-steel-50">{{ person.name }}</span>
+              <span class="block truncate text-xs text-steel-500 dark:text-steel-400">{{ person.email }}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div class="relative">
+        <label class="field-label">{{ t('siteTeam.form.cpf') }}</label>
+        <input v-model="cpf" type="text" class="field-input" autocomplete="off" @input="scheduleSearch(cpf)" />
+      </div>
+
+      <div>
+        <label class="field-label">{{ t('siteTeam.form.phone') }}</label>
+        <input v-model="phone" type="tel" class="field-input" />
+      </div>
       <template v-if="isServiceProvider">
-        <div class="sm:col-span-2">
-          <label class="field-label">{{ t('siteTeam.form.displayName') }}</label>
-          <input v-model="displayName" type="text" required class="field-input" />
-        </div>
         <div>
           <label class="field-label">{{ t('siteTeam.form.trade') }}</label>
           <input v-model="trade" type="text" :placeholder="t('siteTeam.form.tradePlaceholder')" class="field-input" />
         </div>
-        <div>
+        <div class="sm:col-span-2">
           <label class="field-label">{{ t('siteTeam.form.contactEmail') }}</label>
           <input v-model="contactEmail" type="email" class="field-input" />
         </div>
       </template>
-      <template v-else>
-        <div :class="isClient ? '' : 'sm:col-span-2'">
-          <label class="field-label">{{ t('siteTeam.form.email') }}</label>
-          <input v-model="email" type="email" required class="field-input" />
-        </div>
-        <div v-if="isClient">
-          <label class="field-label">{{ t('siteTeam.form.cpf') }}</label>
-          <input v-model="cpf" type="text" class="field-input" />
-        </div>
-      </template>
 
+      <p v-if="matchedExisting && !submitBlocked" class="text-sm text-blueprint-600 dark:text-blueprint-400 sm:col-span-2">
+        {{ t('siteTeam.form.knownPerson') }}
+      </p>
+      <p v-if="emailConflict?.activeOnThisSite" class="text-sm text-safety-600 dark:text-safety-500 sm:col-span-2">
+        {{ t('siteTeam.form.alreadyMember') }}
+      </p>
+      <p v-else-if="emailConflict?.existsInAnotherCompany" class="text-sm text-safety-600 dark:text-safety-500 sm:col-span-2">
+        {{ t('siteTeam.form.emailInAnotherCompany') }}
+      </p>
       <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500 sm:col-span-2">{{ errorMessage }}</p>
       <div class="flex gap-2 sm:col-span-2">
-        <button type="submit" :disabled="submitting" class="btn-primary">
-          {{ t('siteTeam.form.submit') }}
+        <button type="submit" :disabled="submitting || submitBlocked" class="btn-primary">
+          {{ matchedExisting ? t('siteTeam.form.sendInvite') : t('siteTeam.form.submit') }}
         </button>
         <button type="button" class="btn-secondary" @click="showForm = false">
           {{ t('siteTeam.form.cancel') }}

@@ -11,6 +11,8 @@ public interface SiteMembershipRepository extends JpaRepository<SiteMembership, 
 
     List<SiteMembership> findByConstructionSiteId(UUID constructionSiteId);
 
+    List<SiteMembership> findByConstructionSiteIdIn(List<UUID> constructionSiteIds);
+
     List<SiteMembership> findByConstructionSiteIdAndFunction(UUID constructionSiteId, ConstructionFunction function);
 
     List<SiteMembership> findByUserId(UUID userId);

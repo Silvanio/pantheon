@@ -244,7 +244,8 @@ class TaskCardServiceTest {
                 UUID.randomUUID(), siteId, columnId, "Card", null, null, 0, UUID.randomUUID(), Instant.now(), Instant.now());
         when(cardRepository.findById(card.getId())).thenReturn(Optional.of(card));
         UUID membershipId = UUID.randomUUID();
-        SiteMembership membership = SiteMembership.accountless(membershipId, siteId, "Eletricista", "Fulano", null, Instant.now());
+        SiteMembership membership =
+                SiteMembership.accountless(membershipId, siteId, "Eletricista", "Fulano", null, null, null, Instant.now());
         when(siteMembershipRepository.findById(membershipId)).thenReturn(Optional.of(membership));
         when(assigneeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -256,7 +257,7 @@ class TaskCardServiceTest {
 
         UUID otherSiteMembershipId = UUID.randomUUID();
         SiteMembership otherSiteMembership = SiteMembership.accountless(
-                otherSiteMembershipId, UUID.randomUUID(), "Pedreiro", "Ciclano", null, Instant.now());
+                otherSiteMembershipId, UUID.randomUUID(), "Pedreiro", "Ciclano", null, null, null, Instant.now());
         when(siteMembershipRepository.findById(otherSiteMembershipId)).thenReturn(Optional.of(otherSiteMembership));
 
         assertThatThrownBy(() -> service.assign(card.getId(), UUID.randomUUID(), otherSiteMembershipId))

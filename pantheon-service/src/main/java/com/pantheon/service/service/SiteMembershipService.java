@@ -8,14 +8,17 @@ import com.pantheon.service.entity.MembershipInvitation;
 import com.pantheon.service.entity.MembershipType;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
+import com.pantheon.service.exception.InvalidCpfException;
 import com.pantheon.service.exception.MemberAlreadyActiveException;
 import com.pantheon.service.exception.NotSiteMemberException;
+import com.pantheon.service.exception.PersonBelongsToAnotherCompanyException;
 import com.pantheon.service.exception.SiteMembershipNotFoundException;
 import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.MembershipInvitationRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.repository.SitePermissionOverrideRepository;
 import com.pantheon.service.repository.TaskCardAssigneeRepository;
+import com.pantheon.service.validation.CpfValidator;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +44,7 @@ public class SiteMembershipService {
     private final SitePermissionService permissionService;
     private final SitePermissionOverrideRepository permissionOverrideRepository;
     private final TaskCardAssigneeRepository taskCardAssigneeRepository;
+    private final PersonSearchService personSearchService;
 
     public SiteMembershipService(
             SiteMembershipRepository membershipRepository,
@@ -50,7 +54,8 @@ public class SiteMembershipService {
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
             SitePermissionOverrideRepository permissionOverrideRepository,
-            TaskCardAssigneeRepository taskCardAssigneeRepository) {
+            TaskCardAssigneeRepository taskCardAssigneeRepository,
+            PersonSearchService personSearchService) {
         this.membershipRepository = membershipRepository;
         this.invitationRepository = invitationRepository;
         this.userRepository = userRepository;
@@ -59,26 +64,31 @@ public class SiteMembershipService {
         this.permissionService = permissionService;
         this.permissionOverrideRepository = permissionOverrideRepository;
         this.taskCardAssigneeRepository = taskCardAssigneeRepository;
+        this.personSearchService = personSearchService;
     }
 
     @Transactional
     public SiteMembership addAccountlessServiceProvider(
-            UUID constructionSiteId, UUID actingUserId, String displayName, String trade, String contactEmail) {
+            UUID constructionSiteId, UUID actingUserId, String displayName, String trade, String contactEmail,
+            String cpf, String phone) {
         requireCompanyStaff(constructionSiteId, actingUserId);
+        requireValidCpfIfPresent(cpf);
         SiteMembership membership = SiteMembership.accountless(
-                UUID.randomUUID(), constructionSiteId, trade, displayName, contactEmail, Instant.now());
+                UUID.randomUUID(), constructionSiteId, trade, displayName, contactEmail, cpf, phone, Instant.now());
         return membershipRepository.save(membership);
     }
 
     @Transactional
     public MembershipInvitation inviteMember(
-            UUID constructionSiteId, UUID actingUserId, ConstructionFunction function, String email, String cpf) {
+            UUID constructionSiteId, UUID actingUserId, ConstructionFunction function, String displayName,
+            String email, String cpf, String phone) {
         requireCompanyStaff(constructionSiteId, actingUserId);
+        requireValidCpfIfPresent(cpf);
         ConstructionSite site = siteAccessService.requireSite(constructionSiteId);
         AppUser inviter = userRepository.findById(actingUserId).orElseThrow(() -> new NotSiteMemberException(constructionSiteId));
 
         Instant now = Instant.now();
-        var resolved = invitationIssuer.resolveOrCreateUser(email, now);
+        var resolved = invitationIssuer.resolveOrCreateUser(email, displayName, now);
 
         Optional<SiteMembership> existing =
                 membershipRepository.findByConstructionSiteIdAndUserId(constructionSiteId, resolved.user().getId());
@@ -93,8 +103,12 @@ public class SiteMembershipService {
             return invitationIssuer.reissue(existingInvitation, site.getId(), site.getName(), inviter.getDisplayName(), now);
         }
 
-        SiteMembership membership = membershipRepository.save(
-                SiteMembership.invited(UUID.randomUUID(), constructionSiteId, resolved.user().getId(), function, cpf, now));
+        if (!resolved.preRegistered() && personSearchService.belongsToAnotherCompany(resolved.user().getId(), site.getCompanyId())) {
+            throw new PersonBelongsToAnotherCompanyException(email);
+        }
+
+        SiteMembership membership = membershipRepository.save(SiteMembership.invited(
+                UUID.randomUUID(), constructionSiteId, resolved.user().getId(), function, cpf, phone, now));
 
         return invitationIssuer.issue(
                 MembershipType.SITE, membership.getId(), email, actingUserId, resolved.preRegistered(),
@@ -112,13 +126,19 @@ public class SiteMembershipService {
                 .orElseThrow(() -> new NotSiteMemberException(membership.getConstructionSiteId()));
 
         Instant now = Instant.now();
-        var resolved = invitationIssuer.resolveOrCreateUser(email, now);
+        var resolved = invitationIssuer.resolveOrCreateUser(email, membership.getDisplayName(), now);
         membership.attachAccount(resolved.user().getId());
         membershipRepository.save(membership);
 
         return invitationIssuer.issue(
                 MembershipType.SITE, membership.getId(), email, actingUserId, resolved.preRegistered(), site.getId(),
                 site.getName(), inviter.getDisplayName(), now);
+    }
+
+    private void requireValidCpfIfPresent(String cpf) {
+        if (cpf != null && !cpf.isBlank() && !CpfValidator.isValid(cpf)) {
+            throw new InvalidCpfException(cpf);
+        }
     }
 
     public List<SiteMemberResponse> listMembers(UUID constructionSiteId, UUID actingUserId) {
@@ -139,7 +159,8 @@ public class SiteMembershipService {
                             user != null ? user.getDisplayName() : m.getDisplayName(),
                             m.getFunction(),
                             m.getServiceProviderTrade(),
-                            m.getClientCpf(),
+                            m.getCpf(),
+                            m.getPhone(),
                             m.getStatus(),
                             !m.isActive());
                 })

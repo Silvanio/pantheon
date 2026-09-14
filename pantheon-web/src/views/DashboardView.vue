@@ -20,6 +20,7 @@ const { status, activeCompany } = useCompanyOnboarding()
 const { listSites, createSite } = useConstructionSites()
 
 const companyId = computed(() => (status.value ? activeCompany(status.value)?.companyId ?? null : null))
+const companyName = computed(() => (status.value ? activeCompany(status.value)?.companyName ?? null : null))
 const isCompanyAdmin = computed(() => (status.value ? activeCompany(status.value)?.role === 'ADMIN' : false))
 const sites = ref<ConstructionSite[]>([])
 const loading = ref(false)
@@ -85,14 +86,13 @@ onMounted(loadSites)
   <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
     <AppHeader>
       <template #left>
-        <div v-if="companyId" class="flex items-center gap-2.5">
+        <div v-if="companyId" class="-ml-1 flex items-center gap-2.5">
           <CompanyLogo :company-id="companyId" />
-          <span class="text-lg font-semibold tracking-tight text-steel-800 dark:text-steel-50">Pantheon</span>
+          <span class="truncate text-lg font-semibold tracking-tight text-steel-800 dark:text-steel-50">{{ companyName }}</span>
         </div>
         <BrandMark v-else />
       </template>
       <template #right>
-        <ThemeToggle />
         <div class="relative">
           <button
             type="button"
@@ -128,6 +128,7 @@ onMounted(loadSites)
             </button>
           </div>
         </div>
+        <ThemeToggle />
       </template>
     </AppHeader>
 

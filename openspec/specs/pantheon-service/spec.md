@@ -67,7 +67,7 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 - **THEN** the service logs the failure and does not silently lose the triggering request's success response semantics (the failure is surfaced, not swallowed)
 
 ### Requirement: Server-Sent Events stream
-`pantheon-service` SHALL expose an authenticated Server-Sent Events (SSE) endpoint that pushes real-time events to connected clients.
+`pantheon-service` SHALL expose an authenticated Server-Sent Events (SSE) endpoint that pushes real-time events to connected clients. Company-scoped events SHALL only be delivered to a connected client belonging to that company. The stream's behavior SHALL be identical regardless of how many `pantheon-service` instances are running or which instance produced a given event, achieved by fanning every SSE-worthy event out to all instances via RabbitMQ before local delivery.
 
 #### Scenario: Client subscribes to the event stream
 - **WHEN** an authenticated client opens a connection to the SSE endpoint
@@ -76,6 +76,18 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 #### Scenario: Unauthenticated subscription rejected
 - **WHEN** a client attempts to open the SSE endpoint without a valid session token
 - **THEN** `pantheon-service` responds with HTTP 401 and does not open the stream
+
+#### Scenario: Company-scoped event reaches only that company's clients
+- **WHEN** `pantheon-service` emits an event scoped to a given company
+- **THEN** only clients whose connected user belongs to that company receive the event; clients belonging only to other companies do not
+
+#### Scenario: Event reaches a client connected to a different instance
+- **WHEN** an action on one `pantheon-service` instance produces an event, and the intended recipient's SSE connection is open on a different instance
+- **THEN** the recipient still receives the event in real time
+
+#### Scenario: Idle connection kept alive
+- **WHEN** an SSE connection has had no application event to deliver for an extended period
+- **THEN** `pantheon-service` periodically sends a keep-alive frame on that connection so intermediary proxies or load balancers do not close it as idle
 
 ### Requirement: User profile registration
 `pantheon-service` SHALL allow an authenticated user to record their CNPJ/CPF, legal name (Nome/Razão Social), address, and postal code (CEP) as their own profile data, independent of any specific project. Submitting this data again SHALL update the user's existing profile rather than creating a duplicate.

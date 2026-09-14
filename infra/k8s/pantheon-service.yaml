@@ -37,9 +37,13 @@ metadata:
   labels:
     app: pantheon-service
 spec:
-  # Kept at 1 replica: SSE emitter state is per-pod (see design.md "Risks / Trade-offs").
-  # Scaling beyond 1 needs a fan-out backplane (RabbitMQ/Redis pub-sub) first.
-  replicas: 1
+  # Safe to run with multiple replicas: SSE events are fanned out to every pod via the
+  # "pantheon.sse.events" RabbitMQ exchange (see openspec/changes/add-task-card-sse-events),
+  # so a client's connection reaches the right emitter regardless of which pod it lands on.
+  # If a reverse proxy/ingress is added in front of this Service, it must disable response
+  # buffering on the SSE endpoint (e.g. `proxy_buffering off;` for nginx), or events will be
+  # queued instead of streamed in real time.
+  replicas: 2
   selector:
     matchLabels:
       app: pantheon-service

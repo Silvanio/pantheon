@@ -15,13 +15,18 @@ const MAX_BACKOFF_MS = 30000
 
 let entryCounter = 0
 
+export interface UseSseOptions {
+  /** Called with the parsed JSON payload each time one of the subscribed events is received. */
+  onEvent?: (eventName: string, data: unknown) => void
+}
+
 /**
  * Wraps the browser EventSource API to connect to pantheon-service's
  * GET /api/sse/subscribe stream, reconnecting with exponential backoff on drop.
  * The native EventSource API can't set an Authorization header, so the JWT is
  * passed as a query parameter instead (see JwtAuthenticationFilter.resolveToken).
  */
-export function useSse(eventNames: string[]) {
+export function useSse(eventNames: string[], options: UseSseOptions = {}) {
   const { token } = useAuth()
   const connected = ref(false)
   const entries = ref<SseLogEntry[]>([])
@@ -61,7 +66,11 @@ export function useSse(eventNames: string[]) {
 
     for (const eventName of eventNames) {
       source.addEventListener(eventName, (event) => {
-        recordEntry(eventName, (event as MessageEvent<string>).data)
+        const data = (event as MessageEvent<string>).data
+        recordEntry(eventName, data)
+        if (options.onEvent) {
+          options.onEvent(eventName, JSON.parse(data))
+        }
       })
     }
   }

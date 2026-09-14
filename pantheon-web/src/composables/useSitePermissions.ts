@@ -9,7 +9,8 @@ export type PermissionCapability =
   | 'PURCHASE_REQUEST'
   | 'ORCAMENTO_MANAGE'
   | 'TASKS'
-export type AccessLevel = 'VIEW' | 'MANAGE'
+  | 'TEAM_MANAGE'
+export type AccessLevel = 'VIEW' | 'MANAGE' | 'HIDDEN'
 
 export interface SitePermissionOverride {
   id: string
@@ -52,6 +53,10 @@ export function useSitePermissions() {
     })
   }
 
+  function getMyPermissions(siteId: string): Promise<Record<PermissionCapability, AccessLevel>> {
+    return authFetch(`/api/sites/${siteId}/permissions/mine`)
+  }
+
   function setMemberOverride(
     siteId: string,
     siteMembershipId: string,
@@ -64,5 +69,5 @@ export function useSitePermissions() {
     })
   }
 
-  return { listOverrides, setFunctionOverride, setMemberOverride }
+  return { listOverrides, setFunctionOverride, setMemberOverride, getMyPermissions }
 }

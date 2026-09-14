@@ -50,6 +50,9 @@ class TaskLabelServiceTest {
     @Mock
     private SitePermissionService permissionService;
 
+    @Mock
+    private TaskCardService taskCardService;
+
     private TaskLabelService service;
 
     private UUID siteId;
@@ -59,7 +62,8 @@ class TaskLabelServiceTest {
     @BeforeEach
     void setUp() {
         service = new TaskLabelService(
-                labelRepository, cardRepository, cardLabelRepository, siteRepository, siteAccessService, permissionService);
+                labelRepository, cardRepository, cardLabelRepository, siteRepository, siteAccessService,
+                permissionService, taskCardService);
         siteId = UUID.randomUUID();
         companyId = UUID.randomUUID();
         cardId = UUID.randomUUID();
@@ -81,6 +85,7 @@ class TaskLabelServiceTest {
         assertThat(label.getCardId()).isEqualTo(cardId);
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
         verify(cardLabelRepository).save(any());
+        verify(taskCardService).publishCardUpdated(cardId);
     }
 
     @Test
@@ -117,6 +122,7 @@ class TaskLabelServiceTest {
         service.attachPredefined(cardId, labelId, UUID.randomUUID());
 
         verify(cardLabelRepository).save(any());
+        verify(taskCardService).publishCardUpdated(cardId);
     }
 
     @Test
@@ -138,5 +144,6 @@ class TaskLabelServiceTest {
         service.detach(cardId, labelId, UUID.randomUUID());
 
         verify(cardLabelRepository).delete(link);
+        verify(taskCardService).publishCardUpdated(cardId);
     }
 }

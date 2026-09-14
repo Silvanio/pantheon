@@ -113,6 +113,7 @@ class TaskCardServiceTest {
         assertThat(card.getColumnId()).isEqualTo(columnId);
         assertThat(card.getSortOrder()).isEqualTo(2);
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+        verify(sseEventPublisher).publishToCompany(eq(companyId), eq("task-card-created"), any());
     }
 
     @Test
@@ -182,6 +183,7 @@ class TaskCardServiceTest {
 
         assertThat(updated.getDueDate()).isEqualTo(dueDate);
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+        verify(sseEventPublisher).publishToCompany(eq(companyId), eq("task-card-updated"), any());
     }
 
     @Test
@@ -250,6 +252,7 @@ class TaskCardServiceTest {
 
         verify(assigneeRepository).save(any());
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+        verify(sseEventPublisher).publishToCompany(eq(companyId), eq("task-card-updated"), any());
 
         UUID otherSiteMembershipId = UUID.randomUUID();
         SiteMembership otherSiteMembership = SiteMembership.accountless(
@@ -272,6 +275,7 @@ class TaskCardServiceTest {
         service.unassign(card.getId(), UUID.randomUUID(), membershipId);
 
         verify(assigneeRepository).delete(assignee);
+        verify(sseEventPublisher).publishToCompany(eq(companyId), eq("task-card-updated"), any());
     }
 
     @Test
@@ -287,6 +291,7 @@ class TaskCardServiceTest {
         verify(commentRepository).deleteByCardId(card.getId());
         verify(assigneeRepository).deleteByCardId(card.getId());
         verify(cardRepository).delete(card);
+        verify(sseEventPublisher).publishToCompany(eq(companyId), eq("task-card-deleted"), any());
     }
 
     @Test

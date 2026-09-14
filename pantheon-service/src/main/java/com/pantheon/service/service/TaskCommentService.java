@@ -26,16 +26,18 @@ public class TaskCommentService {
     private final AppUserRepository userRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final TaskCardService taskCardService;
 
     public TaskCommentService(
             TaskCommentRepository commentRepository, TaskCardRepository cardRepository,
             AppUserRepository userRepository, SiteAccessService siteAccessService,
-            SitePermissionService permissionService) {
+            SitePermissionService permissionService, TaskCardService taskCardService) {
         this.commentRepository = commentRepository;
         this.cardRepository = cardRepository;
         this.userRepository = userRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.taskCardService = taskCardService;
     }
 
     public List<TaskComment> list(UUID cardId, UUID actingUserId) {
@@ -50,8 +52,10 @@ public class TaskCommentService {
         var access = siteAccessService.requireAccess(card.getConstructionSiteId(), actingUserId);
         permissionService.requireManage(card.getConstructionSiteId(), access, PermissionCapability.TASKS);
 
-        return commentRepository.save(
+        TaskComment comment = commentRepository.save(
                 new TaskComment(UUID.randomUUID(), cardId, actingUserId, request.body(), Instant.now()));
+        taskCardService.publishCardUpdated(cardId);
+        return comment;
     }
 
     /** Resolves each comment's author id to a display name (falling back to email), for rendering. */

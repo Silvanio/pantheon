@@ -67,7 +67,7 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 - **THEN** the service logs the failure and does not silently lose the triggering request's success response semantics (the failure is surfaced, not swallowed)
 
 ### Requirement: Server-Sent Events stream
-`pantheon-service` SHALL expose an authenticated Server-Sent Events (SSE) endpoint that pushes real-time events to connected clients. Company-scoped events SHALL only be delivered to a connected client belonging to that company. The stream's behavior SHALL be identical regardless of how many `pantheon-service` instances are running or which instance produced a given event, achieved by fanning every SSE-worthy event out to all instances via RabbitMQ before local delivery.
+`pantheon-service` SHALL expose an authenticated Server-Sent Events (SSE) endpoint that pushes real-time events to connected clients. Company-scoped events SHALL only be delivered to a connected client belonging to that company — belonging is determined the same way `pantheon-service` determines site access elsewhere: an active `CompanyMembership` on that company, OR an active `SiteMembership` on any construction site owned by that company. The stream's behavior SHALL be identical regardless of how many `pantheon-service` instances are running or which instance produced a given event, achieved by fanning every SSE-worthy event out to all instances via RabbitMQ before local delivery.
 
 #### Scenario: Client subscribes to the event stream
 - **WHEN** an authenticated client opens a connection to the SSE endpoint
@@ -80,6 +80,10 @@ Regardless of login method (Google OAuth2 or email/password), `pantheon-service`
 #### Scenario: Company-scoped event reaches only that company's clients
 - **WHEN** `pantheon-service` emits an event scoped to a given company
 - **THEN** only clients whose connected user belongs to that company receive the event; clients belonging only to other companies do not
+
+#### Scenario: Site-only member receives their company's events
+- **WHEN** a user has no `CompanyMembership` but has an active `SiteMembership` on a construction site belonging to a given company, and that company emits an event
+- **THEN** that user's SSE connection still receives the event
 
 #### Scenario: Event reaches a client connected to a different instance
 - **WHEN** an action on one `pantheon-service` instance produces an event, and the intended recipient's SSE connection is open on a different instance

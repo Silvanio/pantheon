@@ -32,17 +32,20 @@ public class TaskLabelService {
     private final ConstructionSiteRepository siteRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final TaskCardService taskCardService;
 
     public TaskLabelService(
             TaskLabelRepository labelRepository, TaskCardRepository cardRepository,
             TaskCardLabelRepository cardLabelRepository, ConstructionSiteRepository siteRepository,
-            SiteAccessService siteAccessService, SitePermissionService permissionService) {
+            SiteAccessService siteAccessService, SitePermissionService permissionService,
+            TaskCardService taskCardService) {
         this.labelRepository = labelRepository;
         this.cardRepository = cardRepository;
         this.cardLabelRepository = cardLabelRepository;
         this.siteRepository = siteRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.taskCardService = taskCardService;
     }
 
     @Transactional
@@ -53,6 +56,7 @@ public class TaskLabelService {
         TaskLabel label = labelRepository.save(
                 TaskLabel.custom(UUID.randomUUID(), cardId, request.name(), request.colorHex(), Instant.now()));
         cardLabelRepository.save(new TaskCardLabel(UUID.randomUUID(), cardId, label.getId()));
+        taskCardService.publishCardUpdated(cardId);
         return label;
     }
 
@@ -65,6 +69,7 @@ public class TaskLabelService {
         if (cardLabelRepository.findByCardIdAndLabelId(cardId, labelId).isEmpty()) {
             cardLabelRepository.save(new TaskCardLabel(UUID.randomUUID(), cardId, labelId));
         }
+        taskCardService.publishCardUpdated(cardId);
     }
 
     @Transactional
@@ -73,6 +78,7 @@ public class TaskLabelService {
         requireManage(card.getConstructionSiteId(), actingUserId);
 
         cardLabelRepository.findByCardIdAndLabelId(cardId, labelId).ifPresent(cardLabelRepository::delete);
+        taskCardService.publishCardUpdated(cardId);
     }
 
     private void requireLabelOnCompany(UUID labelId, UUID companyId) {

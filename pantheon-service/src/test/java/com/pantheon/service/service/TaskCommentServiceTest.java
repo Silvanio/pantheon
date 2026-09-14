@@ -44,6 +44,9 @@ class TaskCommentServiceTest {
     @Mock
     private SitePermissionService permissionService;
 
+    @Mock
+    private TaskCardService taskCardService;
+
     private TaskCommentService service;
 
     private UUID siteId;
@@ -51,7 +54,8 @@ class TaskCommentServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TaskCommentService(commentRepository, cardRepository, userRepository, siteAccessService, permissionService);
+        service = new TaskCommentService(
+                commentRepository, cardRepository, userRepository, siteAccessService, permissionService, taskCardService);
         siteId = UUID.randomUUID();
         cardId = UUID.randomUUID();
 
@@ -69,6 +73,7 @@ class TaskCommentServiceTest {
         assertThat(comment.getCardId()).isEqualTo(cardId);
         assertThat(comment.getBody()).isEqualTo("Aguardando entrega");
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+        verify(taskCardService).publishCardUpdated(cardId);
     }
 
     @Test

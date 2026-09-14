@@ -41,6 +41,14 @@ Vue 3 single-page application for the Pantheon platform. Provides the app shell 
 - **WHEN** `pantheon-web` has one obra's Tasks board open and receives a `task-card-moved` event for a different obra
 - **THEN** `pantheon-web` does not modify the currently displayed board
 
+#### Scenario: Task board reflects a card created or deleted elsewhere
+- **WHEN** `pantheon-web` has an obra's Tasks board open and receives a `task-card-created` or `task-card-deleted` event for that same obra
+- **THEN** `pantheon-web` adds or removes the affected card in the board's local state without refetching the whole board, closing that card's detail modal first if it was the one deleted
+
+#### Scenario: Task board reflects a card edited elsewhere
+- **WHEN** `pantheon-web` has an obra's Tasks board open and receives a `task-card-updated` event for that same obra
+- **THEN** `pantheon-web` updates the affected card's due date, labels, assignees, and comment count in the board's local state, and in that card's detail modal if it is currently open, without refetching the whole board
+
 ### Requirement: Internationalized UI text
 `pantheon-web` SHALL source all user-facing text (labels, buttons, messages, validation errors) from i18n locale resource files rather than hardcoding it in components, with `pt-BR` as the default and, for now, only shipped locale.
 

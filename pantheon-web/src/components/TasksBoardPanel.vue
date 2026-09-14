@@ -60,8 +60,39 @@ interface TaskCardMovedEvent {
   sortOrder: number
 }
 
-function handleTaskCardMoved(_eventName: string, data: unknown) {
-  const event = data as TaskCardMovedEvent
+interface TaskCardCreatedEvent {
+  cardId: string
+  constructionSiteId: string
+  columnId: string
+  title: string
+  description: string | null
+  dueDate: string | null
+  sortOrder: number
+  createdBy: string
+  createdAt: string
+}
+
+interface TaskCardDeletedEvent {
+  cardId: string
+  constructionSiteId: string
+}
+
+interface TaskCardUpdatedEvent {
+  cardId: string
+  constructionSiteId: string
+  columnId: string
+  title: string
+  description: string | null
+  dueDate: string | null
+  sortOrder: number
+  labelIds: string[]
+  labels: TaskLabel[]
+  assigneeIds: string[]
+  commentCount: number
+  updatedAt: string
+}
+
+function handleTaskCardMoved(event: TaskCardMovedEvent) {
   if (event.constructionSiteId !== props.siteId) return
   const card = board.value.cards.find((c) => c.id === event.cardId)
   if (!card) return
@@ -69,7 +100,79 @@ function handleTaskCardMoved(_eventName: string, data: unknown) {
   card.sortOrder = event.sortOrder
 }
 
-const { connect: connectTaskEvents } = useSse(['task-card-moved'], { onEvent: handleTaskCardMoved })
+function handleTaskCardCreated(event: TaskCardCreatedEvent) {
+  if (event.constructionSiteId !== props.siteId) return
+  if (board.value.cards.some((c) => c.id === event.cardId)) return
+  board.value.cards.push({
+    id: event.cardId,
+    constructionSiteId: event.constructionSiteId,
+    columnId: event.columnId,
+    title: event.title,
+    description: event.description,
+    dueDate: event.dueDate,
+    sortOrder: event.sortOrder,
+    labelIds: [],
+    assigneeIds: [],
+    commentCount: 0,
+    createdBy: event.createdBy,
+    createdAt: event.createdAt,
+    updatedAt: event.createdAt,
+  })
+}
+
+function handleTaskCardDeleted(event: TaskCardDeletedEvent) {
+  if (event.constructionSiteId !== props.siteId) return
+  board.value.cards = board.value.cards.filter((c) => c.id !== event.cardId)
+  if (selectedCard.value?.id === event.cardId) {
+    closeCard()
+  }
+}
+
+function handleTaskCardUpdated(event: TaskCardUpdatedEvent) {
+  if (event.constructionSiteId !== props.siteId) return
+  const card = board.value.cards.find((c) => c.id === event.cardId)
+  if (card) {
+    card.columnId = event.columnId
+    card.title = event.title
+    card.description = event.description
+    card.dueDate = event.dueDate
+    card.sortOrder = event.sortOrder
+    card.labelIds = event.labelIds
+    card.assigneeIds = event.assigneeIds
+    card.commentCount = event.commentCount
+    card.updatedAt = event.updatedAt
+  }
+
+  // A label a recipient hasn't loaded yet (a card-only custom label, or a predefined one their
+  // role can't independently fetch) rides along in the event so it renders immediately, not
+  // just its id.
+  for (const label of event.labels) {
+    const existing = board.value.labels.find((l) => l.id === label.id)
+    if (existing) {
+      existing.name = label.name
+      existing.colorHex = label.colorHex
+    } else {
+      board.value.labels.push(label)
+    }
+  }
+}
+
+function handleTaskEvent(eventName: string, data: unknown) {
+  if (eventName === 'task-card-moved') {
+    handleTaskCardMoved(data as TaskCardMovedEvent)
+  } else if (eventName === 'task-card-created') {
+    handleTaskCardCreated(data as TaskCardCreatedEvent)
+  } else if (eventName === 'task-card-deleted') {
+    handleTaskCardDeleted(data as TaskCardDeletedEvent)
+  } else if (eventName === 'task-card-updated') {
+    handleTaskCardUpdated(data as TaskCardUpdatedEvent)
+  }
+}
+
+const { connect: connectTaskEvents } = useSse(
+  ['task-card-moved', 'task-card-created', 'task-card-deleted', 'task-card-updated'],
+  { onEvent: handleTaskEvent },
+)
 
 const customLabelsForSelectedCard = computed(() => {
   if (!selectedCard.value) return []

@@ -2,6 +2,7 @@ package com.pantheon.service.service;
 
 import com.pantheon.service.dto.MoveTaskCardRequest;
 import com.pantheon.service.dto.TaskCardCreationRequest;
+import com.pantheon.service.dto.TaskLabelResponse;
 import com.pantheon.service.dto.UpdateTaskCardDueDateRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.PermissionCapability;
@@ -25,6 +26,7 @@ import com.pantheon.service.repository.TaskCommentRepository;
 import com.pantheon.service.repository.TaskLabelRepository;
 import com.pantheon.service.sse.SseEventPublisher;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -104,7 +106,22 @@ public class TaskCardService {
         TaskCard card = new TaskCard(
                 UUID.randomUUID(), siteId, request.columnId(), request.title(), request.description(),
                 request.dueDate(), nextSortOrder, actingUserId, now, now);
-        return cardRepository.save(card);
+        TaskCard created = cardRepository.save(card);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("cardId", created.getId());
+        payload.put("constructionSiteId", created.getConstructionSiteId());
+        payload.put("companyId", site.getCompanyId());
+        payload.put("columnId", created.getColumnId());
+        payload.put("title", created.getTitle());
+        payload.put("description", created.getDescription());
+        payload.put("dueDate", created.getDueDate());
+        payload.put("sortOrder", created.getSortOrder());
+        payload.put("createdBy", created.getCreatedBy());
+        payload.put("createdAt", created.getCreatedAt().toString());
+        sseEventPublisher.publishToCompany(site.getCompanyId(), "task-card-created", payload);
+
+        return created;
     }
 
     @Transactional
@@ -135,7 +152,9 @@ public class TaskCardService {
         requireManage(card.getConstructionSiteId(), actingUserId);
 
         card.updateDueDate(request.dueDate(), Instant.now());
-        return cardRepository.save(card);
+        TaskCard updated = cardRepository.save(card);
+        publishCardUpdated(updated);
+        return updated;
     }
 
     @Transactional
@@ -147,6 +166,7 @@ public class TaskCardService {
         if (assigneeRepository.findByCardIdAndSiteMembershipId(cardId, siteMembershipId).isEmpty()) {
             assigneeRepository.save(new TaskCardAssignee(UUID.randomUUID(), cardId, siteMembershipId, Instant.now()));
         }
+        publishCardUpdated(card);
     }
 
     @Transactional
@@ -156,11 +176,54 @@ public class TaskCardService {
 
         assigneeRepository.findByCardIdAndSiteMembershipId(cardId, siteMembershipId)
                 .ifPresent(assigneeRepository::delete);
+        publishCardUpdated(card);
+    }
+
+    /**
+     * Publishes a company-scoped {@code task-card-updated} event carrying the card's current
+     * derived state (labels, assignees, comment count) so any client with the board open can
+     * merge it into its local copy in place. Called after any in-place edit to an existing card
+     * (due date, assignees, labels, comments) — as opposed to {@code task-card-moved},
+     * {@code task-card-created}, and {@code task-card-deleted}, which cover structural changes.
+     * Public so {@link TaskLabelService} and {@link TaskCommentService} can call it after their
+     * own mutations without duplicating this card/site/derived-data lookup.
+     */
+    @Transactional
+    public void publishCardUpdated(UUID cardId) {
+        publishCardUpdated(requireCard(cardId));
+    }
+
+    private void publishCardUpdated(TaskCard card) {
+        ConstructionSite site = requireSite(card.getConstructionSiteId());
+        List<UUID> labelIds = labelIdsForCard(card.getId());
+        // Full label objects, not just ids: a label a recipient hasn't seen yet (a card-only
+        // custom label, or a predefined label they can't independently fetch — see
+        // CompanyTaskLabelService's company-staff-only catalog endpoint) would otherwise render
+        // as a pill with no name/color until their next full reload.
+        List<TaskLabelResponse> labels =
+                labelRepository.findAllById(labelIds).stream().map(TaskLabelResponse::from).toList();
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("cardId", card.getId());
+        payload.put("constructionSiteId", card.getConstructionSiteId());
+        payload.put("companyId", site.getCompanyId());
+        payload.put("columnId", card.getColumnId());
+        payload.put("title", card.getTitle());
+        payload.put("description", card.getDescription());
+        payload.put("dueDate", card.getDueDate());
+        payload.put("sortOrder", card.getSortOrder());
+        payload.put("labelIds", labelIds);
+        payload.put("labels", labels);
+        payload.put("assigneeIds", assigneeIdsForCard(card.getId()));
+        payload.put("commentCount", commentCountForCard(card.getId()));
+        payload.put("updatedAt", Instant.now().toString());
+        sseEventPublisher.publishToCompany(site.getCompanyId(), "task-card-updated", payload);
     }
 
     @Transactional
     public void deleteCard(UUID cardId, UUID actingUserId) {
         TaskCard card = requireCard(cardId);
+        ConstructionSite site = requireSite(card.getConstructionSiteId());
         requireManage(card.getConstructionSiteId(), actingUserId);
 
         cardLabelRepository.deleteByCardId(cardId);
@@ -168,6 +231,11 @@ public class TaskCardService {
         commentRepository.deleteByCardId(cardId);
         assigneeRepository.deleteByCardId(cardId);
         cardRepository.delete(card);
+
+        sseEventPublisher.publishToCompany(site.getCompanyId(), "task-card-deleted", Map.of(
+                "cardId", cardId,
+                "constructionSiteId", card.getConstructionSiteId(),
+                "companyId", site.getCompanyId()));
     }
 
     public List<UUID> labelIdsForCard(UUID cardId) {

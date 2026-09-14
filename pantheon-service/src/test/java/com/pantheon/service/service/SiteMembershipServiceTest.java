@@ -259,6 +259,20 @@ class SiteMembershipServiceTest {
     }
 
     @Test
+    void listMembersRejectsMemberHiddenFromTeam() {
+        UUID hiddenUserId = UUID.randomUUID();
+        SiteMembership membership = SiteMembership.invited(
+                UUID.randomUUID(), siteId, hiddenUserId, ConstructionFunction.CLIENT, null, null, Instant.now());
+        membership.accept();
+        when(siteAccessService.requireAccess(siteId, hiddenUserId)).thenReturn(new SiteAccessContext(false, membership));
+        doThrow(new com.pantheon.service.exception.ForbiddenCapabilityException(siteId, PermissionCapability.TEAM_MANAGE))
+                .when(permissionService).requireVisible(eq(siteId), any(), eq(PermissionCapability.TEAM_MANAGE));
+
+        assertThatThrownBy(() -> service.listMembers(siteId, hiddenUserId))
+                .isInstanceOf(com.pantheon.service.exception.ForbiddenCapabilityException.class);
+    }
+
+    @Test
     void removeMemberDeletesMembershipAndDependents() {
         SiteMembership membership = SiteMembership.admin(UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now());
         when(membershipRepository.findById(membership.getId())).thenReturn(Optional.of(membership));

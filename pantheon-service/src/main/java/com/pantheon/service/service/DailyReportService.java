@@ -188,7 +188,8 @@ public class DailyReportService {
 
     public List<DailyReport> list(UUID siteId, UUID actingUserId) {
         requireSite(siteId);
-        siteAccessService.requireAccess(siteId, actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireVisible(siteId, access, PermissionCapability.DAILY_REPORT);
         return dailyReportRepository.findByConstructionSiteIdOrderByReportDateDesc(siteId);
     }
 
@@ -223,7 +224,8 @@ public class DailyReportService {
     private DailyReport requireReport(UUID reportId, UUID actingUserId) {
         DailyReport report =
                 dailyReportRepository.findById(reportId).orElseThrow(() -> new DailyReportNotFoundException(reportId));
-        siteAccessService.requireAccess(report.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(report.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(report.getConstructionSiteId(), access, PermissionCapability.DAILY_REPORT);
         return report;
     }
 

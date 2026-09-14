@@ -139,6 +139,15 @@ class TaskCardServiceTest {
     }
 
     @Test
+    void getBoardRejectsMemberHiddenFromTasks() {
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.TASKS))
+                .when(permissionService).requireVisible(eq(siteId), any(), eq(PermissionCapability.TASKS));
+
+        assertThatThrownBy(() -> service.getBoard(siteId, UUID.randomUUID()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
     void cardCreatedInOneSiteIsInvisibleWhenBoardingAnotherSite() {
         UUID otherSiteId = UUID.randomUUID();
         when(siteRepository.findById(otherSiteId)).thenReturn(Optional.of(new ConstructionSite(

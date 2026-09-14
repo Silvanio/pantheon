@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useConstructionSites, type ConstructionSite } from '../composables/useConstructionSites'
 import { useCompanies } from '../composables/useCompanies'
 import { useSiteHeroCollapse } from '../composables/useSiteHeroCollapse'
+import { useSitePermissions, type AccessLevel, type PermissionCapability } from '../composables/useSitePermissions'
 import SitePhoto from '../components/SitePhoto.vue'
 import SiteTeamPanel from '../components/SiteTeamPanel.vue'
 import SiteDocumentProjectsPanel from '../components/SiteDocumentProjectsPanel.vue'
@@ -24,6 +25,7 @@ const { t } = useI18n()
 const { getSite, updateSitePhoto } = useConstructionSites()
 const { listMyCompanies } = useCompanies()
 const { collapsed: heroCollapsed, toggle: toggleHero } = useSiteHeroCollapse()
+const { getMyPermissions } = useSitePermissions()
 
 const siteId = route.params.siteId as string
 const site = ref<ConstructionSite | null>(null)
@@ -33,12 +35,42 @@ const isCompanyAdmin = ref(false)
 type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('team')
 
+// Tabs backed by a PermissionCapability can be hidden per member; 'schedule' (an unimplemented
+// placeholder) and 'permissions' (gated by company-admin status, not a capability) are exempt.
+const TAB_CAPABILITY: Partial<Record<Tab, PermissionCapability>> = {
+  team: 'TEAM_MANAGE',
+  dailyReport: 'DAILY_REPORT',
+  projects: 'DOCUMENT_PROJECTS',
+  equipment: 'EQUIPMENT',
+  purchaseRequests: 'PURCHASE_REQUEST',
+  orcamentos: 'ORCAMENTO_MANAGE',
+  tasks: 'TASKS',
+}
+const TAB_ORDER: Tab[] = ['team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'tasks']
+
+const myPermissions = ref<Record<PermissionCapability, AccessLevel> | null>(null)
+
+function isTabVisible(tab: Tab): boolean {
+  const capability = TAB_CAPABILITY[tab]
+  if (!capability) return true
+  // Don't hide anything before permissions have loaded — avoids a flash of a tab disappearing.
+  if (!myPermissions.value) return true
+  return myPermissions.value[capability] !== 'HIDDEN'
+}
+
 async function load() {
   loading.value = true
   try {
-    site.value = await getSite(siteId)
-    const memberships = await listMyCompanies()
+    const [siteResult, memberships, permissions] = await Promise.all([
+      getSite(siteId),
+      listMyCompanies(),
+      getMyPermissions(siteId),
+    ])
+    site.value = siteResult
     isCompanyAdmin.value = memberships.some((m) => m.companyId === site.value?.companyId && m.role === 'ADMIN')
+    myPermissions.value = permissions
+    const firstVisible = TAB_ORDER.find(isTabVisible)
+    if (firstVisible) activeTab.value = firstVisible
   } finally {
     loading.value = false
   }
@@ -128,6 +160,7 @@ onMounted(load)
       <main class="app-container space-y-6 py-8">
         <nav class="flex flex-wrap gap-1.5 border-b border-steel-200 pb-3 dark:border-steel-800">
           <button
+            v-if="isTabVisible('team')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'team' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -136,6 +169,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.team') }}
           </button>
           <button
+            v-if="isTabVisible('dailyReport')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'dailyReport' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -144,6 +178,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.dailyReport') }}
           </button>
           <button
+            v-if="isTabVisible('projects')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'projects' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -152,6 +187,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.projects') }}
           </button>
           <button
+            v-if="isTabVisible('equipment')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'equipment' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -160,6 +196,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.equipment') }}
           </button>
           <button
+            v-if="isTabVisible('purchaseRequests')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'purchaseRequests' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -168,6 +205,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.purchaseRequests') }}
           </button>
           <button
+            v-if="isTabVisible('orcamentos')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'orcamentos' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -176,6 +214,7 @@ onMounted(load)
             {{ t('siteDetail.tabs.orcamentos') }}
           </button>
           <button
+            v-if="isTabVisible('tasks')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
             :class="activeTab === 'tasks' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
@@ -202,13 +241,13 @@ onMounted(load)
           </button>
         </nav>
 
-        <SiteTeamPanel v-if="activeTab === 'team'" :site-id="siteId" />
-        <DailyReportsPanel v-if="activeTab === 'dailyReport'" :site-id="siteId" />
-        <SiteDocumentProjectsPanel v-if="activeTab === 'projects'" :site-id="siteId" />
-        <EquipmentPanel v-if="activeTab === 'equipment'" :site-id="siteId" />
-        <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests'" :site-id="siteId" />
-        <OrcamentoListPanel v-if="activeTab === 'orcamentos'" :site-id="siteId" />
-        <TasksBoardPanel v-if="activeTab === 'tasks'" :site-id="siteId" />
+        <SiteTeamPanel v-if="activeTab === 'team' && isTabVisible('team')" :site-id="siteId" />
+        <DailyReportsPanel v-if="activeTab === 'dailyReport' && isTabVisible('dailyReport')" :site-id="siteId" />
+        <SiteDocumentProjectsPanel v-if="activeTab === 'projects' && isTabVisible('projects')" :site-id="siteId" />
+        <EquipmentPanel v-if="activeTab === 'equipment' && isTabVisible('equipment')" :site-id="siteId" />
+        <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests' && isTabVisible('purchaseRequests')" :site-id="siteId" />
+        <OrcamentoListPanel v-if="activeTab === 'orcamentos' && isTabVisible('orcamentos')" :site-id="siteId" />
+        <TasksBoardPanel v-if="activeTab === 'tasks' && isTabVisible('tasks')" :site-id="siteId" />
         <template v-if="activeTab === 'permissions' && isCompanyAdmin">
           <SitePermissionsPanel :site-id="siteId" />
           <SiteOrcamentoApprovalLevelsPanel :site-id="siteId" />

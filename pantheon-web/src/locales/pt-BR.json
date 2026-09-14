@@ -192,11 +192,13 @@
       "EQUIPMENT": "Equipamentos",
       "PURCHASE_REQUEST": "Pedido de compra",
       "ORCAMENTO_MANAGE": "Orçamentos",
-      "TASKS": "Tasks"
+      "TASKS": "Tasks",
+      "TEAM_MANAGE": "Equipe"
     },
     "accessLevel": {
       "VIEW": "Apenas ver",
-      "MANAGE": "Gerenciar"
+      "MANAGE": "Gerenciar",
+      "HIDDEN": "Ocultar menu"
     }
   },
   "tasks": {

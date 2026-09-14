@@ -3,12 +3,15 @@ package com.pantheon.service.controller;
 import com.pantheon.service.dto.SetFunctionPermissionRequest;
 import com.pantheon.service.dto.SetMemberPermissionRequest;
 import com.pantheon.service.dto.SitePermissionOverrideResponse;
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.exception.NotSiteMemberException;
 import com.pantheon.service.service.SiteAccessService;
 import com.pantheon.service.service.SitePermissionService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,6 +41,15 @@ public class SitePermissionController {
         List<SitePermissionOverrideResponse> overrides =
                 permissionService.listOverrides(siteId).stream().map(SitePermissionOverrideResponse::from).toList();
         return ResponseEntity.ok(overrides);
+    }
+
+    // Any active member (not staff-only, unlike list() above) may learn their own resolved
+    // access — this is what pantheon-web uses to decide which tabs to show.
+    @GetMapping("/mine")
+    public ResponseEntity<Map<PermissionCapability, AccessLevel>> mine(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID siteId) {
+        var access = siteAccessService.requireAccess(siteId, user.getId());
+        return ResponseEntity.ok(permissionService.resolveAll(siteId, access));
     }
 
     @PutMapping("/function")

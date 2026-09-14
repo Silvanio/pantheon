@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,6 +24,7 @@ import com.pantheon.service.entity.OrcamentoStatus;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.SiteOrcamentoApprovalLevel;
+import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
 import com.pantheon.service.exception.OrcamentoEmptyException;
 import com.pantheon.service.exception.OrcamentoNotApprovedException;
@@ -340,6 +342,15 @@ class OrcamentoServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrcamentoStatus.COMPLETED);
         verify(materialService).createFromOrcamento(orcamento, items);
+    }
+
+    @Test
+    void listRejectsMemberHiddenFromOrcamentoManage() {
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.ORCAMENTO_MANAGE))
+                .when(permissionService).requireVisible(eq(siteId), any(), eq(PermissionCapability.ORCAMENTO_MANAGE));
+
+        assertThatThrownBy(() -> service.list(siteId, UUID.randomUUID(), null, null))
+                .isInstanceOf(ForbiddenCapabilityException.class);
     }
 
     @Test

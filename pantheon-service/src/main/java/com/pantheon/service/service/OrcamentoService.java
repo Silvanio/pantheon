@@ -245,7 +245,8 @@ public class OrcamentoService {
 
     public List<Orcamento> list(UUID siteId, UUID actingUserId, LocalDate dateFilter, UUID purchaseRequestIdFilter) {
         requireSite(siteId);
-        siteAccessService.requireAccess(siteId, actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireVisible(siteId, access, PermissionCapability.ORCAMENTO_MANAGE);
 
         if (dateFilter == null && purchaseRequestIdFilter == null) {
             return orcamentoRepository.findByConstructionSiteIdOrderByCreatedAtDesc(siteId);
@@ -266,7 +267,8 @@ public class OrcamentoService {
 
     public Orcamento get(UUID orcamentoId, UUID actingUserId) {
         Orcamento orcamento = requireOrcamento(orcamentoId);
-        siteAccessService.requireAccess(orcamento.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(orcamento.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(orcamento.getConstructionSiteId(), access, PermissionCapability.ORCAMENTO_MANAGE);
         return orcamento;
     }
 

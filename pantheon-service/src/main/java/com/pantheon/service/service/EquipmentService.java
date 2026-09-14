@@ -56,7 +56,8 @@ public class EquipmentService {
 
     public List<Equipment> list(UUID siteId, UUID actingUserId) {
         requireSite(siteId);
-        siteAccessService.requireAccess(siteId, actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireVisible(siteId, access, PermissionCapability.EQUIPMENT);
         return equipmentRepository.findByConstructionSiteId(siteId);
     }
 

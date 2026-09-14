@@ -107,6 +107,22 @@ public class SitePermissionService {
         }
     }
 
+    /** Rejects a member whose resolved access to {@code capability} is {@code HIDDEN} — used to gate reads, not just writes. */
+    public void requireVisible(UUID constructionSiteId, SiteAccessContext access, PermissionCapability capability) {
+        if (resolve(constructionSiteId, access, capability) == AccessLevel.HIDDEN) {
+            throw new ForbiddenCapabilityException(constructionSiteId, capability);
+        }
+    }
+
+    /** Every capability's resolved access for {@code access}'s member — backs the "my permissions" endpoint. */
+    public Map<PermissionCapability, AccessLevel> resolveAll(UUID constructionSiteId, SiteAccessContext access) {
+        Map<PermissionCapability, AccessLevel> resolved = new EnumMap<>(PermissionCapability.class);
+        for (PermissionCapability capability : PermissionCapability.values()) {
+            resolved.put(capability, resolve(constructionSiteId, access, capability));
+        }
+        return resolved;
+    }
+
     public List<SitePermissionOverride> listOverrides(UUID constructionSiteId) {
         return overrideRepository.findByConstructionSiteId(constructionSiteId);
     }

@@ -43,7 +43,8 @@ public class PurchaseRequestItemService {
 
     public List<PurchaseRequestItem> list(UUID purchaseRequestId, UUID actingUserId, PurchaseRequestItemStatus statusFilter) {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
-        siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
         return statusFilter != null
                 ? itemRepository.findByPurchaseRequestIdAndStatusOrderByCreatedAtDesc(purchaseRequestId, statusFilter)
                 : itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);

@@ -3,6 +3,8 @@ package com.pantheon.service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +13,7 @@ import com.pantheon.service.dto.PurchaseRequestItemCreationRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
+import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
@@ -96,5 +99,14 @@ class PurchaseRequestServiceTest {
 
         verify(itemRepository).save(org.mockito.ArgumentMatchers.argThat(
                 item -> item.getPurchaseRequestId().equals(result.getId()) && item.getName().equals("Cimento")));
+    }
+
+    @Test
+    void listRejectsMemberHiddenFromPurchaseRequest() {
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireVisible(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.list(siteId, UUID.randomUUID(), null))
+                .isInstanceOf(ForbiddenCapabilityException.class);
     }
 }

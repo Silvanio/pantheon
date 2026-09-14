@@ -14,6 +14,7 @@ import DailyReportDetailView from '../views/DailyReportDetailView.vue'
 import OrcamentoDetailView from '../views/OrcamentoDetailView.vue'
 import PurchaseRequestDetailView from '../views/PurchaseRequestDetailView.vue'
 import GlobalTasksBoardView from '../views/GlobalTasksBoardView.vue'
+import UserProfileView from '../views/UserProfileView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -66,6 +67,7 @@ const router = createRouter({
       component: GlobalTasksBoardView,
       meta: { requiresAuth: true },
     },
+    { path: '/profile', name: 'user-profile', component: UserProfileView, meta: { requiresAuth: true } },
   ],
 })
 
@@ -110,12 +112,17 @@ router.beforeEach(async (to) => {
 
   if (!current.hasCompany) {
     // A user with only site membership(s) — e.g. a client or an outside architect/engineer —
-    // has no company of their own and shouldn't be forced through company onboarding; send
-    // them straight to one of their obras instead of the (company-scoped) dashboard.
-    if (current.siteIds.length > 0) {
+    // has no company of their own and shouldn't be forced through company onboarding. With
+    // exactly one obra, send them straight into it; with more than one (possibly spanning
+    // different companies), send them to the dashboard's site-only view instead of an
+    // arbitrary first obra — see add-site-only-member-dashboard.
+    if (current.siteIds.length === 1) {
       if (to.name === 'dashboard') {
         return { name: 'site-detail', params: { siteId: current.siteIds[0] } }
       }
+      return true
+    }
+    if (current.siteIds.length > 1) {
       return true
     }
     return to.name === 'company-new' ? true : { name: 'company-new' }

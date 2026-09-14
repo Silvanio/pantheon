@@ -76,7 +76,8 @@ public class TaskCardService {
 
     public TaskBoard getBoard(UUID siteId, UUID actingUserId) {
         ConstructionSite site = requireSite(siteId);
-        siteAccessService.requireAccess(siteId, actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireVisible(siteId, access, PermissionCapability.TASKS);
 
         List<TaskColumn> columns = columnRepository.findByCompanyIdOrderBySortOrderAsc(site.getCompanyId());
         List<TaskCard> cards = cardRepository.findByConstructionSiteIdOrderBySortOrderAsc(siteId);

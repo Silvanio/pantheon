@@ -117,4 +117,42 @@ class SitePermissionServiceTest {
 
         service.requireManage(siteId, engineerAccess, PermissionCapability.ORCAMENTO_MANAGE);
     }
+
+    @Test
+    void requireVisibleThrowsWhenResolvedAccessIsHidden() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.TASKS))
+                .thenReturn(Optional.of(SitePermissionOverride.forMember(
+                        UUID.randomUUID(), siteId, clientMembership.getId(), PermissionCapability.TASKS, AccessLevel.HIDDEN)));
+
+        assertThatThrownBy(() -> service.requireVisible(siteId, clientAccess, PermissionCapability.TASKS))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void requireVisiblePassesForViewAndManage() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.TASKS))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.TASKS))
+                .thenReturn(Optional.empty());
+
+        service.requireVisible(siteId, clientAccess, PermissionCapability.TASKS);
+    }
+
+    @Test
+    void requireVisibleNeverThrowsForCompanyStaff() {
+        SiteAccessContext staffAccess = new SiteAccessContext(true, null);
+
+        service.requireVisible(siteId, staffAccess, PermissionCapability.TASKS);
+    }
+
+    @Test
+    void resolveAllReturnsEveryCapability() {
+        SiteAccessContext staffAccess = new SiteAccessContext(true, null);
+
+        var resolved = service.resolveAll(siteId, staffAccess);
+
+        assertThat(resolved).hasSize(PermissionCapability.values().length);
+        assertThat(resolved.values()).allMatch(level -> level == AccessLevel.MANAGE);
+    }
 }

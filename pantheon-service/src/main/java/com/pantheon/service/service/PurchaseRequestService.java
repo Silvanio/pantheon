@@ -68,7 +68,8 @@ public class PurchaseRequestService {
 
     public List<PurchaseRequest> list(UUID siteId, UUID actingUserId, LocalDate dateFilter) {
         requireSite(siteId);
-        siteAccessService.requireAccess(siteId, actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireVisible(siteId, access, PermissionCapability.PURCHASE_REQUEST);
         if (dateFilter == null) {
             return purchaseRequestRepository.findByConstructionSiteIdOrderByCreatedAtDesc(siteId);
         }
@@ -80,7 +81,8 @@ public class PurchaseRequestService {
 
     public PurchaseRequest get(UUID purchaseRequestId, UUID actingUserId) {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
-        siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
         return purchaseRequest;
     }
 

@@ -22,6 +22,7 @@ const capabilities: PermissionCapability[] = [
   'PURCHASE_REQUEST',
   'ORCAMENTO_MANAGE',
   'TASKS',
+  'TEAM_MANAGE',
 ]
 
 const overrides = ref<SitePermissionOverride[]>([])
@@ -90,6 +91,7 @@ onMounted(load)
                 <option value="" disabled>{{ t('sitePermissions.default') }}</option>
                 <option value="VIEW">{{ t('sitePermissions.accessLevel.VIEW') }}</option>
                 <option value="MANAGE">{{ t('sitePermissions.accessLevel.MANAGE') }}</option>
+                <option value="HIDDEN">{{ t('sitePermissions.accessLevel.HIDDEN') }}</option>
               </select>
             </td>
           </tr>

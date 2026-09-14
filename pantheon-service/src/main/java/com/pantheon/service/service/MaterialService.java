@@ -112,7 +112,8 @@ public class MaterialService {
 
     public List<Material> list(UUID siteId, UUID actingUserId, UUID orcamentoIdFilter) {
         requireSite(siteId);
-        siteAccessService.requireAccess(siteId, actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireVisible(siteId, access, PermissionCapability.ORCAMENTO_MANAGE);
         List<Material> materials = materialRepository.findByConstructionSiteId(siteId);
         if (orcamentoIdFilter == null) {
             return materials;
@@ -135,7 +136,8 @@ public class MaterialService {
         MaterialDeliveryPhoto photo = photoRepository.findById(photoId)
                 .orElseThrow(() -> new InvalidFileException("Photo not found: " + photoId));
         Material material = requireMaterial(photo.getMaterialId());
-        siteAccessService.requireAccess(material.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(material.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(material.getConstructionSiteId(), access, PermissionCapability.ORCAMENTO_MANAGE);
         return storageService.getObject(photo.getStorageKey());
     }
 

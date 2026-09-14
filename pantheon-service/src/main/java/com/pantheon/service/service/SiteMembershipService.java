@@ -142,7 +142,8 @@ public class SiteMembershipService {
     }
 
     public List<SiteMemberResponse> listMembers(UUID constructionSiteId, UUID actingUserId) {
-        siteAccessService.requireAccess(constructionSiteId, actingUserId);
+        var access = siteAccessService.requireAccess(constructionSiteId, actingUserId);
+        permissionService.requireVisible(constructionSiteId, access, PermissionCapability.TEAM_MANAGE);
 
         List<SiteMembership> memberships = membershipRepository.findByConstructionSiteId(constructionSiteId);
         List<UUID> userIds = memberships.stream().map(SiteMembership::getUserId).filter(id -> id != null).toList();

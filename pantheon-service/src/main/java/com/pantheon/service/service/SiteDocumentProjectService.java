@@ -52,13 +52,15 @@ public class SiteDocumentProjectService {
     }
 
     public List<SiteDocumentProject> list(UUID constructionSiteId, UUID actingUserId) {
-        siteAccessService.requireAccess(constructionSiteId, actingUserId);
+        var access = siteAccessService.requireAccess(constructionSiteId, actingUserId);
+        permissionService.requireVisible(constructionSiteId, access, PermissionCapability.DOCUMENT_PROJECTS);
         return projectRepository.findByConstructionSiteId(constructionSiteId);
     }
 
     public SiteDocumentProject get(UUID projectId, UUID actingUserId) {
         SiteDocumentProject project = requireProject(projectId);
-        siteAccessService.requireAccess(project.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(project.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(project.getConstructionSiteId(), access, PermissionCapability.DOCUMENT_PROJECTS);
         return project;
     }
 
@@ -88,13 +90,15 @@ public class SiteDocumentProjectService {
 
     public List<SiteDocumentProjectAttachment> listAttachments(UUID projectId, UUID actingUserId) {
         SiteDocumentProject project = requireProject(projectId);
-        siteAccessService.requireAccess(project.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(project.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(project.getConstructionSiteId(), access, PermissionCapability.DOCUMENT_PROJECTS);
         return attachmentRepository.findBySiteDocumentProjectId(projectId);
     }
 
     public byte[] getAttachmentContent(UUID projectId, UUID attachmentId, UUID actingUserId) {
         SiteDocumentProject project = requireProject(projectId);
-        siteAccessService.requireAccess(project.getConstructionSiteId(), actingUserId);
+        var access = siteAccessService.requireAccess(project.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(project.getConstructionSiteId(), access, PermissionCapability.DOCUMENT_PROJECTS);
         SiteDocumentProjectAttachment attachment = attachmentRepository
                 .findById(attachmentId)
                 .orElseThrow(() -> new InvalidFileException("Attachment not found: " + attachmentId));

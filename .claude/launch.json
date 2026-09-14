@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pantheon-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "pantheon-web", "run", "dev"],
+      "port": 8585
+    },
+    {
+      "name": "pantheon-service",
+      "runtimeExecutable": "pantheon-service/mvnw",
+      "runtimeArgs": ["-f", "pantheon-service/pom.xml", "spring-boot:run"],
+      "port": 8081
+    }
+  ]
+}

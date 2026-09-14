@@ -29,6 +29,7 @@ import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskColumnRepository;
 import com.pantheon.service.repository.TaskCommentRepository;
 import com.pantheon.service.repository.TaskLabelRepository;
+import com.pantheon.service.sse.SseEventPublisher;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -73,6 +74,9 @@ class TaskCardServiceTest {
     @Mock
     private SitePermissionService permissionService;
 
+    @Mock
+    private SseEventPublisher sseEventPublisher;
+
     private TaskCardService service;
 
     private UUID siteId;
@@ -83,7 +87,8 @@ class TaskCardServiceTest {
     void setUp() {
         service = new TaskCardService(
                 cardRepository, columnRepository, cardLabelRepository, labelRepository, commentRepository,
-                assigneeRepository, siteRepository, siteMembershipRepository, siteAccessService, permissionService);
+                assigneeRepository, siteRepository, siteMembershipRepository, siteAccessService, permissionService,
+                sseEventPublisher);
 
         siteId = UUID.randomUUID();
         companyId = UUID.randomUUID();
@@ -163,6 +168,7 @@ class TaskCardServiceTest {
         assertThat(moved.getColumnId()).isEqualTo(newColumnId);
         assertThat(moved.getSortOrder()).isEqualTo(3);
         verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.TASKS));
+        verify(sseEventPublisher).publishToCompany(eq(companyId), eq("task-card-moved"), any());
     }
 
     @Test

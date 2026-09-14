@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useTaskCards, type TaskBoard, type TaskCard, type TaskComment, type TaskLabel } from '../composables/useTaskCards'
 import { useTaskLabels } from '../composables/useTaskLabels'
 import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
+import { useSse } from '../composables/useSse'
 import { vDatePicker } from '../lib/datePicker'
 
 const props = defineProps<{ siteId: string }>()
@@ -52,6 +53,24 @@ const confirmingDelete = ref(false)
 const sortedColumns = computed(() => [...board.value.columns].sort((a, b) => a.sortOrder - b.sortOrder))
 const companyId = computed(() => board.value.columns[0]?.companyId ?? null)
 
+interface TaskCardMovedEvent {
+  cardId: string
+  constructionSiteId: string
+  columnId: string
+  sortOrder: number
+}
+
+function handleTaskCardMoved(_eventName: string, data: unknown) {
+  const event = data as TaskCardMovedEvent
+  if (event.constructionSiteId !== props.siteId) return
+  const card = board.value.cards.find((c) => c.id === event.cardId)
+  if (!card) return
+  card.columnId = event.columnId
+  card.sortOrder = event.sortOrder
+}
+
+const { connect: connectTaskEvents } = useSse(['task-card-moved'], { onEvent: handleTaskCardMoved })
+
 const customLabelsForSelectedCard = computed(() => {
   if (!selectedCard.value) return []
   return selectedCard.value.labelIds
@@ -99,7 +118,15 @@ async function load() {
     board.value = boardResult
     siteMembers.value = membersResult
     if (companyId.value) {
-      predefinedLabels.value = await listCompanyLabels(companyId.value)
+      // A site-only member (e.g. an external engineer/service provider with no CompanyMembership)
+      // can access this board but isn't authorized to read the company's predefined label catalog.
+      // That's an expected 403 for them, not a board-load failure, so it's isolated here rather
+      // than left to bubble up and falsely mark the caller's action (move, create, ...) as failed.
+      try {
+        predefinedLabels.value = await listCompanyLabels(companyId.value)
+      } catch {
+        predefinedLabels.value = []
+      }
     }
   } finally {
     loading.value = false
@@ -266,7 +293,10 @@ async function onConfirmDeleteCard() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  connectTaskEvents()
+})
 </script>
 
 <template>

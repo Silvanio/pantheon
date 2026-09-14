@@ -10,7 +10,7 @@ import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.exception.EmailAlreadyRegisteredException;
 import com.pantheon.service.messaging.EventPublisher;
 import com.pantheon.service.repository.AppUserRepository;
-import com.pantheon.service.sse.SseBroadcaster;
+import com.pantheon.service.sse.SseEventPublisher;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,13 +34,13 @@ class AppUserServiceTest {
     private EventPublisher eventPublisher;
 
     @Mock
-    private SseBroadcaster sseBroadcaster;
+    private SseEventPublisher sseEventPublisher;
 
     private AppUserService service;
 
     @BeforeEach
     void setUp() {
-        service = new AppUserService(repository, passwordEncoder, eventPublisher, sseBroadcaster);
+        service = new AppUserService(repository, passwordEncoder, eventPublisher, sseEventPublisher);
         lenient().when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(passwordEncoder.encode(any())).thenReturn("encoded");
     }

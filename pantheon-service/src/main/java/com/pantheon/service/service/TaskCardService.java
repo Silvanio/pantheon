@@ -23,6 +23,7 @@ import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskColumnRepository;
 import com.pantheon.service.repository.TaskCommentRepository;
 import com.pantheon.service.repository.TaskLabelRepository;
+import com.pantheon.service.sse.SseEventPublisher;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -49,13 +50,15 @@ public class TaskCardService {
     private final SiteMembershipRepository siteMembershipRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final SseEventPublisher sseEventPublisher;
 
     public TaskCardService(
             TaskCardRepository cardRepository, TaskColumnRepository columnRepository,
             TaskCardLabelRepository cardLabelRepository, TaskLabelRepository labelRepository,
             TaskCommentRepository commentRepository, TaskCardAssigneeRepository assigneeRepository,
             ConstructionSiteRepository siteRepository, SiteMembershipRepository siteMembershipRepository,
-            SiteAccessService siteAccessService, SitePermissionService permissionService) {
+            SiteAccessService siteAccessService, SitePermissionService permissionService,
+            SseEventPublisher sseEventPublisher) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
         this.cardLabelRepository = cardLabelRepository;
@@ -66,6 +69,7 @@ public class TaskCardService {
         this.siteMembershipRepository = siteMembershipRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.sseEventPublisher = sseEventPublisher;
     }
 
     public TaskBoard getBoard(UUID siteId, UUID actingUserId) {
@@ -111,7 +115,18 @@ public class TaskCardService {
         requireColumnBelongsToCompany(request.columnId(), site.getCompanyId());
 
         card.moveTo(request.columnId(), request.sortOrder(), Instant.now());
-        return cardRepository.save(card);
+        TaskCard moved = cardRepository.save(card);
+
+        sseEventPublisher.publishToCompany(site.getCompanyId(), "task-card-moved", Map.of(
+                "cardId", moved.getId(),
+                "constructionSiteId", moved.getConstructionSiteId(),
+                "companyId", site.getCompanyId(),
+                "columnId", moved.getColumnId(),
+                "sortOrder", moved.getSortOrder(),
+                "movedBy", actingUserId,
+                "movedAt", Instant.now().toString()));
+
+        return moved;
     }
 
     @Transactional

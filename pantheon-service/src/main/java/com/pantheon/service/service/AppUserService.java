@@ -1,7 +1,7 @@
 package com.pantheon.service.service;
 
 import com.pantheon.service.messaging.EventPublisher;
-import com.pantheon.service.sse.SseBroadcaster;
+import com.pantheon.service.sse.SseEventPublisher;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -17,17 +17,17 @@ public class AppUserService {
     private final AppUserRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final EventPublisher eventPublisher;
-    private final SseBroadcaster sseBroadcaster;
+    private final SseEventPublisher sseEventPublisher;
 
     public AppUserService(
             AppUserRepository repository,
             PasswordEncoder passwordEncoder,
             EventPublisher eventPublisher,
-            SseBroadcaster sseBroadcaster) {
+            SseEventPublisher sseEventPublisher) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.eventPublisher = eventPublisher;
-        this.sseBroadcaster = sseBroadcaster;
+        this.sseEventPublisher = sseEventPublisher;
     }
 
     public AppUser registerWithPassword(String email, String rawPassword, String displayName) {
@@ -74,6 +74,6 @@ public class AppUserService {
                 "email", user.getEmail(),
                 "displayName", user.getDisplayName());
         eventPublisher.publish("user-registered", payload);
-        sseBroadcaster.broadcast("user-registered", payload);
+        sseEventPublisher.publishGlobal("user-registered", payload);
     }
 }

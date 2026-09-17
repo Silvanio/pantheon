@@ -13,6 +13,7 @@ export interface TaskCard {
   labelIds: string[]
   assigneeIds: string[]
   commentCount: number
+  attachmentCount: number
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -41,6 +42,19 @@ export interface TaskComment {
   createdAt: string
 }
 
+export interface TaskCardAttachment {
+  id: string
+  constructionSiteId: string
+  siteDocumentProjectId: string | null
+  originalName: string
+  contentType: string
+  taskCardId: string | null
+  uploadedBy: string
+  uploadedByName: string | null
+  createdAt: string
+  folderPath: string | null
+}
+
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const { token } = useAuth()
   const response = await fetch(`${SERVICE_BASE_URL}${path}`, {
@@ -58,6 +72,32 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
     return undefined as T
   }
   return (await response.json()) as T
+}
+
+async function authUpload<T>(path: string, formData: FormData): Promise<T> {
+  const { token } = useAuth()
+  const response = await fetch(`${SERVICE_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token.value}` },
+    body: formData,
+  })
+  if (!response.ok) {
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+async function authFetchBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const { token } = useAuth()
+  const response = await fetch(`${SERVICE_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token.value}` },
+  })
+  if (!response.ok) {
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename="?([^"]+)"?/.exec(disposition)
+  return { blob: await response.blob(), filename: match ? match[1] : null }
 }
 
 export function useTaskCards() {
@@ -130,6 +170,21 @@ export function useTaskCards() {
     })
   }
 
+  function listCardAttachments(cardId: string): Promise<TaskCardAttachment[]> {
+    return authFetch(`/api/task-cards/${cardId}/attachments`)
+  }
+
+  function attachFileToCard(cardId: string, parentId: string | null, file: File): Promise<TaskCardAttachment> {
+    const query = parentId ? `?parentId=${parentId}` : ''
+    const formData = new FormData()
+    formData.set('file', file)
+    return authUpload(`/api/task-cards/${cardId}/attachments${query}`, formData)
+  }
+
+  function getCardAttachmentContentBlob(attachmentId: string): Promise<{ blob: Blob; filename: string | null }> {
+    return authFetchBlob(`/api/site-project-attachments/${attachmentId}/content`)
+  }
+
   return {
     getBoard,
     createCard,
@@ -143,5 +198,8 @@ export function useTaskCards() {
     unassignMember,
     listComments,
     addComment,
+    listCardAttachments,
+    attachFileToCard,
+    getCardAttachmentContentBlob,
   }
 }

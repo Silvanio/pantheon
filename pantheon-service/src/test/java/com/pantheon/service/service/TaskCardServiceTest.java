@@ -22,6 +22,7 @@ import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.SiteMembershipNotFoundException;
 import com.pantheon.service.exception.TaskColumnNotFoundException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
+import com.pantheon.service.repository.SiteDocumentProjectAttachmentRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.repository.TaskCardAssigneeRepository;
 import com.pantheon.service.repository.TaskCardLabelRepository;
@@ -69,6 +70,9 @@ class TaskCardServiceTest {
     private SiteMembershipRepository siteMembershipRepository;
 
     @Mock
+    private SiteDocumentProjectAttachmentRepository attachmentRepository;
+
+    @Mock
     private SiteAccessService siteAccessService;
 
     @Mock
@@ -87,8 +91,8 @@ class TaskCardServiceTest {
     void setUp() {
         service = new TaskCardService(
                 cardRepository, columnRepository, cardLabelRepository, labelRepository, commentRepository,
-                assigneeRepository, siteRepository, siteMembershipRepository, siteAccessService, permissionService,
-                sseEventPublisher);
+                assigneeRepository, siteRepository, siteMembershipRepository, attachmentRepository, siteAccessService,
+                permissionService, sseEventPublisher);
 
         siteId = UUID.randomUUID();
         companyId = UUID.randomUUID();
@@ -240,10 +244,22 @@ class TaskCardServiceTest {
             }
         };
         when(commentRepository.countByCardIdIn(List.of(card.getId()))).thenReturn(List.of(count));
+        SiteDocumentProjectAttachmentRepository.CardAttachmentCount attachmentCount =
+                new SiteDocumentProjectAttachmentRepository.CardAttachmentCount() {
+                    public UUID getCardId() {
+                        return card.getId();
+                    }
+
+                    public long getAttachmentCount() {
+                        return 2L;
+                    }
+                };
+        when(attachmentRepository.countByTaskCardIdIn(List.of(card.getId()))).thenReturn(List.of(attachmentCount));
 
         TaskCardService.TaskBoard board = service.getBoard(siteId, UUID.randomUUID());
 
         assertThat(board.commentCountByCard()).containsEntry(card.getId(), 3L);
+        assertThat(board.attachmentCountByCard()).containsEntry(card.getId(), 2L);
         assertThat(board.assigneeIdsByCard()).containsEntry(card.getId(), List.of(membershipId));
     }
 

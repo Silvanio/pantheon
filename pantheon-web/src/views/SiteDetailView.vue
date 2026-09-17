@@ -243,11 +243,20 @@ onMounted(load)
 
         <SiteTeamPanel v-if="activeTab === 'team' && isTabVisible('team')" :site-id="siteId" />
         <DailyReportsPanel v-if="activeTab === 'dailyReport' && isTabVisible('dailyReport')" :site-id="siteId" />
-        <SiteDocumentProjectsPanel v-if="activeTab === 'projects' && isTabVisible('projects')" :site-id="siteId" />
+        <SiteDocumentProjectsPanel
+          v-if="activeTab === 'projects' && isTabVisible('projects')"
+          :site-id="siteId"
+          :can-manage="myPermissions?.DOCUMENT_PROJECTS === 'MANAGE'"
+        />
         <EquipmentPanel v-if="activeTab === 'equipment' && isTabVisible('equipment')" :site-id="siteId" />
         <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests' && isTabVisible('purchaseRequests')" :site-id="siteId" />
         <OrcamentoListPanel v-if="activeTab === 'orcamentos' && isTabVisible('orcamentos')" :site-id="siteId" />
-        <TasksBoardPanel v-if="activeTab === 'tasks' && isTabVisible('tasks')" :site-id="siteId" />
+        <TasksBoardPanel
+          v-if="activeTab === 'tasks' && isTabVisible('tasks')"
+          :site-id="siteId"
+          :can-manage-tasks="myPermissions?.TASKS === 'MANAGE'"
+          :can-view-projects="myPermissions?.DOCUMENT_PROJECTS !== 'HIDDEN'"
+        />
         <template v-if="activeTab === 'permissions' && isCompanyAdmin">
           <SitePermissionsPanel :site-id="siteId" />
           <SiteOrcamentoApprovalLevelsPanel :site-id="siteId" />

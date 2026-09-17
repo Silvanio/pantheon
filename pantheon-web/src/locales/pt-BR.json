@@ -165,20 +165,37 @@
   },
   "siteDocumentProjects": {
     "title": "Projetos",
-    "subtitle": "Projetos e documentos desta obra.",
-    "empty": "Nenhum projeto cadastrado ainda.",
-    "newButton": "Novo projeto",
+    "subtitle": "Pastas e arquivos desta obra.",
+    "root": "Início",
+    "filterPlaceholder": "Filtrar nesta pasta...",
+    "newFolderButton": "Nova pasta",
+    "uploadButton": "Enviar arquivo",
+    "uploading": "Enviando...",
+    "loading": "Carregando...",
+    "empty": "Esta pasta está vazia.",
+    "error": "Não foi possível carregar os projetos.",
+    "save": "Salvar",
+    "rename": "Renomear",
+    "renameError": "Não foi possível renomear a pasta.",
+    "delete": "Excluir",
+    "deleteFolderConfirm": "Esta pasta e todo o seu conteúdo (subpastas e arquivos) serão excluídos permanentemente. Deseja continuar?",
+    "deleteFileConfirm": "Este arquivo será excluído permanentemente. Deseja continuar?",
+    "deleteError": "Não foi possível excluir. Tente novamente.",
+    "download": "Baixar",
+    "downloadError": "Não foi possível baixar o arquivo.",
+    "uploadError": "Não foi possível enviar o arquivo. Apenas JPG, JPEG, PNG, PDF e MP4 são aceitos (vídeos de até 60 segundos).",
+    "linkTask": "Vincular a uma task",
+    "linkTaskLabel": "Task vinculada a esta pasta",
+    "noTaskLink": "Nenhuma task vinculada",
+    "taskLinkError": "Não foi possível atualizar o vínculo com a task.",
     "form": {
       "name": "Nome",
       "submit": "Criar",
       "cancel": "Cancelar",
-      "error": "Não foi possível criar o projeto. Verifique os dados e tente novamente."
+      "error": "Não foi possível criar a pasta. Verifique os dados e tente novamente."
     },
-    "attachments": {
-      "empty": "Nenhum arquivo anexado ainda.",
-      "uploadButton": "Anexar PDF",
-      "error": "Não foi possível enviar o arquivo. Apenas PDF é aceito."
-    }
+    "close": "Fechar",
+    "previewError": "Não foi possível carregar a visualização deste arquivo."
   },
   "sitePermissions": {
     "title": "Permissões da obra",
@@ -223,7 +240,20 @@
     "assignees": "Responsáveis",
     "noMembers": "Nenhum membro cadastrado nesta obra ainda. Adicione membros na aba Equipe para poder atribuí-los a cards.",
     "deleteCard": "Excluir card",
-    "deleteCardConfirm": "Tem certeza que deseja excluir este card? Esta ação não pode ser desfeita."
+    "deleteCardConfirm": "Tem certeza que deseja excluir este card? Esta ação não pode ser desfeita.",
+    "attachments": {
+      "title": "Anexos",
+      "empty": "Nenhum arquivo anexado ainda.",
+      "attachButton": "Anexar arquivo",
+      "uploading": "Enviando...",
+      "chooseFolder": "Escolha uma pasta em Projetos",
+      "root": "Início",
+      "uploadHere": "Enviar para esta pasta",
+      "cancel": "Cancelar",
+      "error": "Não foi possível anexar o arquivo. Apenas JPG, JPEG, PNG, PDF e MP4 são aceitos (vídeos de até 60 segundos).",
+      "downloadError": "Não foi possível baixar o arquivo."
+    },
+    "attachmentsIndicator": "{count} anexo(s)"
   },
   "globalTasksBoard": {
     "back": "Voltar ao painel",

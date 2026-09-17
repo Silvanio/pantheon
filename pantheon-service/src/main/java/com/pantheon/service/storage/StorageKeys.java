@@ -37,6 +37,10 @@ public final class StorageKeys {
                 .formatted(constructionSiteId, documentProjectId, attachmentId, extension);
     }
 
+    public static String siteDocumentRootAttachmentKey(UUID constructionSiteId, UUID attachmentId, String extension) {
+        return "construction-sites/%s/projects/root/%s.%s".formatted(constructionSiteId, attachmentId, extension);
+    }
+
     public static String materialDeliveryPhotoKey(UUID constructionSiteId, UUID materialId, UUID photoId, String extension) {
         return "construction-sites/%s/materials/%s/delivery-photos/%s.%s"
                 .formatted(constructionSiteId, materialId, photoId, extension);

@@ -17,6 +17,7 @@ import com.pantheon.service.exception.SiteMembershipNotFoundException;
 import com.pantheon.service.exception.TaskCardNotFoundException;
 import com.pantheon.service.exception.TaskColumnNotFoundException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
+import com.pantheon.service.repository.SiteDocumentProjectAttachmentRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.repository.TaskCardAssigneeRepository;
 import com.pantheon.service.repository.TaskCardLabelRepository;
@@ -50,6 +51,7 @@ public class TaskCardService {
     private final TaskCardAssigneeRepository assigneeRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteMembershipRepository siteMembershipRepository;
+    private final SiteDocumentProjectAttachmentRepository attachmentRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
     private final SseEventPublisher sseEventPublisher;
@@ -59,8 +61,8 @@ public class TaskCardService {
             TaskCardLabelRepository cardLabelRepository, TaskLabelRepository labelRepository,
             TaskCommentRepository commentRepository, TaskCardAssigneeRepository assigneeRepository,
             ConstructionSiteRepository siteRepository, SiteMembershipRepository siteMembershipRepository,
-            SiteAccessService siteAccessService, SitePermissionService permissionService,
-            SseEventPublisher sseEventPublisher) {
+            SiteDocumentProjectAttachmentRepository attachmentRepository, SiteAccessService siteAccessService,
+            SitePermissionService permissionService, SseEventPublisher sseEventPublisher) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
         this.cardLabelRepository = cardLabelRepository;
@@ -69,6 +71,7 @@ public class TaskCardService {
         this.assigneeRepository = assigneeRepository;
         this.siteRepository = siteRepository;
         this.siteMembershipRepository = siteMembershipRepository;
+        this.attachmentRepository = attachmentRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
         this.sseEventPublisher = sseEventPublisher;
@@ -89,11 +92,15 @@ public class TaskCardService {
                 .collect(Collectors.toMap(
                         TaskCommentRepository.CardCommentCount::getCardId,
                         TaskCommentRepository.CardCommentCount::getCommentCount));
+        Map<UUID, Long> attachmentCountByCard = attachmentRepository.countByTaskCardIdIn(cardIds).stream()
+                .collect(Collectors.toMap(
+                        SiteDocumentProjectAttachmentRepository.CardAttachmentCount::getCardId,
+                        SiteDocumentProjectAttachmentRepository.CardAttachmentCount::getAttachmentCount));
 
         List<UUID> attachedLabelIds = labelIdsByCard.values().stream().flatMap(List::stream).distinct().toList();
         List<TaskLabel> labels = labelRepository.findAllById(attachedLabelIds);
 
-        return new TaskBoard(columns, cards, labelIdsByCard, assigneeIdsByCard, commentCountByCard, labels);
+        return new TaskBoard(columns, cards, labelIdsByCard, assigneeIdsByCard, commentCountByCard, attachmentCountByCard, labels);
     }
 
     @Transactional
@@ -217,6 +224,7 @@ public class TaskCardService {
         payload.put("labels", labels);
         payload.put("assigneeIds", assigneeIdsForCard(card.getId()));
         payload.put("commentCount", commentCountForCard(card.getId()));
+        payload.put("attachmentCount", attachmentCountForCard(card.getId()));
         payload.put("updatedAt", Instant.now().toString());
         sseEventPublisher.publishToCompany(site.getCompanyId(), "task-card-updated", payload);
     }
@@ -251,6 +259,10 @@ public class TaskCardService {
 
     public long commentCountForCard(UUID cardId) {
         return commentRepository.findByCardIdOrderByCreatedAtAsc(cardId).size();
+    }
+
+    public long attachmentCountForCard(UUID cardId) {
+        return attachmentRepository.findByTaskCardId(cardId).size();
     }
 
     private Map<UUID, List<UUID>> labelIdsByCard(List<UUID> cardIds) {
@@ -295,10 +307,11 @@ public class TaskCardService {
 
     /**
      * A site's task board: the company's shared columns, that obra's cards, and each card's
-     * label ids, assignee (site membership) ids, and comment count.
+     * label ids, assignee (site membership) ids, comment count, and attachment count.
      */
     public record TaskBoard(
             List<TaskColumn> columns, List<TaskCard> cards, Map<UUID, List<UUID>> labelIdsByCard,
-            Map<UUID, List<UUID>> assigneeIdsByCard, Map<UUID, Long> commentCountByCard, List<TaskLabel> labels) {
+            Map<UUID, List<UUID>> assigneeIdsByCard, Map<UUID, Long> commentCountByCard,
+            Map<UUID, Long> attachmentCountByCard, List<TaskLabel> labels) {
     }
 }

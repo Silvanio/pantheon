@@ -33,6 +33,11 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
+    @ExceptionHandler(SiteDocumentAttachmentNotFoundException.class)
+    public ResponseEntity<String> handleSiteDocumentAttachmentNotFound(SiteDocumentAttachmentNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
     @ExceptionHandler(OrcamentoNotFoundException.class)
     public ResponseEntity<String> handleOrcamentoNotFound(OrcamentoNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());

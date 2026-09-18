@@ -64,6 +64,19 @@ controllers.
   in `infra/k8s/`.
 - **`.claude/settings.local.json` is machine-local** (git-ignored) — put
   reusable, repo-wide permission entries in `.claude/settings.json` instead.
+- **No native browser dialogs (`window.confirm`/`alert`/`prompt`) in
+  `pantheon-web`.** They can't be styled or localized consistently and break
+  the app's look. For a destructive-action confirmation (delete, remove),
+  reuse the existing inline popover pattern: a boolean `confirmingX` ref
+  toggled by the action button, revealing a `.modal-panel absolute right-0
+  top-full z-10 mt-2 ... shadow-lg` panel anchored under it with a short
+  confirmation message and Cancel/Confirm buttons — see
+  `SiteDocumentProjectsPanel.vue`'s `confirmingDeleteFolderId`/
+  `confirmingDeleteFileId` for the reference implementation, also used by
+  `PurchaseRequestDetailView.vue` and `OrcamentoDetailView.vue`'s delete
+  actions. For a larger, centered dialog (not anchored to a trigger button),
+  the same `.modal-panel` class also backs full-screen modals — see
+  `TasksBoardPanel.vue`.
 
 ## Before committing
 

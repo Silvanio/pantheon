@@ -570,20 +570,27 @@ onBeforeUnmount(() => {
 
     <div v-else class="flex gap-4 overflow-x-auto pb-2">
       <div
-        v-for="column in sortedColumns"
+        v-for="(column, columnIndex) in sortedColumns"
         :key="column.id"
         class="w-72 shrink-0 rounded-xl bg-steel-100 p-3 dark:bg-steel-800/60"
         @dragover.prevent
         @drop="onDrop(column.id)"
       >
-        <h3 class="mb-3 px-1 text-sm font-semibold text-steel-700 dark:text-steel-200">{{ column.name }}</h3>
+        <h3 class="mb-3 flex items-center gap-2 px-1 text-sm font-semibold text-steel-700 dark:text-steel-200">
+          <span
+            class="h-2 w-2 shrink-0 rounded-full"
+            :class="['bg-steel-400', 'bg-blueprint-500', 'bg-amber-500', 'bg-emerald-500', 'bg-safety-500'][columnIndex % 5]"
+          ></span>
+          {{ column.name }}
+          <span class="ml-auto text-xs font-semibold text-steel-400 dark:text-steel-500">{{ cardsForColumn(column.id).length }}</span>
+        </h3>
 
         <div class="space-y-2">
           <div
             v-for="card in cardsForColumn(column.id)"
             :key="card.id"
             draggable="true"
-            class="relative w-full cursor-pointer rounded-lg bg-white p-3 pr-14 pb-5 text-left shadow-sm transition hover:shadow dark:bg-steel-900"
+            class="relative w-full cursor-pointer rounded-xl border border-steel-200 bg-white p-3 pr-14 pb-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-steel-700 dark:bg-steel-900"
             @dragstart="onDragStart(card)"
             @click="openCard(card)"
           >

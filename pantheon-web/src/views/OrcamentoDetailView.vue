@@ -9,6 +9,7 @@ import {
   type OrcamentoLineItemInput,
 } from '../composables/useOrcamentos'
 import AppHeader from '../components/AppHeader.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const route = useRoute()
@@ -191,7 +192,9 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
+  <div class="flex min-h-screen bg-steel-50 dark:bg-steel-900">
+    <AppSidebar />
+    <div class="min-w-0 flex-1">
     <AppHeader>
       <template #left>
         <button type="button" class="btn-ghost -ml-2" @click="router.back()">
@@ -369,5 +372,6 @@ onMounted(load)
     </main>
 
     <p v-else-if="loadError" class="app-container max-w-5xl! py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
+    </div>
   </div>
 </template>

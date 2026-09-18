@@ -4,35 +4,49 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Blueprint blue — primary. Evokes technical drawings / schematics. */
-  --color-blueprint-50: #eef4ff;
-  --color-blueprint-100: #d9e6ff;
-  --color-blueprint-200: #b8d0ff;
-  --color-blueprint-300: #8bb0ff;
-  --color-blueprint-400: #5c8bff;
-  --color-blueprint-500: #3566f5;
-  --color-blueprint-600: #2148d6;
-  --color-blueprint-700: #1c39ac;
-  --color-blueprint-800: #1a3189;
+  /* Blueprint blue — primary/brand. 2026 redesign: more saturated, more presence. */
+  --color-blueprint-50: #f1f4ff;
+  --color-blueprint-100: #e4e9ff;
+  --color-blueprint-200: #c3d0ff;
+  --color-blueprint-300: #9aaeff;
+  --color-blueprint-400: #6f86ff;
+  --color-blueprint-500: #3d63ff;
+  --color-blueprint-600: #2f53f0;
+  --color-blueprint-700: #1e3fd6;
+  --color-blueprint-800: #1b35ac;
   --color-blueprint-900: #182c6e;
 
-  /* Steel / graphite — neutrals. Evokes structural materials. */
-  --color-steel-50: #f5f6f7;
-  --color-steel-100: #e7e9ec;
-  --color-steel-200: #cfd3d9;
-  --color-steel-300: #aab0ba;
-  --color-steel-400: #7d8794;
-  --color-steel-500: #5f6874;
-  --color-steel-600: #4a515c;
-  --color-steel-700: #3b414a;
-  --color-steel-800: #262a30;
-  --color-steel-900: #17191d;
+  /* Steel / graphite — neutrals, nudged slightly cooler to pair with the new sidebar ink. */
+  --color-steel-50: #f6f7fb;
+  --color-steel-100: #eef0f6;
+  --color-steel-200: #e1e4ee;
+  --color-steel-300: #c7cbdb;
+  --color-steel-400: #9298b3;
+  --color-steel-500: #6b7290;
+  --color-steel-600: #4e546e;
+  --color-steel-700: #333a55;
+  --color-steel-800: #1f2440;
+  --color-steel-900: #12172e;
 
-  /* Safety orange — single accent for calls to action / live status. */
-  --color-safety-500: #ff6a13;
-  --color-safety-600: #cc5510;
+  /* Ink — the persistent sidebar's own dark scale (see AppSidebar.vue), distinct from steel
+     because it stays dark in both themes (the sidebar does not flip light in light mode). */
+  --color-ink-950: #0b0f1f;
+  --color-ink-900: #12172e;
+  --color-ink-800: #1b2242;
+  --color-ink-700: #242c52;
 
-  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Status semantics reuse Tailwind's built-in `emerald-*` (success/approved) and `amber-*`
+     (pending/warning) scales — already the established pattern in StatusBadge.vue — rather than
+     a custom scale under those names, which would collide with Tailwind's own palette. */
+
+  /* Safety / coral — danger, rejection, destructive actions (kept the "safety-*" token name
+     used by .btn-danger and other existing call sites; only its color evolved). */
+  --color-safety-50: #fdf0f0;
+  --color-safety-100: #fbdede;
+  --color-safety-500: #e14f4f;
+  --color-safety-600: #c93d3d;
+
+  --font-sans: 'Manrope', system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
 html {
@@ -94,6 +108,10 @@ body {
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 bg-safety-500 text-white hover:bg-safety-600;
+  }
+  /* Positive/confirming actions distinct from the primary brand blue — approve, mark done. */
+  .btn-success {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-700;

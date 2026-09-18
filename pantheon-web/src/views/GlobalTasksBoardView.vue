@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useGlobalTasksBoard, type GlobalTaskBoard, type GlobalTaskCard } from '../composables/useGlobalTasksBoard'
 import AppHeader from '../components/AppHeader.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,7 +48,9 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
+  <div class="flex min-h-screen bg-steel-50 dark:bg-steel-900">
+    <AppSidebar />
+    <div class="min-w-0 flex-1">
     <AppHeader>
       <template #left>
         <button type="button" class="btn-ghost -ml-2" @click="router.push('/')">
@@ -106,5 +109,6 @@ onMounted(load)
         </div>
       </div>
     </main>
+    </div>
   </div>
 </template>

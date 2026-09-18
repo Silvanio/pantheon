@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   usePurchaseRequests,
@@ -7,15 +8,18 @@ import {
   type PurchaseRequestItemCreationData,
   type PurchaseRequestStatus,
 } from '../composables/usePurchaseRequests'
+import { useSiteMembers } from '../composables/useSiteMembers'
 import { vDatePicker } from '../lib/datePicker'
 import StatusBadge from './StatusBadge.vue'
 
 const props = defineProps<{ siteId: string; canManage: boolean }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const { listPurchaseRequests, createPurchaseRequest } = usePurchaseRequests()
+const { listMembers } = useSiteMembers()
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 20
 const STATUSES: PurchaseRequestStatus[] = ['INICIADO', 'ORCADO', 'CONFERIDO', 'CONCLUIDO']
 
 const purchaseRequests = ref<PurchaseRequest[]>([])
@@ -34,6 +38,10 @@ const submitting = ref(false)
 const formError = ref('')
 const rows = ref<PurchaseRequestItemCreationData[]>([{ name: '', type: null, quantity: '', unit: null }])
 
+const memberNames = ref<Record<string, string>>({})
+
+const stats = ref<{ awaitingApproval: number; budgeting: number; approved: number; completed: number } | null>(null)
+
 async function load() {
   loading.value = true
   try {
@@ -48,6 +56,37 @@ async function load() {
     totalElements.value = result.totalElements
   } finally {
     loading.value = false
+  }
+}
+
+async function loadMemberNames() {
+  try {
+    const members = await listMembers(props.siteId)
+    memberNames.value = Object.fromEntries(
+      members.filter((m) => m.userId).map((m) => [m.userId as string, m.displayName || m.email || '—']),
+    )
+  } catch {
+    memberNames.value = {}
+  }
+}
+
+// Real, cheaply-computable buckets derived from status + submittedAt — no per-item approval-step
+// fetch (that would need one detail call per row). "Aguardando aprovação" = ORCADO and already
+// submitted; "Em orçamento" = ORCADO but not yet submitted.
+async function loadStats() {
+  stats.value = null
+  const [orcadoPage, conferidoPage, concluidoPage] = await Promise.all([
+    listPurchaseRequests(props.siteId, { status: 'ORCADO', size: 100 }),
+    listPurchaseRequests(props.siteId, { status: 'CONFERIDO', size: 1 }),
+    listPurchaseRequests(props.siteId, { status: 'CONCLUIDO', size: 1 }),
+  ])
+  const awaitingApproval = orcadoPage.content.filter((pr) => pr.submittedAt).length
+  const budgeting = orcadoPage.content.filter((pr) => !pr.submittedAt).length
+  stats.value = {
+    awaitingApproval,
+    budgeting,
+    approved: conferidoPage.totalElements,
+    completed: concluidoPage.totalElements,
   }
 }
 
@@ -96,6 +135,7 @@ async function onSubmitForm() {
     showForm.value = false
     page.value = 0
     await load()
+    await loadStats()
   } catch {
     formError.value = t('purchaseRequests.form.error')
   } finally {
@@ -103,17 +143,47 @@ async function onSubmitForm() {
   }
 }
 
-watch(() => props.siteId, () => {
-  page.value = 0
-  load()
-})
+function stageLabel(pr: PurchaseRequest): string {
+  if (pr.status === 'INICIADO') return t('purchaseRequests.stage.notBudgeted')
+  if (pr.status === 'ORCADO') return pr.submittedAt ? t('purchaseRequests.stage.awaitingApproval') : t('purchaseRequests.stage.budgeting')
+  if (pr.status === 'CONFERIDO') return t('purchaseRequests.stage.approved')
+  return t('purchaseRequests.stage.completed')
+}
 
-onMounted(load)
+function supplierSummary(pr: PurchaseRequest): string {
+  if (pr.linkedOrcamentos.length === 0) return '—'
+  return pr.linkedOrcamentos[0].fornecedorNome
+}
+
+function allSuppliers(pr: PurchaseRequest): string {
+  return pr.linkedOrcamentos.map((o) => o.fornecedorNome).join(', ')
+}
+
+const dateFormatter = new Intl.DateTimeFormat('pt-BR')
+function formatDate(value: string): string {
+  return dateFormatter.format(new Date(value))
+}
+
+watch(
+  () => props.siteId,
+  () => {
+    page.value = 0
+    load()
+    loadMemberNames()
+    loadStats()
+  },
+)
+
+onMounted(() => {
+  load()
+  loadMemberNames()
+  loadStats()
+})
 </script>
 
 <template>
-  <section class="card card-pad">
-    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <section class="space-y-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.title') }}</h2>
         <p class="text-sm text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.subtitle') }}</p>
@@ -145,12 +215,34 @@ onMounted(load)
           </div>
         </div>
         <button v-if="canManage" type="button" class="btn-primary" @click="showForm = !showForm">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5">
+            <path stroke-linecap="round" d="M12 5v14M5 12h14" />
+          </svg>
           {{ t('purchaseRequests.newButton') }}
         </button>
       </div>
     </div>
 
-    <form v-if="canManage && showForm" class="mb-5 space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmitForm">
+    <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+      <div class="rounded-2xl border border-steel-200 bg-white p-4 dark:border-steel-700 dark:bg-steel-800/60">
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.stats.awaitingApproval') }}</p>
+        <p class="text-2xl font-extrabold text-amber-600">{{ stats?.awaitingApproval ?? '—' }}</p>
+      </div>
+      <div class="rounded-2xl border border-steel-200 bg-white p-4 dark:border-steel-700 dark:bg-steel-800/60">
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.stats.budgeting') }}</p>
+        <p class="text-2xl font-extrabold text-blueprint-600">{{ stats?.budgeting ?? '—' }}</p>
+      </div>
+      <div class="rounded-2xl border border-steel-200 bg-white p-4 dark:border-steel-700 dark:bg-steel-800/60">
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.stats.approved') }}</p>
+        <p class="text-2xl font-extrabold text-emerald-600">{{ stats?.approved ?? '—' }}</p>
+      </div>
+      <div class="rounded-2xl border border-steel-200 bg-white p-4 dark:border-steel-700 dark:bg-steel-800/60">
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.stats.completed') }}</p>
+        <p class="text-2xl font-extrabold text-steel-700 dark:text-steel-300">{{ stats?.completed ?? '—' }}</p>
+      </div>
+    </div>
+
+    <form v-if="canManage && showForm" class="space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmitForm">
       <div v-for="(row, index) in rows" :key="index" class="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:items-end">
         <div class="sm:col-span-2">
           <label class="field-label">{{ t('purchaseRequests.form.name') }}</label>
@@ -188,24 +280,42 @@ onMounted(load)
       {{ t('purchaseRequests.empty') }}
     </p>
     <template v-else>
-      <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <li v-for="pr in purchaseRequests" :key="pr.id">
-          <router-link
-            :to="`/purchase-requests/${pr.id}`"
-            class="flex flex-col gap-2 rounded-lg border border-steel-200 px-4 py-3 text-sm transition hover:bg-steel-50 dark:border-steel-700 dark:hover:bg-steel-700"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <span class="min-w-0 truncate font-medium text-steel-800 dark:text-steel-50">{{ pr.name }}</span>
-              <StatusBadge kind="purchaseRequest" :status="pr.status" />
-            </div>
-            <span class="text-xs text-steel-500 dark:text-steel-400">
-              {{ t('purchaseRequests.card.linkedOrcamentos', { count: pr.linkedOrcamentos.length }) }}
-            </span>
-          </router-link>
-        </li>
-      </ul>
+      <div class="overflow-hidden rounded-2xl border border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-900">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="pb-3 pl-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.name') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.status') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.stage') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.suppliers') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.createdBy') }}</th>
+              <th class="pb-3 pr-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.date') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="pr in purchaseRequests"
+              :key="pr.id"
+              class="group cursor-pointer border-t border-steel-100 transition hover:bg-steel-50 dark:border-steel-800 dark:hover:bg-steel-800/60"
+              @click="router.push(`/purchase-requests/${pr.id}`)"
+            >
+              <td class="py-3.5 pl-5 text-[13.5px] font-bold text-steel-800 dark:text-steel-50">{{ pr.name }}</td>
+              <td class="py-3.5"><StatusBadge kind="purchaseRequest" :status="pr.status" /></td>
+              <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ stageLabel(pr) }}</td>
+              <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">
+                <span :title="pr.linkedOrcamentos.length > 1 ? allSuppliers(pr) : undefined">
+                  {{ supplierSummary(pr) }}
+                  <span v-if="pr.linkedOrcamentos.length > 1" class="text-steel-400">+{{ pr.linkedOrcamentos.length - 1 }}</span>
+                </span>
+              </td>
+              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ memberNames[pr.createdBy] ?? '—' }}</td>
+              <td class="py-3.5 pr-5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(pr.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <div v-if="totalPages > 1" class="mt-5 flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
+      <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
         <p class="text-xs text-steel-500 dark:text-steel-400">
           {{ t('purchaseRequests.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
         </p>

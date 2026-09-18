@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
  * `redesign-purchase-request-approval-and-comparison`'s design.md decision 9.
  */
 const props = defineProps<{
-  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval'
+  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval' | 'constructionSite'
   status: string
 }>()
 
@@ -34,6 +34,12 @@ const CLASS_MAP: Record<string, Record<string, string>> = {
     APPROVED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
     REJECTED: 'bg-safety-100 text-safety-700 dark:bg-safety-900/50 dark:text-safety-300',
   },
+  constructionSite: {
+    PLANNING: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
+    IN_PROGRESS: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+    PAUSED: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+    COMPLETED: 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200',
+  },
 }
 
 const LABEL_KEY: Record<string, string> = {
@@ -41,6 +47,7 @@ const LABEL_KEY: Record<string, string> = {
   purchaseRequestItem: 'purchaseRequests.status',
   orcamento: 'orcamento.status',
   approval: 'purchaseRequests.approvalStatus',
+  constructionSite: 'constructionSites.status',
 }
 
 const badgeClass = computed(() => CLASS_MAP[props.kind]?.[props.status] ?? 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200')

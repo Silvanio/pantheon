@@ -1,4 +1,11 @@
 {
+  "appSidebar": {
+    "home": "Pantheon",
+    "myObras": "Minhas obras",
+    "companySettings": "Configurações da empresa",
+    "logout": "Sair",
+    "profile": "Meu perfil"
+  },
   "company": {
     "creation": {
       "title": "Criar empresa",
@@ -68,23 +75,33 @@
     }
   },
   "dashboard": {
-    "title": "Obras",
-    "subtitle": "Obras da sua empresa.",
+    "title": "Minhas obras",
     "newSiteButton": "Nova obra",
+    "addSiteCard": "Adicionar nova obra",
+    "searchPlaceholder": "Buscar obra",
     "globalTasksBoardButton": "Quadro global de Tasks",
+    "summary": {
+      "activeSites": "{count} obras ativas",
+      "pendingPurchaseRequests": "{count} aguardando aprovação de pedidos",
+      "pendingOrcamentos": "{count} orçamentos pendentes"
+    },
+    "card": {
+      "progress": "Progresso da obra",
+      "pendingPurchaseRequests": "{count} pedido(s) aguardando aprovação",
+      "pendingOrcamentos": "{count} orçamento(s) pendente(s)"
+    },
     "form": {
       "error": "Não foi possível criar a obra. Verifique os dados e tente novamente."
-    },
-    "profileMenu": {
-      "toggle": "Perfil",
-      "changePlan": "Alterar plano",
-      "editCompany": "Editar dados da empresa",
-      "editRegistration": "Editar dados do cadastro",
-      "logout": "Sair"
     }
   },
   "constructionSites": {
     "empty": "Nenhuma obra cadastrada ainda.",
+    "status": {
+      "PLANNING": "Planejamento",
+      "IN_PROGRESS": "Em execução",
+      "PAUSED": "Pausada",
+      "COMPLETED": "Concluída"
+    },
     "form": {
       "name": "Nome",
       "address": "Endereço",
@@ -319,6 +336,12 @@
       "newButton": "Novo relatório",
       "reportLabel": "Relatório",
       "back": "Voltar",
+      "table": {
+        "report": "Relatório",
+        "status": "Status",
+        "weather": "Clima",
+        "date": "Data"
+      },
       "form": {
         "date": "Data",
         "submit": "Criar relatório",
@@ -476,7 +499,14 @@
     "sourcePurchaseRequestLabel": "Originado do pedido",
     "supplierSectionTitle": "Fornecedor",
     "totalLabel": "Total",
-    "changeSupplierButton": "Trocar fornecedor"
+    "changeSupplierButton": "Trocar fornecedor",
+    "table": {
+      "supplier": "Fornecedor",
+      "status": "Status",
+      "sourcePurchaseRequest": "Pedido de origem",
+      "createdBy": "Criado por",
+      "date": "Data"
+    }
   },
   "purchaseRequests": {
     "title": "Pedido de Compra",
@@ -495,11 +525,39 @@
       "product": "Produto",
       "quantity": "Qtd.",
       "status": "Status",
-      "selectedSupplier": "Fornecedor selecionado"
+      "selectedSupplier": "Fornecedor selecionado",
+      "name": "Pedido",
+      "stage": "Etapa atual",
+      "suppliers": "Fornecedores",
+      "createdBy": "Criado por",
+      "date": "Data"
+    },
+    "stats": {
+      "awaitingApproval": "Aguardando aprovação",
+      "budgeting": "Em orçamento",
+      "approved": "Aprovados",
+      "completed": "Concluídos"
+    },
+    "stage": {
+      "notBudgeted": "Não orçado",
+      "budgeting": "Em orçamento",
+      "awaitingApproval": "Em aprovação",
+      "approved": "Aprovado",
+      "completed": "Concluído"
     },
     "addRowButton": "+ Adicionar item",
     "removeRowButton": "Remover",
     "linkedOrcamentosTitle": "Orçamentos vinculados",
+    "sidebar": {
+      "supplierTitle": "Fornecedor",
+      "viewAllSuppliers": "Ver todos ({count})",
+      "allSuppliersTitle": "Fornecedores vinculados",
+      "infoTitle": "Informações do pedido",
+      "createdBy": "Criado por",
+      "createdAt": "Criado em",
+      "submittedAt": "Enviado p/ aprovação",
+      "approvalCycle": "Ciclo de aprovação"
+    },
     "invoices": {
       "title": "Notas fiscais",
       "uploadButton": "Anexar nota fiscal",
@@ -570,6 +628,7 @@
     "lastRejectionReason": "Motivo da última rejeição",
     "approvalError": "Não foi possível concluir a ação. Tente novamente.",
     "approvalHistoryTitle": "Histórico de aprovação",
+    "pendingStepSubtitle": "Aguardando decisão",
     "cycleLabel": "Ciclo",
     "stepLabel": "Etapa",
     "materialsTitle": "Materiais gerados",

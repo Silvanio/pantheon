@@ -31,8 +31,21 @@ async function postJson(path: string, body: unknown): Promise<AuthResponse> {
   return (await response.json()) as AuthResponse
 }
 
+/** Decodes the JWT payload's `email` claim for display purposes only — never trust this for authorization. */
+function decodeEmail(jwt: string | null): string | null {
+  if (!jwt) return null
+  try {
+    const payload = jwt.split('.')[1]
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return (JSON.parse(json) as { email?: string }).email ?? null
+  } catch {
+    return null
+  }
+}
+
 export function useAuth() {
   const isAuthenticated = computed(() => token.value !== null)
+  const userEmail = computed(() => decodeEmail(token.value))
 
   function setToken(newToken: string) {
     token.value = newToken
@@ -58,5 +71,5 @@ export function useAuth() {
     return `${SERVICE_BASE_URL}/oauth2/authorization/google`
   }
 
-  return { token, isAuthenticated, login, register, logout, setToken, googleLoginUrl }
+  return { token, isAuthenticated, userEmail, login, register, logout, setToken, googleLoginUrl }
 }

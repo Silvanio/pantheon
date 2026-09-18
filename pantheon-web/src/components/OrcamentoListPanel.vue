@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useOrcamentos, type Orcamento } from '../composables/useOrcamentos'
 import { usePurchaseRequests, type PurchaseRequest } from '../composables/usePurchaseRequests'
+import { useSiteMembers } from '../composables/useSiteMembers'
 import type { FornecedorInput } from '../composables/useFornecedores'
 import FornecedorPicker from './FornecedorPicker.vue'
 import StatusBadge from './StatusBadge.vue'
@@ -15,6 +16,7 @@ const { t } = useI18n()
 const router = useRouter()
 const { listOrcamentos, createOrcamento } = useOrcamentos()
 const { listPurchaseRequests } = usePurchaseRequests()
+const { listMembers } = useSiteMembers()
 
 const PAGE_SIZE = 12
 
@@ -33,6 +35,24 @@ const dateFilter = ref('')
 const purchaseRequestFilter = ref('')
 const supplierFilter = ref('')
 const hasActiveFilter = ref(false)
+
+const memberNames = ref<Record<string, string>>({})
+
+const dateFormatter = new Intl.DateTimeFormat('pt-BR')
+function formatDate(value: string): string {
+  return dateFormatter.format(new Date(value))
+}
+
+async function loadMemberNames() {
+  try {
+    const members = await listMembers(props.siteId)
+    memberNames.value = Object.fromEntries(
+      members.filter((m) => m.userId).map((m) => [m.userId as string, m.displayName || m.email || '—']),
+    )
+  } catch {
+    memberNames.value = {}
+  }
+}
 
 async function load() {
   loading.value = true
@@ -91,18 +111,20 @@ async function onCreateConfirmed(fornecedor: FornecedorInput) {
 watch(() => props.siteId, () => {
   page.value = 0
   load()
+  loadMemberNames()
 })
 
 onMounted(async () => {
   const prPage = await listPurchaseRequests(props.siteId, { size: 100 })
   purchaseRequests.value = prPage.content
   await load()
+  await loadMemberNames()
 })
 </script>
 
 <template>
-  <section class="card card-pad">
-    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <section class="space-y-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('orcamento.title') }}</h2>
         <p class="text-sm text-steel-500 dark:text-steel-400">{{ t('orcamento.subtitle') }}</p>
@@ -147,25 +169,38 @@ onMounted(async () => {
       <FornecedorPicker :site-id="siteId" @confirm="onCreateConfirmed" @cancel="showFornecedorPicker = false" />
     </div>
 
-    <p v-if="errorMessage" class="mb-4 text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
     <p v-if="!loading && orcamentos.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('orcamento.empty') }}</p>
     <template v-else>
-      <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <li v-for="orcamento in orcamentos" :key="orcamento.id">
-          <router-link :to="`/orcamentos/${orcamento.id}`" class="flex flex-col gap-1.5 rounded-lg border border-steel-200 px-4 py-3 text-sm transition hover:bg-steel-50 dark:border-steel-700 dark:hover:bg-steel-700">
-            <div class="flex items-center justify-between">
-              <span class="font-medium text-steel-800 dark:text-steel-50">{{ orcamento.fornecedorNome }}</span>
-              <StatusBadge kind="orcamento" :status="orcamento.status" />
-            </div>
-            <span class="text-xs text-steel-500 dark:text-steel-400">
-              {{ t('orcamento.label') }} #{{ orcamento.id.slice(0, 8) }}
-              <span v-if="orcamento.sourcePurchaseRequestName"> · {{ orcamento.sourcePurchaseRequestName }}</span>
-            </span>
-          </router-link>
-        </li>
-      </ul>
+      <div class="overflow-hidden rounded-2xl border border-steel-200 bg-white dark:border-steel-700 dark:bg-steel-900">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="pb-3 pl-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('orcamento.table.supplier') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('orcamento.table.status') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('orcamento.table.sourcePurchaseRequest') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('orcamento.table.createdBy') }}</th>
+              <th class="pb-3 pr-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('orcamento.table.date') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="orcamento in orcamentos"
+              :key="orcamento.id"
+              class="group cursor-pointer border-t border-steel-100 transition hover:bg-steel-50 dark:border-steel-800 dark:hover:bg-steel-800/60"
+              @click="router.push(`/orcamentos/${orcamento.id}`)"
+            >
+              <td class="py-3.5 pl-5 text-[13.5px] font-bold text-steel-800 dark:text-steel-50">{{ orcamento.fornecedorNome }}</td>
+              <td class="py-3.5"><StatusBadge kind="orcamento" :status="orcamento.status" /></td>
+              <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ orcamento.sourcePurchaseRequestName ?? '—' }}</td>
+              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ memberNames[orcamento.createdBy] ?? '—' }}</td>
+              <td class="py-3.5 pr-5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(orcamento.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <div v-if="totalPages > 1" class="mt-5 flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
+      <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
         <p class="text-xs text-steel-500 dark:text-steel-400">
           {{ t('orcamento.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
         </p>

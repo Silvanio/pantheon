@@ -26,38 +26,44 @@ public class PdfBrandingService {
      * Mostly neutral grays for a clean, uncluttered layout, with the product's blue
      * ({@code pantheon-web}'s {@code blueprint} token) reserved for a few deliberate accents
      * (header rule, section labels, table header fill, totals) rather than large filled blocks —
-     * the balance asked for after the all-blue first pass and the all-gray second pass.
+     * the balance asked for after the all-blue first pass and the all-gray second pass. Colors
+     * mirror {@code pantheon-web}'s 2026 redesign tokens (see {@code style.css}'s {@code
+     * blueprint-*}/{@code steel-*} scales and {@code obra-visual-design}'s spec) so a PDF looks
+     * like it came from the same product as the screen that generated it. The body font stays on
+     * PDF-safe standard fonts (Helvetica/Arial) rather than the screen's Manrope — embedding a
+     * variable webfont in openhtmltopdf is fragile enough to risk breaking generation reliability,
+     * which matters more here than exact typeface parity; only the color system is shared.
      */
     public static final String STYLE = "@page{margin:30px 36px;}"
             + "*{box-sizing:border-box;}"
-            + "body{font-family:Helvetica,Arial,sans-serif;font-size:9.5px;color:#33373d;line-height:1.5;}"
-            + "h1{font-size:15px;font-weight:600;margin:14px 0 2px;color:#17191d;}"
-            + "h2{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#2148d6;"
-            + "margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid #e3e5e8;}"
+            + "body{font-family:Helvetica,Arial,sans-serif;font-size:9.5px;color:#333a55;line-height:1.5;}"
+            + "h1{font-size:15px;font-weight:600;margin:14px 0 2px;color:#12172e;}"
+            + "h2{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#2f53f0;"
+            + "margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid #e1e4ee;}"
             + "table.data{width:100%;border-collapse:collapse;margin-top:2px;}"
-            + "table.data th{background:#eef4ff;color:#1c39ac;font-size:8px;font-weight:700;text-transform:uppercase;"
-            + "letter-spacing:0.03em;text-align:left;padding:6px 10px;border-bottom:1.5px solid #b8d0ff;}"
-            + "table.data td{padding:6px 10px;font-size:9.5px;color:#33373d;border-bottom:1px solid #edeeef;}"
+            + "table.data th{background:#f1f4ff;color:#1e3fd6;font-size:8px;font-weight:700;text-transform:uppercase;"
+            + "letter-spacing:0.03em;text-align:left;padding:6px 10px;border-bottom:1.5px solid #c3d0ff;}"
+            + "table.data td{padding:6px 10px;font-size:9.5px;color:#333a55;border-bottom:1px solid #eef0f6;}"
             + "table.data tbody tr:last-child td{border-bottom:none;}"
-            + ".muted{color:#9aa1ab;} .italic{font-style:italic;}"
+            + ".muted{color:#9298b3;} .italic{font-style:italic;}"
             + ".right{text-align:right;}"
-            + ".total-line{margin-top:8px;padding-top:8px;border-top:1.5px solid #b8d0ff;text-align:right;"
-            + "font-size:11px;font-weight:700;color:#1c39ac;}"
+            + ".total-line{margin-top:8px;padding-top:8px;border-top:1.5px solid #c3d0ff;text-align:right;"
+            + "font-size:11px;font-weight:700;color:#1e3fd6;}"
             + ".total-line .label{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;"
-            + "color:#9aa1ab;margin-right:10px;}"
-            + ".meta-card{background:#f7f9ff;border:1px solid #d9e6ff;border-left:3px solid #2148d6;border-radius:4px;"
+            + "color:#9298b3;margin-right:10px;}"
+            + ".meta-card{background:#f4f6ff;border:1px solid #e4e9ff;border-left:3px solid #2f53f0;border-radius:4px;"
             + "padding:9px 13px;margin:9px 0;}"
-            + ".meta-row{padding:1.5px 0;font-size:9px;} .meta-row .label{color:#5f6874;display:inline-block;min-width:104px;}"
-            + ".meta-row .value{color:#17191d;font-weight:600;}"
-            + ".badge{display:inline-block;background:#eef4ff;color:#1c39ac;border-radius:3px;padding:2px 8px;"
+            + ".meta-row{padding:1.5px 0;font-size:9px;} .meta-row .label{color:#6b7290;display:inline-block;min-width:104px;}"
+            + ".meta-row .value{color:#12172e;font-weight:600;}"
+            + ".badge{display:inline-block;background:#f1f4ff;color:#1e3fd6;border-radius:3px;padding:2px 8px;"
             + "font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;}"
-            + ".pdf-header{width:100%;padding-bottom:12px;margin-bottom:2px;border-bottom:3px solid #2148d6;}"
+            + ".pdf-header{width:100%;padding-bottom:12px;margin-bottom:2px;border-bottom:3px solid #2f53f0;}"
             + ".pdf-header td{border:none;padding:0;vertical-align:middle;}"
             + ".pdf-logo-cell{width:44px;}"
             + ".pdf-logo{max-width:36px;max-height:36px;}"
-            + ".pdf-company-name{font-size:12px;font-weight:700;color:#17191d;}"
-            + ".pdf-site-name{font-size:9px;color:#2148d6;margin-top:1px;}"
-            + ".footer-note{margin-top:20px;padding-top:8px;border-top:1px solid #ececed;font-size:7.5px;color:#b5b9bf;}";
+            + ".pdf-company-name{font-size:12px;font-weight:700;color:#12172e;}"
+            + ".pdf-site-name{font-size:9px;color:#2f53f0;margin-top:1px;}"
+            + ".footer-note{margin-top:20px;padding-top:8px;border-top:1px solid #eef0f6;font-size:7.5px;color:#c7cbdb;}";
 
     private final ConstructionSiteRepository siteRepository;
     private final CompanyRepository companyRepository;

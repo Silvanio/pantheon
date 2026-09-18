@@ -7,6 +7,7 @@ import CompanyStaffPanel from '../components/CompanyStaffPanel.vue'
 import CompanyTaskColumnsPanel from '../components/CompanyTaskColumnsPanel.vue'
 import CompanyTaskLabelsPanel from '../components/CompanyTaskLabelsPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,7 +59,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
+  <div class="flex min-h-screen bg-steel-50 dark:bg-steel-900">
+    <AppSidebar />
+    <div class="min-w-0 flex-1">
     <AppHeader>
       <template #left>
         <button type="button" class="btn-ghost -ml-2" @click="router.push('/')">
@@ -119,5 +122,6 @@ onMounted(async () => {
       <CompanyTaskColumnsPanel :company-id="companyId" />
       <CompanyTaskLabelsPanel :company-id="companyId" />
     </main>
+    </div>
   </div>
 </template>

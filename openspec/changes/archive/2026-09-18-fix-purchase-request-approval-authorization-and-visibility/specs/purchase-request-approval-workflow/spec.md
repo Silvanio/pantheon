@@ -1,35 +1,4 @@
-# purchase-request-approval-workflow Specification
-
-## Purpose
-Defines the approval workflow for a Pedido de Compra: configurable per-site multi-step approval levels, submission gated on every item having a selected Orçamento line item, acting on approval steps (which locks or unlocks the Pedido de Compra's linked Orçamentos), and concluding an approved Pedido de Compra into delivery-tracking materials.
-
-## Requirements
-
-### Requirement: Per-site Pedido de Compra approval levels
-`pantheon-service` SHALL allow a company staff member with `MANAGE` access to a construction site's permissions to configure an ordered list of Pedido de Compra approval levels for that site, each specifying a step order and a required construction-site function. A site with no configured levels SHALL default to a single implicit level requiring the `ENGINEER` function.
-
-#### Scenario: Admin configures a two-step chain
-- **WHEN** a company staff member configures a site's approval levels as step 1 = `ENGINEER`, step 2 = `CLIENT`
-- **THEN** `pantheon-service` persists both levels in that order for that site
-
-#### Scenario: Unconfigured site defaults to a single level
-- **WHEN** a Pedido de Compra is submitted for approval on a site with no configured approval levels
-- **THEN** `pantheon-service` creates a single approval step requiring the `ENGINEER` function
-
-### Requirement: Submitting a Pedido de Compra for approval
-`pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` access to submit an `ORCADO` Pedido de Compra for approval, transitioning it to a pending-approval state and creating one `PurchaseRequestApproval` record per configured approval level (or the default level), in order, all starting `PENDING`, tagged with a new approval cycle number. Submission SHALL require that every `PurchaseRequestItem` of the header has a non-null `selectedOrcamentoLineItemId`.
-
-#### Scenario: Fully selected Pedido de Compra submitted
-- **WHEN** a construction site member submits an `ORCADO` Pedido de Compra whose every item has a selected Orçamento line item
-- **THEN** `pantheon-service` creates its ordered approval steps for a new cycle and marks the header pending approval
-
-#### Scenario: Cannot submit before every item is selected
-- **WHEN** a construction site member attempts to submit an `ORCADO` Pedido de Compra that has at least one item with no selected Orçamento line item
-- **THEN** `pantheon-service` rejects the request
-
-#### Scenario: Cannot submit a Pedido de Compra with no Orçamentos yet
-- **WHEN** a construction site member attempts to submit an `INICIADO` Pedido de Compra (no Orçamento has been created for it yet)
-- **THEN** `pantheon-service` rejects the request
+## MODIFIED Requirements
 
 ### Requirement: Acting on an approval step
 `pantheon-service` SHALL allow a user to approve or reject the current cycle's lowest-order `PENDING` `PurchaseRequestApproval` step only when both hold: (1) either the user holds no active `SiteMembership` on that construction site (company staff acting with no site role of their own), or the user holds an active `SiteMembership` on that site whose function matches the step's function — this function match is required with no exception, even for company staff who also hold a `SiteMembership` there; and (2) the user's resolved `PURCHASE_REQUEST` access level is `MANAGE` or `VIEW_AND_APPROVE` (never `VIEW` or `HIDDEN`). Approving the final step SHALL transition the Pedido de Compra to `CONFERIDO` and lock every Orçamento linked to it; approving a non-final step SHALL activate the next step. Rejecting SHALL require a reason, mark that step `REJECTED`, record the reason on the Pedido de Compra, transition it back to `ORCADO`, and unlock every Orçamento linked to it. When the acting user has an active `SiteMembership` on the site, the decision SHALL be attributed to that `SiteMembership`, even if the user is also company staff.
@@ -107,6 +76,8 @@ Defines the approval workflow for a Pedido de Compra: configurable per-site mult
 #### Scenario: View-only member does not see the conclude action
 - **WHEN** a construction site member whose resolved `PURCHASE_REQUEST` access is `VIEW` opens a `CONFERIDO` Pedido de Compra
 - **THEN** `pantheon-web` shows the status stepper but does not show the "Concluir" button to that member
+
+## ADDED Requirements
 
 ### Requirement: Dynamic visibility for view-and-approve members
 `pantheon-service` SHALL only let a construction site member whose resolved `PURCHASE_REQUEST` access is `VIEW_AND_APPROVE` read a given Pedido de Compra (via listing, direct lookup, the comparison view, or its invoices) when the Pedido de Compra is `CONCLUIDO`, when that member's function already decided (`APPROVED` or `REJECTED`) a step of the Pedido de Compra's current approval cycle, or when that member's function matches the current cycle's currently actionable step — the lowest-order step still `PENDING`. Every configured level's `PurchaseRequestApproval` is created `PENDING` at submission time, all at once, so a step existing for a member's function is not by itself sufficient: only the lowest-order `PENDING` step is actionable at any moment, and a member's function having a `PENDING` row that is *not* that lowest-order step does not grant visibility. A Pedido de Compra that meets none of these conditions SHALL behave, for that member, as if it does not exist. This check is scoped to the Pedido de Compra's `currentApprovalCycle`: a step from an earlier, superseded cycle does not by itself grant visibility.

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserProfile } from '../composables/useUserProfile'
 import AppHeader from '../components/AppHeader.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -48,7 +49,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
+  <div class="flex min-h-screen bg-steel-50 dark:bg-steel-900">
+    <AppSidebar />
+    <div class="min-w-0 flex-1">
     <AppHeader>
       <template #left>
         <button type="button" class="btn-ghost -ml-2" @click="router.push('/')">
@@ -96,5 +99,6 @@ onMounted(async () => {
         </form>
       </section>
     </main>
+    </div>
   </div>
 </template>

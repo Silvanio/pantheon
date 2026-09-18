@@ -77,6 +77,42 @@ controllers.
   actions. For a larger, centered dialog (not anchored to a trigger button),
   the same `.modal-panel` class also backs full-screen modals — see
   `TasksBoardPanel.vue`.
+- **Visual design system (2026 redesign, see `obra-visual-design` spec).**
+  `pantheon-web` has a persistent app shell — a dark, icon-only global sidebar
+  (`AppSidebar.vue`, `bg-ink-950`, links to the dashboard) on every
+  authenticated screen, plus, inside an obra, a second labeled sidebar
+  (`SiteDetailView.vue`'s `<aside>`) replacing what used to be a horizontal
+  tab bar — an obra's sections (Equipe, Diário de Obra, Projetos,
+  Equipamentos, Pedido de Compra, Orçamentos, Tasks, Cronograma, Permissões)
+  live there now, not in `<nav>` tabs. Keep new obra-scoped screens inside
+  that sidebar's list rather than adding new top-level tabs. A compact
+  `md:hidden` fallback `<nav>` of the old tab-button style is kept for narrow
+  viewports where the obra sidebar itself is hidden — update both if you
+  change the tab set.
+  - Colors are Tailwind `@theme` tokens in `style.css`: `blueprint-*` (brand
+    blue, primary actions/links), `steel-*` (neutrals, backgrounds/text),
+    `ink-*` (the sidebar's own always-dark scale — distinct from `steel-*`,
+    which flips light/dark with the theme), `safety-*` (coral —
+    danger/destructive, backs `.btn-danger`). Status semantics (pending,
+    approved, rejected, etc.) reuse Tailwind's built-in `emerald-*`/`amber-*`
+    scales, centralized in `StatusBadge.vue` — don't introduce a custom
+    `mint`/`amber` token scale, which would collide with Tailwind's own
+    palette under those names (this was tried and reverted once already).
+  - Typeface is Manrope (loaded via Google Fonts `<link>` in `index.html`,
+    `--font-sans` in `style.css`) — not Inter. Prefer `.btn-primary`,
+    `.btn-secondary`, `.btn-danger`, `.btn-success` (positive/confirming
+    actions — approve, mark done — distinct from the primary brand blue),
+    `.btn-ghost`, `.card`, `.badge`, `.field-input`/`.field-label` from
+    `style.css`'s `@layer components` over ad hoc utility classes, so a
+    future palette/type change stays a token edit instead of a grep-and-edit
+    across components.
+  - Server-rendered PDFs (`PdfBrandingService.STYLE`, shared by every PDF
+    service) mirror the same `blueprint-*`/`steel-*` hex values for visual
+    consistency with the screens, but intentionally keep PDF-safe standard
+    fonts (Helvetica/Arial) rather than embedding Manrope — openhtmltopdf's
+    variable-font support is fragile enough to risk breaking PDF generation
+    for a typeface-parity nice-to-have. If that trade-off ever changes,
+    update the doc comment on `PdfBrandingService.STYLE` alongside the code.
 
 ## Before committing
 

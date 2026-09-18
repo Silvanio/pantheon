@@ -12,9 +12,11 @@ import {
 import { useMaterialDeliveries, type Material } from '../composables/useMaterialDeliveries'
 import { useSitePermissions, type AccessLevel } from '../composables/useSitePermissions'
 import { useSiteMembers, type ConstructionFunction } from '../composables/useSiteMembers'
+import { useOrcamentos, type Orcamento } from '../composables/useOrcamentos'
 import type { FornecedorInput } from '../composables/useFornecedores'
 import FornecedorPicker from '../components/FornecedorPicker.vue'
 import AppHeader from '../components/AppHeader.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import PurchaseRequestComparisonTable from '../components/PurchaseRequestComparisonTable.vue'
 
@@ -40,7 +42,8 @@ const {
 } = usePurchaseRequests()
 const { listMaterials, markDelivered, markChecked } = useMaterialDeliveries()
 const { getMyPermissions } = useSitePermissions()
-const { getMyFunction } = useSiteMembers()
+const { getMyFunction, listMembers } = useSiteMembers()
+const { getOrcamento } = useOrcamentos()
 
 const purchaseRequestId = route.params.id as string
 const detail = ref<PurchaseRequestDetail | null>(null)
@@ -82,6 +85,10 @@ const photosByMaterial = ref<Record<string, File[]>>({})
 const uploadingInvoice = ref(false)
 const invoiceError = ref('')
 const confirmingDeleteInvoiceId = ref<string | null>(null)
+
+const fornecedores = ref<Orcamento[]>([])
+const showFornecedoresModal = ref(false)
+const memberNames = ref<Record<string, string>>({})
 
 const items = computed(() => detail.value?.items ?? [])
 const allSelected = computed(() => items.value.length > 0 && items.value.every((i) => selectedIds.value.has(i.id)))
@@ -189,17 +196,48 @@ async function loadInvoices() {
   invoices.value = await listInvoices(purchaseRequestId)
 }
 
+async function loadFornecedores() {
+  if (!detail.value || detail.value.purchaseRequest.linkedOrcamentos.length === 0) {
+    fornecedores.value = []
+    return
+  }
+  const results = await Promise.all(
+    detail.value.purchaseRequest.linkedOrcamentos.map((linked) =>
+      getOrcamento(linked.id)
+        .then((d) => d.orcamento)
+        .catch(() => null),
+    ),
+  )
+  fornecedores.value = results.filter((o): o is Orcamento => o !== null)
+}
+
+async function loadMemberNames() {
+  if (!detail.value) return
+  try {
+    const members = await listMembers(detail.value.purchaseRequest.constructionSiteId)
+    memberNames.value = Object.fromEntries(
+      members.filter((m) => m.userId).map((m) => [m.userId as string, m.displayName || m.email || '—']),
+    )
+  } catch {
+    memberNames.value = {}
+  }
+}
+
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
     await loadDetail()
-    await Promise.all([loadComparison(), loadMaterials(), loadInvoices()])
+    await Promise.all([loadComparison(), loadMaterials(), loadInvoices(), loadFornecedores(), loadMemberNames()])
   } catch {
     loadError.value = t('purchaseRequests.loadError')
   } finally {
     loading.value = false
   }
+}
+
+function paymentMethodLabel(orcamento: Orcamento): string {
+  return orcamento.fornecedorFormaPagamento ? t(`fornecedor.paymentMethod.${orcamento.fornecedorFormaPagamento}`) : '—'
 }
 
 function toggleSelection(itemId: string) {
@@ -409,7 +447,9 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-steel-50 dark:bg-steel-900">
+  <div class="flex min-h-screen bg-steel-50 dark:bg-steel-900">
+    <AppSidebar />
+    <div class="min-w-0 flex-1">
     <AppHeader>
       <template #left>
         <button type="button" class="btn-ghost -ml-2" @click="router.back()">
@@ -421,15 +461,27 @@ onMounted(load)
       </template>
     </AppHeader>
 
-    <main v-if="detail" class="app-container max-w-5xl! space-y-6 py-8">
-      <div class="flex flex-wrap items-center justify-between gap-4">
+    <main v-if="detail" class="app-container max-w-[1360px]! space-y-6 py-8">
+      <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold text-steel-800 dark:text-steel-50">{{ detail.purchaseRequest.name }}</h1>
           <div class="mt-1.5 flex flex-wrap items-center gap-2">
             <StatusBadge kind="purchaseRequest" :status="detail.purchaseRequest.status" />
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-if="comparison && comparison.columns.length > 0"
+            type="button"
+            :disabled="printingSummary"
+            class="btn-secondary"
+            @click="onPrintSummary"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3" />
+            </svg>
+            {{ printingSummary ? t('purchaseRequests.comparison.summaryPrinting') : t('purchaseRequests.comparison.summaryButton') }}
+          </button>
           <button v-if="canSubmit" type="button" :disabled="submitting" class="btn-primary" @click="onSubmitForApproval">
             {{ t('purchaseRequests.submitButton') }}
           </button>
@@ -451,32 +503,49 @@ onMounted(load)
         </div>
       </div>
       <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
+      <p v-if="summaryError" class="text-sm text-safety-600 dark:text-safety-500">{{ summaryError }}</p>
+
+      <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div class="min-w-0 flex-1 space-y-6">
 
       <!-- Status stepper -->
       <section class="card card-pad">
-        <ol class="flex flex-wrap items-center gap-2 text-sm">
+        <ol class="flex items-center">
           <template v-for="(step, index) in STEPS" :key="step">
-            <li class="flex items-center gap-2">
+            <li class="flex flex-col items-center gap-2">
               <span
-                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 :class="
                   index < currentStepIndex
                     ? 'bg-emerald-500 text-white'
                     : index === currentStepIndex
-                      ? 'bg-blueprint-600 text-white'
-                      : 'bg-steel-200 text-steel-500 dark:bg-steel-700 dark:text-steel-400'
+                      ? 'border-[2.5px] border-amber-500 bg-amber-50 dark:bg-amber-900/30'
+                      : 'border-[2.5px] border-steel-200 bg-steel-100 dark:border-steel-700 dark:bg-steel-800'
                 "
               >
-                {{ index + 1 }}
+                <svg v-if="index < currentStepIndex" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3.5 w-3.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span v-else-if="index === currentStepIndex" class="h-2 w-2 rounded-full bg-amber-500"></span>
               </span>
               <span
-                class="font-medium"
-                :class="index <= currentStepIndex ? 'text-steel-800 dark:text-steel-50' : 'text-steel-400 dark:text-steel-500'"
+                class="text-xs font-bold"
+                :class="
+                  index === currentStepIndex
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : index < currentStepIndex
+                      ? 'text-steel-700 dark:text-steel-200'
+                      : 'text-steel-400 dark:text-steel-500'
+                "
               >
                 {{ t(`purchaseRequests.status.${step}`) }}
               </span>
             </li>
-            <li v-if="index < STEPS.length - 1" class="h-px w-8 shrink-0 bg-steel-200 dark:bg-steel-700"></li>
+            <li
+              v-if="index < STEPS.length - 1"
+              class="mx-1.5 mb-6 h-0.5 flex-1 rounded-full"
+              :class="index < currentStepIndex ? 'bg-emerald-500' : 'bg-steel-200 dark:bg-steel-700'"
+            ></li>
           </template>
         </ol>
         <p v-if="detail.purchaseRequest.lastRejectionReason && detail.purchaseRequest.status === 'ORCADO'" class="mt-3 text-sm text-safety-600 dark:text-safety-500">
@@ -486,51 +555,46 @@ onMounted(load)
         <p v-if="concludeError" class="mt-3 text-sm text-safety-600 dark:text-safety-500">{{ concludeError }}</p>
       </section>
 
-      <!-- Linked Orçamentos -->
-      <section v-if="detail.purchaseRequest.linkedOrcamentos.length > 0" class="card card-pad">
-        <h2 class="mb-3 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.linkedOrcamentosTitle') }}</h2>
-        <ul class="flex flex-wrap gap-2">
-          <li v-for="linked in detail.purchaseRequest.linkedOrcamentos" :key="linked.id">
-            <router-link
-              :to="`/orcamentos/${linked.id}`"
-              class="inline-flex items-center gap-1.5 rounded-full border border-blueprint-200 bg-blueprint-50 px-3 py-1 text-sm font-medium text-blueprint-700 transition hover:bg-blueprint-100 dark:border-blueprint-800 dark:bg-blueprint-900/30 dark:text-blueprint-300"
-            >
-              {{ linked.fornecedorNome }}
-            </router-link>
-          </li>
-        </ul>
-      </section>
+      <!-- Approval — sits directly under the status stepper -->
+      <section v-if="detail.approvals.length > 0" class="card card-pad">
+        <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.approvalHistoryTitle') }}</h2>
 
-      <!-- Invoices -->
-      <section class="card card-pad">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.invoices.title') }}</h2>
-          <label class="btn-secondary cursor-pointer px-3 py-1.5 text-xs" :class="{ 'pointer-events-none opacity-60': uploadingInvoice }">
-            {{ uploadingInvoice ? t('purchaseRequests.invoices.uploading') : t('purchaseRequests.invoices.uploadButton') }}
-            <input type="file" accept=".pdf,.xml,.jpg,.jpeg,.png" class="hidden" :disabled="uploadingInvoice" @change="onUploadInvoice" />
-          </label>
+        <div v-if="currentPendingApproval" class="mb-4 flex items-center gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white">
+            {{ currentPendingApproval.stepOrder }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-steel-800 dark:text-steel-50">
+              {{ t('purchaseRequests.stepLabel') }} {{ currentPendingApproval.stepOrder }} — {{ t(`purchaseRequests.approverFunction.${currentPendingApproval.approverFunction}`) }}
+            </p>
+            <p class="text-xs text-amber-700 dark:text-amber-400">{{ t('purchaseRequests.pendingStepSubtitle') }}</p>
+          </div>
+          <div v-if="canActOnApproval" class="flex shrink-0 flex-wrap items-center gap-2">
+            <button type="button" class="btn-danger px-3 py-1.5" @click="showRejectForm = !showRejectForm">{{ t('purchaseRequests.rejectStepButton') }}</button>
+            <button type="button" class="btn-success px-3 py-1.5" @click="onApproveStep">{{ t('purchaseRequests.approveStepButton') }}</button>
+          </div>
         </div>
-        <p v-if="invoiceError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ invoiceError }}</p>
-        <p v-if="invoices.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.invoices.empty') }}</p>
-        <ul v-else class="divide-y divide-steel-100 dark:divide-steel-800">
-          <li v-for="invoice in invoices" :key="invoice.id" class="flex items-center justify-between gap-3 py-2 text-sm">
-            <button type="button" class="truncate text-left font-medium text-blueprint-600 hover:underline dark:text-blueprint-400" @click="onDownloadInvoice(invoice)">
-              {{ invoice.originalName }}
-            </button>
-            <div class="relative shrink-0">
-              <button type="button" class="text-xs font-medium text-safety-600 hover:underline dark:text-safety-500" @click="confirmingDeleteInvoiceId = invoice.id">
-                {{ t('purchaseRequests.invoices.removeButton') }}
-              </button>
-              <div v-if="confirmingDeleteInvoiceId === invoice.id" class="modal-panel absolute right-0 top-full z-10 mt-2 w-64 p-3 shadow-lg" @click.stop>
-                <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('purchaseRequests.invoices.removeConfirm') }}</p>
-                <div class="flex justify-end gap-2">
-                  <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDeleteInvoiceId = null">{{ t('purchaseRequests.form.cancel') }}</button>
-                  <button type="button" class="btn-danger py-1 text-xs" @click="onDeleteInvoice(invoice.id)">{{ t('purchaseRequests.invoices.removeButton') }}</button>
-                </div>
-              </div>
-            </div>
-          </li>
-        </ul>
+        <template v-if="currentPendingApproval && canActOnApproval">
+          <form v-if="showRejectForm" class="mb-4 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
+            <input v-model="rejectReason" type="text" required :placeholder="t('purchaseRequests.rejectReasonPlaceholder')" class="field-input flex-1" />
+            <button type="submit" class="btn-danger px-3 py-1.5">{{ t('purchaseRequests.confirmReject') }}</button>
+          </form>
+          <p v-if="approvalActionError" class="mb-4 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
+        </template>
+
+        <div v-for="cycle in approvalsByCycle" :key="cycle.cycleNumber" class="mb-4 last:mb-0">
+          <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
+            {{ t('purchaseRequests.cycleLabel') }} {{ cycle.cycleNumber }}
+          </p>
+          <ol class="space-y-1.5 border-l-2 border-steel-200 pl-4 dark:border-steel-700">
+            <li v-for="approval in cycle.approvals" :key="approval.id" class="flex items-center justify-between text-sm">
+              <span class="text-steel-700 dark:text-steel-200">
+                {{ t('purchaseRequests.stepLabel') }} {{ approval.stepOrder }} — {{ t(`purchaseRequests.approverFunction.${approval.approverFunction}`) }}
+              </span>
+              <StatusBadge kind="approval" :status="approval.status" />
+            </li>
+          </ol>
+        </div>
       </section>
 
       <!-- Items -->
@@ -613,16 +677,10 @@ onMounted(load)
 
       <!-- Comparison table -->
       <section v-if="comparison && comparison.columns.length > 0" class="card card-pad">
-        <div class="mb-1 flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.comparison.title') }}</h2>
-          <button type="button" :disabled="printingSummary" class="btn-secondary px-3 py-1.5 text-xs" @click="onPrintSummary">
-            {{ printingSummary ? t('purchaseRequests.comparison.summaryPrinting') : t('purchaseRequests.comparison.summaryButton') }}
-          </button>
-        </div>
+        <h2 class="mb-1 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.comparison.title') }}</h2>
         <p class="mb-4 text-sm text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.comparison.subtitle') }}</p>
         <p v-if="selectionError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ selectionError }}</p>
         <p v-if="printError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ printError }}</p>
-        <p v-if="summaryError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ summaryError }}</p>
         <PurchaseRequestComparisonTable
           :comparison="comparison"
           :readonly="!selectionEditable"
@@ -630,42 +688,6 @@ onMounted(load)
           @select="onSelectCell"
           @print="onPrintPdf"
         />
-      </section>
-
-      <!-- Approval -->
-      <section v-if="detail.approvals.length > 0" class="card card-pad">
-        <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.approvalHistoryTitle') }}</h2>
-
-        <div v-if="currentPendingApproval" class="mb-4 rounded-lg border border-blueprint-200 bg-blueprint-50 p-4 dark:border-blueprint-800 dark:bg-blueprint-900/30">
-          <p class="mb-2 text-sm font-medium text-steel-800 dark:text-steel-50">
-            {{ t('purchaseRequests.stepLabel') }} {{ currentPendingApproval.stepOrder }} — {{ t(`purchaseRequests.approverFunction.${currentPendingApproval.approverFunction}`) }}
-          </p>
-          <template v-if="canActOnApproval">
-            <div class="flex flex-wrap items-center gap-2">
-              <button type="button" class="btn-primary px-3 py-1.5" @click="onApproveStep">{{ t('purchaseRequests.approveStepButton') }}</button>
-              <button type="button" class="btn-danger px-3 py-1.5" @click="showRejectForm = !showRejectForm">{{ t('purchaseRequests.rejectStepButton') }}</button>
-            </div>
-            <form v-if="showRejectForm" class="mt-3 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
-              <input v-model="rejectReason" type="text" required :placeholder="t('purchaseRequests.rejectReasonPlaceholder')" class="field-input flex-1" />
-              <button type="submit" class="btn-danger px-3 py-1.5">{{ t('purchaseRequests.confirmReject') }}</button>
-            </form>
-            <p v-if="approvalActionError" class="mt-2 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
-          </template>
-        </div>
-
-        <div v-for="cycle in approvalsByCycle" :key="cycle.cycleNumber" class="mb-4 last:mb-0">
-          <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
-            {{ t('purchaseRequests.cycleLabel') }} {{ cycle.cycleNumber }}
-          </p>
-          <ol class="space-y-1.5 border-l-2 border-steel-200 pl-4 dark:border-steel-700">
-            <li v-for="approval in cycle.approvals" :key="approval.id" class="flex items-center justify-between text-sm">
-              <span class="text-steel-700 dark:text-steel-200">
-                {{ t('purchaseRequests.stepLabel') }} {{ approval.stepOrder }} — {{ t(`purchaseRequests.approverFunction.${approval.approverFunction}`) }}
-              </span>
-              <StatusBadge kind="approval" :status="approval.status" />
-            </li>
-          </ol>
-        </div>
       </section>
 
       <!-- Materials (post-conclusion) -->
@@ -701,8 +723,134 @@ onMounted(load)
           </li>
         </ul>
       </section>
+
+      </div>
+
+      <!-- Right sidebar -->
+      <div class="w-full shrink-0 space-y-4 lg:w-[320px]">
+        <div v-if="fornecedores.length > 0" class="card card-pad">
+          <div class="mb-1 flex items-center justify-between">
+            <p class="text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.supplierTitle') }}</p>
+            <button
+              v-if="fornecedores.length > 1"
+              type="button"
+              class="text-xs font-bold text-blueprint-600 hover:underline dark:text-blueprint-400"
+              @click="showFornecedoresModal = true"
+            >
+              {{ t('purchaseRequests.sidebar.viewAllSuppliers', { count: fornecedores.length }) }}
+            </button>
+          </div>
+          <router-link :to="`/orcamentos/${fornecedores[0].id}`" class="mb-3 block text-[15px] font-extrabold text-steel-900 hover:underline dark:text-steel-50">
+            {{ fornecedores[0].fornecedorNome }}
+          </router-link>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.paymentMethodLabel') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ paymentMethodLabel(fornecedores[0]) }}</span>
+            </div>
+            <div v-if="fornecedores[0].fornecedorPixKey" class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.pixKeyLabel') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ fornecedores[0].fornecedorPixKey }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.cnpjLabel') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ fornecedores[0].fornecedorCnpj }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <p class="mb-3 text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.infoTitle') }}</p>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.createdBy') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ memberNames[detail.purchaseRequest.createdBy] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.createdAt') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ new Date(detail.purchaseRequest.createdAt).toLocaleDateString('pt-BR') }}</span>
+            </div>
+            <div v-if="detail.purchaseRequest.submittedAt" class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.submittedAt') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ new Date(detail.purchaseRequest.submittedAt).toLocaleDateString('pt-BR') }}</span>
+            </div>
+            <div v-if="currentCycle > 0" class="flex justify-between gap-2">
+              <span class="text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.approvalCycle') }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ currentCycle }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.invoices.title') }}</p>
+            <label class="cursor-pointer text-xs font-bold text-blueprint-600 hover:underline dark:text-blueprint-400" :class="{ 'pointer-events-none opacity-60': uploadingInvoice }">
+              {{ uploadingInvoice ? t('purchaseRequests.invoices.uploading') : `+ ${t('purchaseRequests.invoices.uploadButton')}` }}
+              <input type="file" accept=".pdf,.xml,.jpg,.jpeg,.png" class="hidden" :disabled="uploadingInvoice" @change="onUploadInvoice" />
+            </label>
+          </div>
+          <p v-if="invoiceError" class="mb-3 text-xs text-safety-600 dark:text-safety-500">{{ invoiceError }}</p>
+          <p v-if="invoices.length === 0" class="text-xs text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.invoices.empty') }}</p>
+          <ul v-else class="divide-y divide-steel-100 dark:divide-steel-800">
+            <li v-for="invoice in invoices" :key="invoice.id" class="flex items-center justify-between gap-3 py-2 text-xs">
+              <button type="button" class="min-w-0 truncate text-left font-bold text-blueprint-600 hover:underline dark:text-blueprint-400" @click="onDownloadInvoice(invoice)">
+                {{ invoice.originalName }}
+              </button>
+              <div class="relative shrink-0">
+                <button type="button" class="font-medium text-safety-600 hover:underline dark:text-safety-500" @click="confirmingDeleteInvoiceId = invoice.id">
+                  {{ t('purchaseRequests.invoices.removeButton') }}
+                </button>
+                <div v-if="confirmingDeleteInvoiceId === invoice.id" class="modal-panel absolute right-0 top-full z-10 mt-2 w-64 p-3 shadow-lg" @click.stop>
+                  <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('purchaseRequests.invoices.removeConfirm') }}</p>
+                  <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDeleteInvoiceId = null">{{ t('purchaseRequests.form.cancel') }}</button>
+                    <button type="button" class="btn-danger py-1 text-xs" @click="onDeleteInvoice(invoice.id)">{{ t('purchaseRequests.invoices.removeButton') }}</button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+      </div>
     </main>
 
+    <!-- All suppliers modal -->
+    <div v-if="showFornecedoresModal" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" @click.self="showFornecedoresModal = false">
+      <div class="modal-panel card-pad max-h-[85vh] w-full max-w-lg overflow-y-auto">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.sidebar.allSuppliersTitle') }}</h2>
+          <button type="button" class="btn-ghost px-2 py-1" @click="showFornecedoresModal = false">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <ul class="space-y-3">
+          <li v-for="fornecedor in fornecedores" :key="fornecedor.id" class="rounded-xl border border-steel-200 p-4 dark:border-steel-700">
+            <router-link :to="`/orcamentos/${fornecedor.id}`" class="mb-2 block font-extrabold text-steel-900 hover:underline dark:text-steel-50">
+              {{ fornecedor.fornecedorNome }}
+            </router-link>
+            <div class="space-y-1.5 text-xs">
+              <div class="flex justify-between gap-2">
+                <span class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.cnpjLabel') }}</span>
+                <span class="font-bold text-steel-800 dark:text-steel-100">{{ fornecedor.fornecedorCnpj }}</span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.paymentMethodLabel') }}</span>
+                <span class="font-bold text-steel-800 dark:text-steel-100">{{ paymentMethodLabel(fornecedor) }}</span>
+              </div>
+              <div v-if="fornecedor.fornecedorPixKey" class="flex justify-between gap-2">
+                <span class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.pixKeyLabel') }}</span>
+                <span class="font-bold text-steel-800 dark:text-steel-100">{{ fornecedor.fornecedorPixKey }}</span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
     <p v-else-if="loadError" class="app-container max-w-5xl! py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
+    </div>
   </div>
 </template>

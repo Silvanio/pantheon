@@ -112,33 +112,30 @@ router.beforeEach(async (to) => {
 
   if (!current.hasCompany) {
     // A user with only site membership(s) — e.g. a client or an outside architect/engineer —
-    // has no company of their own and shouldn't be forced through company onboarding. With
-    // exactly one obra, send them straight into it; with more than one (possibly spanning
-    // different companies), send them to the dashboard's site-only view instead of an
-    // arbitrary first obra — see add-site-only-member-dashboard.
-    if (current.siteIds.length === 1) {
-      if (to.name === 'dashboard') {
-        return { name: 'site-detail', params: { siteId: current.siteIds[0] } }
+    // has no company of their own and shouldn't be forced through company onboarding.
+    if (current.siteIds.length === 0) {
+      return to.name === 'company-new' ? true : { name: 'company-new' }
+    }
+  } else {
+    const pending = pendingCompany(current)
+    if (pending) {
+      const targetName = pending.onboardingStatus === 'PLAN_PENDING' ? 'company-plan' : 'company-profile'
+      if (to.name === targetName && to.params.companyId === pending.companyId) {
+        return true
       }
-      return true
+      return { name: targetName, params: { companyId: pending.companyId } }
     }
-    if (current.siteIds.length > 1) {
-      return true
+
+    if (onboardingRouteNames.has(to.name as string)) {
+      return { name: 'dashboard' }
     }
-    return to.name === 'company-new' ? true : { name: 'company-new' }
   }
 
-  const pending = pendingCompany(current)
-  if (pending) {
-    const targetName = pending.onboardingStatus === 'PLAN_PENDING' ? 'company-plan' : 'company-profile'
-    if (to.name === targetName && to.params.companyId === pending.companyId) {
-      return true
-    }
-    return { name: targetName, params: { companyId: pending.companyId } }
-  }
-
-  if (onboardingRouteNames.has(to.name as string)) {
-    return { name: 'dashboard' }
+  // Any user — company owner or site-only member — who belongs to exactly one obra has no use
+  // for the multi-site dashboard; send them straight into it. They can still reach the profile
+  // menu (and log out) from the obra's own header via ProfileMenu.
+  if (to.name === 'dashboard' && current.siteIds.length === 1) {
+    return { name: 'site-detail', params: { siteId: current.siteIds[0] } }
   }
 
   return true

@@ -147,6 +147,17 @@ public class PurchaseRequestController {
                 .body(pdf);
     }
 
+    @GetMapping("/api/purchase-requests/{id}/summary-pdf")
+    public ResponseEntity<byte[]> getSummaryPdf(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        byte[] pdf = purchaseRequestPdfService.generateSummary(id, user.getId());
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename("resumo-pedido-" + id + ".pdf").build().toString())
+                .body(pdf);
+    }
+
     @PostMapping("/api/purchase-requests/{id}/submit")
     public ResponseEntity<PurchaseRequestResponse> submit(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
         var purchaseRequest = purchaseRequestService.submitForApproval(id, user.getId());

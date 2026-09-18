@@ -554,7 +554,10 @@
       "printButton": "Imprimir PDF",
       "printing": "Gerando...",
       "printError": "Não foi possível gerar o PDF deste fornecedor.",
-      "selectError": "Não foi possível salvar a seleção deste item."
+      "selectError": "Não foi possível salvar a seleção deste item.",
+      "summaryButton": "Baixar resumo",
+      "summaryPrinting": "Gerando...",
+      "summaryError": "Não foi possível gerar o resumo em PDF."
     },
     "submitButton": "Enviar para aprovação",
     "submitError": "Não foi possível enviar o pedido para aprovação. Selecione um fornecedor para cada item.",

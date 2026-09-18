@@ -1,6 +1,7 @@
 package com.pantheon.service.service;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
@@ -17,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,11 +60,7 @@ public class PurchaseRequestPdfService {
     }
 
     public byte[] generate(UUID purchaseRequestId, UUID orcamentoId, UUID actingUserId) {
-        PurchaseRequest purchaseRequest = purchaseRequestRepository
-                .findById(purchaseRequestId)
-                .orElseThrow(() -> new PurchaseRequestNotFoundException(purchaseRequestId));
-        var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
-        permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        PurchaseRequest purchaseRequest = requireVisiblePurchaseRequest(purchaseRequestId, actingUserId);
 
         Orcamento orcamento = orcamentoRepository.findById(orcamentoId)
                 .orElseThrow(() -> new OrcamentoNotFoundException(orcamentoId));
@@ -81,6 +79,23 @@ public class PurchaseRequestPdfService {
                 .toList();
 
         String html = buildHtml(purchaseRequest, orcamento, selectedForThisSupplier);
+        return renderPdf(html);
+    }
+
+    /** Every item, whichever supplier (if any) currently fulfills it, with per-supplier subtotals — see purchase-requests' "Pedido de Compra consolidated summary PDF". */
+    public byte[] generateSummary(UUID purchaseRequestId, UUID actingUserId) {
+        PurchaseRequest purchaseRequest = requireVisiblePurchaseRequest(purchaseRequestId, actingUserId);
+
+        List<PurchaseRequestItem> items = itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
+        List<UUID> selectedLineItemIds =
+                items.stream().map(PurchaseRequestItem::getSelectedOrcamentoLineItemId).filter(Objects::nonNull).toList();
+        Map<UUID, OrcamentoLineItem> lineItemsById = lineItemRepository.findAllById(selectedLineItemIds).stream()
+                .collect(Collectors.toMap(OrcamentoLineItem::getId, li -> li));
+        List<UUID> orcamentoIds = lineItemsById.values().stream().map(OrcamentoLineItem::getOrcamentoId).distinct().toList();
+        Map<UUID, Orcamento> orcamentosById = orcamentoRepository.findAllById(orcamentoIds).stream()
+                .collect(Collectors.toMap(Orcamento::getId, o -> o));
+
+        String html = buildSummaryHtml(purchaseRequest, items, lineItemsById, orcamentosById);
         return renderPdf(html);
     }
 
@@ -110,6 +125,13 @@ public class PurchaseRequestPdfService {
                             ? " — " + escape(orcamento.getFornecedorContatoTelefone()) : "")
                     .append("</p>");
         }
+        if (orcamento.getFornecedorFormaPagamento() != null) {
+            html.append("<p class=\"meta\">Forma de pagamento: ")
+                    .append(paymentMethodLabel(orcamento.getFornecedorFormaPagamento())).append("</p>");
+            if (orcamento.getFornecedorFormaPagamento() == FornecedorPaymentMethod.PIX) {
+                html.append("<p class=\"meta\">Chave Pix: ").append(escape(orcamento.getFornecedorPixKey())).append("</p>");
+            }
+        }
 
         html.append("<h2>Itens selecionados</h2>");
         html.append("<table><tr><th>Item</th><th>Quantidade</th><th>Preço unitário</th><th>Total</th></tr>");
@@ -128,6 +150,76 @@ public class PurchaseRequestPdfService {
         return html.toString();
     }
 
+    private String buildSummaryHtml(
+            PurchaseRequest purchaseRequest, List<PurchaseRequestItem> items, Map<UUID, OrcamentoLineItem> lineItemsById,
+            Map<UUID, Orcamento> orcamentosById) {
+        StringBuilder html = new StringBuilder();
+        html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\"/>");
+        html.append("<style>");
+        html.append("body{font-family:sans-serif;font-size:11px;color:#1a1a1a;}");
+        html.append("h1{font-size:18px;margin-bottom:4px;} h2{font-size:13px;margin-top:16px;border-bottom:1px solid #ccc;}");
+        html.append("table{width:100%;border-collapse:collapse;margin-top:4px;}");
+        html.append("td,th{border:1px solid #ddd;padding:4px 6px;text-align:left;font-size:10px;}");
+        html.append(".meta{color:#555;margin-bottom:8px;} .total{font-weight:bold;}");
+        html.append("</style></head><body>");
+
+        html.append("<h1>").append(escape(purchaseRequest.getName())).append("</h1>");
+        html.append("<p class=\"meta\">Data: ")
+                .append(DATE_FORMAT.format(purchaseRequest.getCreatedAt().atZone(ZoneOffset.UTC))).append("</p>");
+
+        Map<UUID, BigDecimal> subtotalByOrcamentoId = new LinkedHashMap<>();
+        html.append("<h2>Itens</h2>");
+        html.append("<table><tr><th>Item</th><th>Quantidade</th><th>Fornecedor</th><th>Preço unitário</th><th>Total</th></tr>");
+        BigDecimal grandTotal = BigDecimal.ZERO;
+        for (PurchaseRequestItem item : items) {
+            OrcamentoLineItem lineItem = item.getSelectedOrcamentoLineItemId() != null
+                    ? lineItemsById.get(item.getSelectedOrcamentoLineItemId())
+                    : null;
+            Orcamento orcamento = lineItem != null ? orcamentosById.get(lineItem.getOrcamentoId()) : null;
+
+            html.append("<tr><td>").append(escape(item.getName())).append("</td><td>").append(item.getQuantity())
+                    .append("</td><td>");
+            if (orcamento == null) {
+                html.append("Não selecionado</td><td></td><td></td></tr>");
+                continue;
+            }
+            BigDecimal unitPrice = lineItem.getUnitPrice() != null ? lineItem.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal lineTotal = unitPrice.multiply(item.getQuantity());
+            grandTotal = grandTotal.add(lineTotal);
+            subtotalByOrcamentoId.merge(orcamento.getId(), lineTotal, BigDecimal::add);
+            html.append(escape(orcamento.getFornecedorNome())).append("</td><td>").append(unitPrice)
+                    .append("</td><td>").append(lineTotal).append("</td></tr>");
+        }
+        html.append("</table>");
+
+        html.append("<h2>Valor a pagar por fornecedor</h2>");
+        html.append("<table><tr><th>Fornecedor</th><th>Forma de pagamento</th><th>Chave Pix</th><th>Subtotal</th></tr>");
+        for (Map.Entry<UUID, BigDecimal> entry : subtotalByOrcamentoId.entrySet()) {
+            Orcamento orcamento = orcamentosById.get(entry.getKey());
+            boolean isPix = orcamento.getFornecedorFormaPagamento() == FornecedorPaymentMethod.PIX;
+            html.append("<tr><td>").append(escape(orcamento.getFornecedorNome())).append("</td><td>")
+                    .append(orcamento.getFornecedorFormaPagamento() != null
+                            ? paymentMethodLabel(orcamento.getFornecedorFormaPagamento()) : "—")
+                    .append("</td><td>").append(isPix ? escape(orcamento.getFornecedorPixKey()) : "—")
+                    .append("</td><td>").append(entry.getValue()).append("</td></tr>");
+        }
+        html.append("</table>");
+        html.append("<p class=\"total\">Total geral: ").append(grandTotal).append("</p>");
+
+        html.append("</body></html>");
+        return html.toString();
+    }
+
+    private PurchaseRequest requireVisiblePurchaseRequest(UUID purchaseRequestId, UUID actingUserId) {
+        PurchaseRequest purchaseRequest = purchaseRequestRepository
+                .findById(purchaseRequestId)
+                .orElseThrow(() -> new PurchaseRequestNotFoundException(purchaseRequestId));
+        var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        return purchaseRequest;
+    }
+
     private byte[] renderPdf(String html) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfRendererBuilder builder = new PdfRendererBuilder();
@@ -140,6 +232,15 @@ public class PurchaseRequestPdfService {
             throw new IllegalStateException("Failed to render purchase request PDF", e);
         }
         return outputStream.toByteArray();
+    }
+
+    private String paymentMethodLabel(FornecedorPaymentMethod paymentMethod) {
+        return switch (paymentMethod) {
+            case CARTAO -> "Cartão";
+            case BOLETO -> "Boleto";
+            case PIX -> "Pix";
+            case DINHEIRO -> "Dinheiro";
+        };
     }
 
     private String escape(String value) {

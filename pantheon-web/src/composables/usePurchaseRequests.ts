@@ -225,6 +225,10 @@ export function usePurchaseRequests() {
     return authFetchBlob(`/api/purchase-requests/${purchaseRequestId}/orcamentos/${orcamentoId}/pdf`)
   }
 
+  function getSummaryPdfBlob(purchaseRequestId: string): Promise<{ blob: Blob; filename: string | null }> {
+    return authFetchBlob(`/api/purchase-requests/${purchaseRequestId}/summary-pdf`)
+  }
+
   function submitForApproval(purchaseRequestId: string): Promise<PurchaseRequest> {
     return authFetch(`/api/purchase-requests/${purchaseRequestId}/submit`, { method: 'POST' })
   }
@@ -272,6 +276,7 @@ export function usePurchaseRequests() {
     setItemSelection,
     getComparison,
     getSupplierPdfBlob,
+    getSummaryPdfBlob,
     submitForApproval,
     approveStep,
     rejectStep,

@@ -26,6 +26,7 @@ const {
   setItemSelection,
   getComparison,
   getSupplierPdfBlob,
+  getSummaryPdfBlob,
   submitForApproval,
   approveStep,
   rejectStep,
@@ -55,6 +56,8 @@ const convertError = ref('')
 const selectionError = ref('')
 const printingOrcamentoId = ref<string | null>(null)
 const printError = ref('')
+const printingSummary = ref(false)
+const summaryError = ref('')
 
 const submitting = ref(false)
 const submitError = ref('')
@@ -226,6 +229,24 @@ async function onPrintPdf(orcamentoId: string) {
     printError.value = t('purchaseRequests.comparison.printError')
   } finally {
     printingOrcamentoId.value = null
+  }
+}
+
+async function onPrintSummary() {
+  summaryError.value = ''
+  printingSummary.value = true
+  try {
+    const { blob, filename } = await getSummaryPdfBlob(purchaseRequestId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename ?? `resumo-pedido-${purchaseRequestId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    summaryError.value = t('purchaseRequests.comparison.summaryError')
+  } finally {
+    printingSummary.value = false
   }
 }
 
@@ -566,10 +587,16 @@ onMounted(load)
 
       <!-- Comparison table -->
       <section v-if="comparison && comparison.columns.length > 0" class="card card-pad">
-        <h2 class="mb-1 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.comparison.title') }}</h2>
+        <div class="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.comparison.title') }}</h2>
+          <button type="button" :disabled="printingSummary" class="btn-secondary px-3 py-1.5 text-xs" @click="onPrintSummary">
+            {{ printingSummary ? t('purchaseRequests.comparison.summaryPrinting') : t('purchaseRequests.comparison.summaryButton') }}
+          </button>
+        </div>
         <p class="mb-4 text-sm text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.comparison.subtitle') }}</p>
         <p v-if="selectionError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ selectionError }}</p>
         <p v-if="printError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ printError }}</p>
+        <p v-if="summaryError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ summaryError }}</p>
         <PurchaseRequestComparisonTable
           :comparison="comparison"
           :readonly="!selectionEditable"

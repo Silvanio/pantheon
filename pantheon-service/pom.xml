@@ -53,10 +53,16 @@
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>s3</artifactId>
 		</dependency>
-		<!-- Server-side HTML-to-PDF rendering for daily report exports -->
+		<!-- Server-side HTML-to-PDF rendering for daily report and purchase-request exports -->
 		<dependency>
 			<groupId>com.openhtmltopdf</groupId>
 			<artifactId>openhtmltopdf-pdfbox</artifactId>
+			<version>1.0.10</version>
+		</dependency>
+		<!-- SVG rendering for those PDFs' branding header (a company logo is commonly an SVG) -->
+		<dependency>
+			<groupId>com.openhtmltopdf</groupId>
+			<artifactId>openhtmltopdf-svg-support</artifactId>
 			<version>1.0.10</version>
 		</dependency>
 		<dependency>

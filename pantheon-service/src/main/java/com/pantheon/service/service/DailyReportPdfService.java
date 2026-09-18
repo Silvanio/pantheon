@@ -1,6 +1,7 @@
 package com.pantheon.service.service;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.openhtmltopdf.svgsupport.BatikSVGDrawer;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportActivity;
@@ -28,6 +29,9 @@ import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
 import com.pantheon.service.repository.EquipmentRepository;
 import com.pantheon.service.storage.StorageService;
 import java.io.ByteArrayOutputStream;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +46,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyReportPdfService {
 
+    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
     private final DailyReportRepository dailyReportRepository;
     private final DailyReportWorkforceEntryRepository workforceEntryRepository;
     private final DailyReportEquipmentUsageRepository equipmentUsageRepository;
@@ -55,6 +61,7 @@ public class DailyReportPdfService {
     private final SiteAccessService siteAccessService;
     private final EquipmentRepository equipmentRepository;
     private final StorageService storageService;
+    private final PdfBrandingService brandingService;
 
     public DailyReportPdfService(
             DailyReportRepository dailyReportRepository,
@@ -69,7 +76,8 @@ public class DailyReportPdfService {
             ConstructionSiteRepository siteRepository,
             SiteAccessService siteAccessService,
             EquipmentRepository equipmentRepository,
-            StorageService storageService) {
+            StorageService storageService,
+            PdfBrandingService brandingService) {
         this.dailyReportRepository = dailyReportRepository;
         this.workforceEntryRepository = workforceEntryRepository;
         this.equipmentUsageRepository = equipmentUsageRepository;
@@ -83,6 +91,7 @@ public class DailyReportPdfService {
         this.siteAccessService = siteAccessService;
         this.equipmentRepository = equipmentRepository;
         this.storageService = storageService;
+        this.brandingService = brandingService;
     }
 
     public byte[] generate(UUID reportId, UUID actingUserId) {
@@ -117,35 +126,37 @@ public class DailyReportPdfService {
         StringBuilder html = new StringBuilder();
         html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\"/>");
-        html.append("<style>");
-        html.append("body{font-family:sans-serif;font-size:11px;color:#1a1a1a;}");
-        html.append("h1{font-size:18px;margin-bottom:4px;} h2{font-size:13px;margin-top:16px;border-bottom:1px solid #ccc;}");
-        html.append("table{width:100%;border-collapse:collapse;margin-top:4px;}");
-        html.append("td,th{border:1px solid #ddd;padding:4px 6px;text-align:left;font-size:10px;}");
-        html.append(".meta{color:#555;margin-bottom:8px;} .photo{max-width:220px;max-height:160px;margin:4px;border:1px solid #ccc;}");
-        html.append("</style></head><body>");
+        html.append("<style>").append(PdfBrandingService.STYLE)
+                .append(".photo{max-width:220px;max-height:160px;margin:4px;border:1px solid #ccc;}")
+                .append("</style></head><body>");
 
-        html.append("<h1>Relatório Diário de Obra #").append(report.getSequenceNo()).append("</h1>");
-        html.append("<p class=\"meta\">Obra: ").append(escape(site.getName())).append(" — Data: ")
-                .append(report.getReportDate()).append(" — Status: ").append(report.getStatus()).append("</p>");
+        html.append(brandingService.renderHeaderHtml(brandingService.resolve(site.getId())));
+        html.append("<h1>Relatório Diário de Obra #").append(report.getSequenceNo()).append("</h1>")
+                .append("<span class=\"badge\">").append(escape(report.getStatus().toString())).append("</span>");
 
-        html.append("<h2>Clima</h2><p>")
-                .append(escape(report.getWeatherCondition())).append(
-                        Boolean.TRUE.equals(report.getWeatherBlockedTasks()) ? " (bloqueou tarefas planejadas)" : "")
-                .append("</p>");
-
-        html.append("<h2>Horário de trabalho</h2><p>")
+        html.append("<div class=\"meta-card\">");
+        html.append("<div class=\"meta-row\"><span class=\"label\">Obra</span><span class=\"value\">")
+                .append(escape(site.getName())).append("</span></div>");
+        html.append("<div class=\"meta-row\"><span class=\"label\">Data</span><span class=\"value\">")
+                .append(report.getReportDate()).append("</span></div>");
+        html.append("<div class=\"meta-row\"><span class=\"label\">Horário de trabalho</span><span class=\"value\">")
                 .append(report.getWorkHoursStart() != null ? report.getWorkHoursStart() : "—").append(" - ")
-                .append(report.getWorkHoursEnd() != null ? report.getWorkHoursEnd() : "—").append("</p>");
+                .append(report.getWorkHoursEnd() != null ? report.getWorkHoursEnd() : "—").append("</span></div>");
+        html.append("<div class=\"meta-row\"><span class=\"label\">Clima</span><span class=\"value\">")
+                .append(escape(report.getWeatherCondition())).append("</span>")
+                .append(Boolean.TRUE.equals(report.getWeatherBlockedTasks())
+                        ? " <span class=\"muted italic\">(bloqueou tarefas planejadas)</span>" : "")
+                .append("</div>");
+        html.append("</div>");
 
-        html.append("<h2>Mão de obra</h2><table><tr><th>Função</th><th>Quantidade</th></tr>");
+        html.append("<h2>Mão de obra</h2><table class=\"data\"><tr><th>Função</th><th class=\"right\">Quantidade</th></tr>");
         for (DailyReportWorkforceEntry entry : workforce) {
-            html.append("<tr><td>").append(escape(entry.getRoleDescription())).append("</td><td>")
+            html.append("<tr><td>").append(escape(entry.getRoleDescription())).append("</td><td class=\"right\">")
                     .append(entry.getHeadcount()).append("</td></tr>");
         }
         html.append("</table>");
 
-        html.append("<h2>Equipamentos utilizados</h2><table><tr><th>Equipamento</th><th>Observação</th></tr>");
+        html.append("<h2>Equipamentos utilizados</h2><table class=\"data\"><tr><th>Equipamento</th><th>Observação</th></tr>");
         for (DailyReportEquipmentUsage usage : equipmentUsage) {
             Equipment eq = equipmentById.get(usage.getEquipmentId());
             html.append("<tr><td>").append(escape(eq != null ? eq.getName() : usage.getEquipmentId().toString()))
@@ -153,7 +164,7 @@ public class DailyReportPdfService {
         }
         html.append("</table>");
 
-        html.append("<h2>Atividades</h2><table><tr><th>Descrição</th><th>Progresso</th><th>Status</th></tr>");
+        html.append("<h2>Atividades</h2><table class=\"data\"><tr><th>Descrição</th><th>Progresso</th><th>Status</th></tr>");
         for (DailyReportActivity activity : activities) {
             html.append("<tr><td>").append(escape(activity.getDescription())).append("</td><td>")
                     .append(escape(activity.getProgressNote())).append("</td><td>")
@@ -166,10 +177,10 @@ public class DailyReportPdfService {
             html.append("<p>- ").append(escape(occurrence.getDescription())).append("</p>");
         }
 
-        html.append("<h2>Materiais recebidos</h2><table><tr><th>Material</th><th>Quantidade</th></tr>");
+        html.append("<h2>Materiais recebidos</h2><table class=\"data\"><tr><th>Material</th><th class=\"right\">Quantidade</th></tr>");
         for (DailyReportMaterialReceived received : materialsReceived) {
             html.append("<tr><td>").append(escape(received.getMaterialName()))
-                    .append("</td><td>").append(received.getQuantity())
+                    .append("</td><td class=\"right\">").append(received.getQuantity())
                     .append(received.getUnit() != null ? " " + escape(received.getUnit()) : "").append("</td></tr>");
         }
         html.append("</table>");
@@ -194,12 +205,14 @@ public class DailyReportPdfService {
             html.append("<p>- ").append(escape(attachment.getOriginalName())).append("</p>");
         }
 
-        html.append("<h2>Assinaturas</h2><table><tr><th>Função</th><th>Data/hora</th></tr>");
+        html.append("<h2>Assinaturas</h2><table class=\"data\"><tr><th>Função</th><th>Data/hora</th></tr>");
         for (DailyReportSignature signature : signatures) {
             html.append("<tr><td>").append(signature.getFunction() != null ? signature.getFunction() : "—")
                     .append("</td><td>").append(signature.getSignedAt()).append("</td></tr>");
         }
         html.append("</table>");
+        html.append("<p class=\"footer-note\">Gerado em ")
+                .append(DATETIME_FORMAT.format(Instant.now().atZone(ZoneOffset.UTC))).append("</p>");
 
         html.append("</body></html>");
         return html.toString();
@@ -209,6 +222,7 @@ public class DailyReportPdfService {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfRendererBuilder builder = new PdfRendererBuilder();
         builder.useFastMode();
+        builder.useSVGDrawer(new BatikSVGDrawer());
         builder.withHtmlContent(html, null);
         builder.toStream(outputStream);
         try {

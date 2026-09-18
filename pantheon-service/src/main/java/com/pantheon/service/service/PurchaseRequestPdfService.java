@@ -1,25 +1,37 @@
 package com.pantheon.service.service;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.openhtmltopdf.svgsupport.BatikSVGDrawer;
+import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
+import com.pantheon.service.entity.PurchaseRequestApproval;
+import com.pantheon.service.entity.PurchaseRequestApprovalStatus;
 import com.pantheon.service.entity.PurchaseRequestItem;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
 import com.pantheon.service.exception.OrcamentoNotLinkedToPurchaseRequestException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
+import com.pantheon.service.repository.PurchaseRequestApprovalRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -36,11 +48,16 @@ import org.springframework.stereotype.Service;
 public class PurchaseRequestPdfService {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final PurchaseRequestRepository purchaseRequestRepository;
     private final PurchaseRequestItemRepository itemRepository;
     private final OrcamentoRepository orcamentoRepository;
     private final OrcamentoLineItemRepository lineItemRepository;
+    private final AppUserRepository userRepository;
+    private final SiteMembershipRepository siteMembershipRepository;
+    private final PurchaseRequestApprovalRepository approvalRepository;
+    private final PdfBrandingService brandingService;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
 
@@ -49,12 +66,20 @@ public class PurchaseRequestPdfService {
             PurchaseRequestItemRepository itemRepository,
             OrcamentoRepository orcamentoRepository,
             OrcamentoLineItemRepository lineItemRepository,
+            AppUserRepository userRepository,
+            SiteMembershipRepository siteMembershipRepository,
+            PurchaseRequestApprovalRepository approvalRepository,
+            PdfBrandingService brandingService,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService) {
         this.purchaseRequestRepository = purchaseRequestRepository;
         this.itemRepository = itemRepository;
         this.orcamentoRepository = orcamentoRepository;
         this.lineItemRepository = lineItemRepository;
+        this.userRepository = userRepository;
+        this.siteMembershipRepository = siteMembershipRepository;
+        this.approvalRepository = approvalRepository;
+        this.brandingService = brandingService;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
     }
@@ -103,48 +128,54 @@ public class PurchaseRequestPdfService {
         StringBuilder html = new StringBuilder();
         html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\"/>");
-        html.append("<style>");
-        html.append("body{font-family:sans-serif;font-size:11px;color:#1a1a1a;}");
-        html.append("h1{font-size:18px;margin-bottom:4px;} h2{font-size:13px;margin-top:16px;border-bottom:1px solid #ccc;}");
-        html.append("table{width:100%;border-collapse:collapse;margin-top:4px;}");
-        html.append("td,th{border:1px solid #ddd;padding:4px 6px;text-align:left;font-size:10px;}");
-        html.append(".meta{color:#555;margin-bottom:8px;} .total{font-weight:bold;}");
-        html.append("</style></head><body>");
+        html.append("<style>").append(PdfBrandingService.STYLE).append("</style></head><body>");
 
-        html.append("<h1>").append(escape(purchaseRequest.getName())).append("</h1>");
-        html.append("<p class=\"meta\">Data: ")
-                .append(DATE_FORMAT.format(purchaseRequest.getCreatedAt().atZone(ZoneOffset.UTC))).append("</p>");
-        html.append("<p class=\"meta\">Fornecedor: ").append(escape(orcamento.getFornecedorNome()))
-                .append(" — CNPJ: ").append(escape(orcamento.getFornecedorCnpj())).append("</p>");
+        html.append(brandingService.renderHeaderHtml(brandingService.resolve(purchaseRequest.getConstructionSiteId())));
+        html.append("<h1>").append(escape(purchaseRequest.getName())).append("</h1>")
+                .append("<span class=\"badge\">Pedido de compra</span>");
+        html.append(buildRequestMetaHtml(purchaseRequest));
+
+        html.append("<div class=\"meta-card\">");
+        html.append("<div class=\"meta-row\"><span class=\"label\">Fornecedor</span><span class=\"value\">")
+                .append(escape(orcamento.getFornecedorNome())).append("</span></div>");
+        html.append("<div class=\"meta-row\"><span class=\"label\">CNPJ</span><span class=\"value\">")
+                .append(escape(orcamento.getFornecedorCnpj())).append("</span></div>");
         if (orcamento.getFornecedorEndereco() != null) {
-            html.append("<p class=\"meta\">Endereço: ").append(escape(orcamento.getFornecedorEndereco())).append("</p>");
+            html.append("<div class=\"meta-row\"><span class=\"label\">Endereço</span><span class=\"value\">")
+                    .append(escape(orcamento.getFornecedorEndereco())).append("</span></div>");
         }
         if (orcamento.getFornecedorContatoNome() != null || orcamento.getFornecedorContatoTelefone() != null) {
-            html.append("<p class=\"meta\">Contato: ").append(escape(orcamento.getFornecedorContatoNome()))
+            html.append("<div class=\"meta-row\"><span class=\"label\">Contato</span><span class=\"value\">")
+                    .append(escape(orcamento.getFornecedorContatoNome()))
                     .append(orcamento.getFornecedorContatoTelefone() != null
                             ? " — " + escape(orcamento.getFornecedorContatoTelefone()) : "")
-                    .append("</p>");
+                    .append("</span></div>");
         }
         if (orcamento.getFornecedorFormaPagamento() != null) {
-            html.append("<p class=\"meta\">Forma de pagamento: ")
-                    .append(paymentMethodLabel(orcamento.getFornecedorFormaPagamento())).append("</p>");
+            html.append("<div class=\"meta-row\"><span class=\"label\">Forma de pagamento</span><span class=\"value\">")
+                    .append(paymentMethodLabel(orcamento.getFornecedorFormaPagamento())).append("</span></div>");
             if (orcamento.getFornecedorFormaPagamento() == FornecedorPaymentMethod.PIX) {
-                html.append("<p class=\"meta\">Chave Pix: ").append(escape(orcamento.getFornecedorPixKey())).append("</p>");
+                html.append("<div class=\"meta-row\"><span class=\"label\">Chave Pix</span><span class=\"value\">")
+                        .append(escape(orcamento.getFornecedorPixKey())).append("</span></div>");
             }
         }
+        html.append("</div>");
 
         html.append("<h2>Itens selecionados</h2>");
-        html.append("<table><tr><th>Item</th><th>Quantidade</th><th>Preço unitário</th><th>Total</th></tr>");
+        html.append("<table class=\"data\"><tr><th>Item</th><th class=\"right\">Quantidade</th>")
+                .append("<th class=\"right\">Preço unitário</th><th class=\"right\">Total</th></tr>");
         BigDecimal grandTotal = BigDecimal.ZERO;
         for (OrcamentoLineItem item : items) {
             BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
             BigDecimal lineTotal = unitPrice.multiply(item.getQuantity());
             grandTotal = grandTotal.add(lineTotal);
-            html.append("<tr><td>").append(escape(item.getName())).append("</td><td>").append(item.getQuantity())
-                    .append("</td><td>").append(unitPrice).append("</td><td>").append(lineTotal).append("</td></tr>");
+            html.append("<tr><td>").append(escape(item.getName())).append("</td><td class=\"right\">")
+                    .append(item.getQuantity()).append("</td><td class=\"right\">").append(money(unitPrice))
+                    .append("</td><td class=\"right\">").append(money(lineTotal)).append("</td></tr>");
         }
         html.append("</table>");
-        html.append("<p class=\"total\">Total geral: ").append(grandTotal).append("</p>");
+        html.append("<p class=\"total-line\"><span class=\"label\">Total geral</span>").append(money(grandTotal)).append("</p>");
+        html.append(footerNote());
 
         html.append("</body></html>");
         return html.toString();
@@ -156,21 +187,17 @@ public class PurchaseRequestPdfService {
         StringBuilder html = new StringBuilder();
         html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\"/>");
-        html.append("<style>");
-        html.append("body{font-family:sans-serif;font-size:11px;color:#1a1a1a;}");
-        html.append("h1{font-size:18px;margin-bottom:4px;} h2{font-size:13px;margin-top:16px;border-bottom:1px solid #ccc;}");
-        html.append("table{width:100%;border-collapse:collapse;margin-top:4px;}");
-        html.append("td,th{border:1px solid #ddd;padding:4px 6px;text-align:left;font-size:10px;}");
-        html.append(".meta{color:#555;margin-bottom:8px;} .total{font-weight:bold;}");
-        html.append("</style></head><body>");
+        html.append("<style>").append(PdfBrandingService.STYLE).append("</style></head><body>");
 
-        html.append("<h1>").append(escape(purchaseRequest.getName())).append("</h1>");
-        html.append("<p class=\"meta\">Data: ")
-                .append(DATE_FORMAT.format(purchaseRequest.getCreatedAt().atZone(ZoneOffset.UTC))).append("</p>");
+        html.append(brandingService.renderHeaderHtml(brandingService.resolve(purchaseRequest.getConstructionSiteId())));
+        html.append("<h1>").append(escape(purchaseRequest.getName())).append("</h1>")
+                .append("<span class=\"badge\">Resumo consolidado</span>");
+        html.append(buildRequestMetaHtml(purchaseRequest));
 
         Map<UUID, BigDecimal> subtotalByOrcamentoId = new LinkedHashMap<>();
         html.append("<h2>Itens</h2>");
-        html.append("<table><tr><th>Item</th><th>Quantidade</th><th>Fornecedor</th><th>Preço unitário</th><th>Total</th></tr>");
+        html.append("<table class=\"data\"><tr><th>Item</th><th class=\"right\">Quantidade</th><th>Fornecedor</th>")
+                .append("<th class=\"right\">Preço unitário</th><th class=\"right\">Total</th></tr>");
         BigDecimal grandTotal = BigDecimal.ZERO;
         for (PurchaseRequestItem item : items) {
             OrcamentoLineItem lineItem = item.getSelectedOrcamentoLineItemId() != null
@@ -178,23 +205,24 @@ public class PurchaseRequestPdfService {
                     : null;
             Orcamento orcamento = lineItem != null ? orcamentosById.get(lineItem.getOrcamentoId()) : null;
 
-            html.append("<tr><td>").append(escape(item.getName())).append("</td><td>").append(item.getQuantity())
-                    .append("</td><td>");
+            html.append("<tr><td>").append(escape(item.getName())).append("</td><td class=\"right\">")
+                    .append(item.getQuantity()).append("</td><td>");
             if (orcamento == null) {
-                html.append("Não selecionado</td><td></td><td></td></tr>");
+                html.append("<span class=\"muted italic\">Não selecionado</span></td><td></td><td></td></tr>");
                 continue;
             }
             BigDecimal unitPrice = lineItem.getUnitPrice() != null ? lineItem.getUnitPrice() : BigDecimal.ZERO;
             BigDecimal lineTotal = unitPrice.multiply(item.getQuantity());
             grandTotal = grandTotal.add(lineTotal);
             subtotalByOrcamentoId.merge(orcamento.getId(), lineTotal, BigDecimal::add);
-            html.append(escape(orcamento.getFornecedorNome())).append("</td><td>").append(unitPrice)
-                    .append("</td><td>").append(lineTotal).append("</td></tr>");
+            html.append(escape(orcamento.getFornecedorNome())).append("</td><td class=\"right\">").append(money(unitPrice))
+                    .append("</td><td class=\"right\">").append(money(lineTotal)).append("</td></tr>");
         }
         html.append("</table>");
 
         html.append("<h2>Valor a pagar por fornecedor</h2>");
-        html.append("<table><tr><th>Fornecedor</th><th>Forma de pagamento</th><th>Chave Pix</th><th>Subtotal</th></tr>");
+        html.append("<table class=\"data\"><tr><th>Fornecedor</th><th>Forma de pagamento</th><th>Chave Pix</th>")
+                .append("<th class=\"right\">Subtotal</th></tr>");
         for (Map.Entry<UUID, BigDecimal> entry : subtotalByOrcamentoId.entrySet()) {
             Orcamento orcamento = orcamentosById.get(entry.getKey());
             boolean isPix = orcamento.getFornecedorFormaPagamento() == FornecedorPaymentMethod.PIX;
@@ -202,13 +230,93 @@ public class PurchaseRequestPdfService {
                     .append(orcamento.getFornecedorFormaPagamento() != null
                             ? paymentMethodLabel(orcamento.getFornecedorFormaPagamento()) : "—")
                     .append("</td><td>").append(isPix ? escape(orcamento.getFornecedorPixKey()) : "—")
-                    .append("</td><td>").append(entry.getValue()).append("</td></tr>");
+                    .append("</td><td class=\"right\">").append(money(entry.getValue())).append("</td></tr>");
         }
         html.append("</table>");
-        html.append("<p class=\"total\">Total geral: ").append(grandTotal).append("</p>");
+        html.append("<p class=\"total-line\"><span class=\"label\">Total geral</span>").append(money(grandTotal)).append("</p>");
+        html.append(footerNote());
 
         html.append("</body></html>");
         return html.toString();
+    }
+
+    /** Requester + current-cycle approval decisions + open/close dates — see design.md decision 4. */
+    private String buildRequestMetaHtml(PurchaseRequest purchaseRequest) {
+        String requesterName = userRepository.findById(purchaseRequest.getCreatedBy())
+                .map(this::displayNameOrEmail)
+                .orElse("—");
+
+        StringBuilder html = new StringBuilder();
+        html.append("<div class=\"meta-card\">");
+        html.append("<div class=\"meta-row\"><span class=\"label\">Aberto por</span><span class=\"value\">")
+                .append(escape(requesterName)).append("</span> <span class=\"muted\">em ")
+                .append(DATE_FORMAT.format(purchaseRequest.getCreatedAt().atZone(ZoneOffset.UTC))).append("</span></div>");
+
+        List<PurchaseRequestApproval> decidedSteps = approvalRepository
+                .findByPurchaseRequestIdOrderByCycleNumberAscStepOrderAsc(purchaseRequest.getId())
+                .stream()
+                .filter(a -> a.getCycleNumber() == purchaseRequest.getCurrentApprovalCycle())
+                .filter(a -> a.getStatus() != PurchaseRequestApprovalStatus.PENDING)
+                .toList();
+        for (PurchaseRequestApproval step : decidedSteps) {
+            String approverName = step.getDecidedBySiteMembershipId() != null
+                    ? resolveMembershipName(step.getDecidedBySiteMembershipId())
+                    : "Equipe da empresa";
+            String verb = step.getStatus() == PurchaseRequestApprovalStatus.APPROVED ? "Aprovado" : "Rejeitado";
+            html.append("<div class=\"meta-row\"><span class=\"label\">")
+                    .append(escape(functionLabel(step.getApproverFunction()))).append("</span><span class=\"value\">")
+                    .append(escape(approverName)).append("</span> <span class=\"muted\">— ").append(verb).append(" em ")
+                    .append(step.getDecidedAt() != null ? DATETIME_FORMAT.format(step.getDecidedAt().atZone(ZoneOffset.UTC)) : "—")
+                    .append("</span></div>");
+        }
+
+        html.append("<div class=\"meta-row\"><span class=\"label\">Finalizado em</span><span class=\"value\">")
+                .append(purchaseRequest.getCompletedAt() != null
+                        ? DATE_FORMAT.format(purchaseRequest.getCompletedAt().atZone(ZoneOffset.UTC))
+                        : "Em andamento")
+                .append("</span></div>");
+        html.append("</div>");
+        return html.toString();
+    }
+
+    private String functionLabel(ConstructionFunction function) {
+        return switch (function) {
+            case ADMIN -> "Administrador";
+            case CLIENT -> "Cliente";
+            case ENGINEER -> "Engenheiro(a)";
+            case ARCHITECT -> "Arquiteto(a)";
+            case SITE_FOREMAN -> "Mestre de obras";
+            case SERVICE_PROVIDER -> "Prestador de serviço";
+            case OTHER -> "Outro";
+        };
+    }
+
+    private String money(BigDecimal value) {
+        return NumberFormat.getCurrencyInstance(new Locale("pt", "BR")).format(value);
+    }
+
+    private String footerNote() {
+        return "<p class=\"footer-note\">Gerado em "
+                + DATETIME_FORMAT.format(Instant.now().atZone(ZoneOffset.UTC)) + "</p>";
+    }
+
+    /** A {@code SiteMembership}'s displayable name: its own {@code displayName} when set (accountless members), otherwise its linked {@code AppUser}'s. */
+    private String resolveMembershipName(UUID siteMembershipId) {
+        SiteMembership membership = siteMembershipRepository.findById(siteMembershipId).orElse(null);
+        if (membership == null) {
+            return "—";
+        }
+        if (membership.getDisplayName() != null && !membership.getDisplayName().isBlank()) {
+            return membership.getDisplayName();
+        }
+        if (membership.getUserId() != null) {
+            return userRepository.findById(membership.getUserId()).map(this::displayNameOrEmail).orElse("—");
+        }
+        return "—";
+    }
+
+    private String displayNameOrEmail(AppUser user) {
+        return user.getDisplayName() != null && !user.getDisplayName().isBlank() ? user.getDisplayName() : user.getEmail();
     }
 
     private PurchaseRequest requireVisiblePurchaseRequest(UUID purchaseRequestId, UUID actingUserId) {
@@ -224,6 +332,7 @@ public class PurchaseRequestPdfService {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfRendererBuilder builder = new PdfRendererBuilder();
         builder.useFastMode();
+        builder.useSVGDrawer(new BatikSVGDrawer());
         builder.withHtmlContent(html, null);
         builder.toStream(outputStream);
         try {

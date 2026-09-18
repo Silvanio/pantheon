@@ -8,18 +8,25 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
+import com.pantheon.service.entity.PurchaseRequestApproval;
 import com.pantheon.service.entity.PurchaseRequestItem;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.OrcamentoNotLinkedToPurchaseRequestException;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
+import com.pantheon.service.repository.PurchaseRequestApprovalRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
+import com.pantheon.service.repository.SiteMembershipRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -52,6 +59,18 @@ class PurchaseRequestPdfServiceTest {
     private OrcamentoLineItemRepository lineItemRepository;
 
     @Mock
+    private AppUserRepository userRepository;
+
+    @Mock
+    private SiteMembershipRepository siteMembershipRepository;
+
+    @Mock
+    private PurchaseRequestApprovalRepository approvalRepository;
+
+    @Mock
+    private PdfBrandingService brandingService;
+
+    @Mock
     private SiteAccessService siteAccessService;
 
     @Mock
@@ -64,10 +83,12 @@ class PurchaseRequestPdfServiceTest {
     @BeforeEach
     void setUp() {
         service = new PurchaseRequestPdfService(
-                purchaseRequestRepository, itemRepository, orcamentoRepository, lineItemRepository, siteAccessService,
-                permissionService);
+                purchaseRequestRepository, itemRepository, orcamentoRepository, lineItemRepository, userRepository,
+                siteMembershipRepository, approvalRepository, brandingService, siteAccessService, permissionService);
         siteId = UUID.randomUUID();
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
+        lenient().when(brandingService.resolve(eq(siteId))).thenReturn(new PdfBrandingService.Branding("Empresa Teste", "Obra Teste", null));
+        lenient().when(brandingService.renderHeaderHtml(any())).thenReturn("<div class=\"pdf-header\">Empresa Teste — Obra Teste</div>");
     }
 
     private PurchaseRequest purchaseRequest() {
@@ -146,8 +167,8 @@ class PurchaseRequestPdfServiceTest {
         byte[] pdf = service.generate(purchaseRequest.getId(), orcamento.getId(), UUID.randomUUID());
 
         String text = textOf(pdf);
-        assertThat(text).contains("Forma de pagamento: Pix");
-        assertThat(text).contains("Chave Pix: chave@pix.com");
+        assertThat(text).contains("Forma de pagamento").contains("Pix");
+        assertThat(text).contains("Chave Pix").contains("chave@pix.com");
     }
 
     @Test
@@ -163,7 +184,7 @@ class PurchaseRequestPdfServiceTest {
         byte[] pdf = service.generate(purchaseRequest.getId(), orcamento.getId(), UUID.randomUUID());
 
         String text = textOf(pdf);
-        assertThat(text).contains("Forma de pagamento: Boleto");
+        assertThat(text).contains("Forma de pagamento").contains("Boleto");
         assertThat(text).doesNotContain("Chave Pix");
     }
 
@@ -210,6 +231,100 @@ class PurchaseRequestPdfServiceTest {
         assertThat(text).contains("Pix");
         assertThat(text).contains("chave@pix.com");
         assertThat(text).contains("Dinheiro");
+    }
+
+    @Test
+    void generateRendersSuccessfullyWithAnSvgLogo() {
+        // End-to-end regression for the SVG-support wiring: without a registered SVGDrawer,
+        // openhtmltopdf can't decode an "image/svg+xml" data URI and used to silently drop it —
+        // this proves the whole render pipeline (including a real <img> pointing at SVG) completes.
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"><circle r=\"4\" cx=\"5\" cy=\"5\"/></svg>";
+        String svgDataUri = "data:image/svg+xml;base64,"
+                + java.util.Base64.getEncoder().encodeToString(svg.getBytes(StandardCharsets.UTF_8));
+        PdfBrandingService.Branding svgBranding = new PdfBrandingService.Branding("Empresa Teste", "Obra Teste", svgDataUri);
+        when(brandingService.resolve(eq(siteId))).thenReturn(svgBranding);
+        when(brandingService.renderHeaderHtml(svgBranding))
+                .thenReturn(new PdfBrandingService(null, null, null).renderHeaderHtml(svgBranding));
+        Orcamento orcamento = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(List.of());
+        when(lineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of());
+
+        byte[] pdf = service.generate(purchaseRequest.getId(), orcamento.getId(), UUID.randomUUID());
+
+        assertThat(pdf).isNotEmpty();
+        assertThat(new String(pdf, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
+    }
+
+    @Test
+    void generateShowsBrandingHeaderRequesterAndInProgressIndicator() throws IOException {
+        UUID requesterId = UUID.randomUUID();
+        PurchaseRequest purchaseRequest = new PurchaseRequest(
+                UUID.randomUUID(), siteId, "Pedido 07/09/2026 #1", requesterId, Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(userRepository.findById(requesterId)).thenReturn(Optional.of(
+                new AppUser(requesterId, "solicitante@example.com", "Solicitante Um", "hash", null, Instant.now(), Instant.now())));
+        Orcamento orcamento = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(List.of());
+        when(lineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of());
+
+        byte[] pdf = service.generate(purchaseRequest.getId(), orcamento.getId(), UUID.randomUUID());
+
+        String text = textOf(pdf);
+        assertThat(text).contains("Empresa Teste").contains("Obra Teste");
+        assertThat(text).contains("Aberto por").contains("Solicitante Um");
+        assertThat(text).contains("Em andamento");
+    }
+
+    @Test
+    void generateShowsApprovalDecisionsAndFinalizationDate() throws IOException {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        purchaseRequest.approve(Instant.now());
+        purchaseRequest.complete(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        UUID membershipId = UUID.randomUUID();
+        UUID approverUserId = UUID.randomUUID();
+        PurchaseRequestApproval step = new PurchaseRequestApproval(
+                UUID.randomUUID(), purchaseRequest.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        step.approve(membershipId, null, Instant.now());
+        when(approvalRepository.findByPurchaseRequestIdOrderByCycleNumberAscStepOrderAsc(purchaseRequest.getId()))
+                .thenReturn(List.of(step));
+        when(siteMembershipRepository.findById(membershipId)).thenReturn(Optional.of(
+                SiteMembership.invited(membershipId, siteId, approverUserId, ConstructionFunction.ENGINEER, null, null, Instant.now())));
+        when(userRepository.findById(approverUserId)).thenReturn(Optional.of(
+                new AppUser(approverUserId, "engenheira@example.com", "Engenheira Um", "hash", null, Instant.now(), Instant.now())));
+        when(userRepository.findById(purchaseRequest.getCreatedBy())).thenReturn(Optional.empty());
+
+        Orcamento orcamento = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(List.of());
+        when(lineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of());
+
+        byte[] pdf = service.generate(purchaseRequest.getId(), orcamento.getId(), UUID.randomUUID());
+
+        String text = textOf(pdf);
+        assertThat(text).contains("Engenheira Um");
+        assertThat(text).contains("Aprovado em");
+        assertThat(text).contains("Finalizado em");
+        assertThat(text).doesNotContain("Em andamento");
+    }
+
+    @Test
+    void generateSummaryShowsBrandingHeader() throws IOException {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(List.of());
+
+        byte[] pdf = service.generateSummary(purchaseRequest.getId(), UUID.randomUUID());
+
+        String text = textOf(pdf);
+        assertThat(text).contains("Empresa Teste").contains("Obra Teste");
     }
 
     @Test

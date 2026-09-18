@@ -57,6 +57,7 @@ const rejectReason = ref('')
 const showRejectForm = ref(false)
 const concluding = ref(false)
 const concludeError = ref('')
+const confirmingDelete = ref(false)
 const deleting = ref(false)
 const deleteError = ref('')
 
@@ -246,7 +247,6 @@ async function onRejectStep() {
 }
 
 async function onDelete() {
-  if (!window.confirm(t('purchaseRequests.deleteConfirm'))) return
   deleteError.value = ''
   deleting.value = true
   try {
@@ -255,6 +255,7 @@ async function onDelete() {
   } catch {
     deleteError.value = t('purchaseRequests.deleteError')
     deleting.value = false
+    confirmingDelete.value = false
   }
 }
 
@@ -327,9 +328,18 @@ onMounted(load)
           <button v-if="canConclude" type="button" :disabled="concluding" class="btn-primary" @click="onConclude">
             {{ t('purchaseRequests.concludeButton') }}
           </button>
-          <button v-if="canDelete" type="button" :disabled="deleting" class="btn-danger" @click="onDelete">
-            {{ t('purchaseRequests.deleteButton') }}
-          </button>
+          <div v-if="canDelete" class="relative">
+            <button type="button" :disabled="deleting" class="btn-danger" @click="confirmingDelete = !confirmingDelete">
+              {{ t('purchaseRequests.deleteButton') }}
+            </button>
+            <div v-if="confirmingDelete" class="modal-panel absolute right-0 top-full z-10 mt-2 w-72 p-3 shadow-lg" @click.stop>
+              <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('purchaseRequests.deleteConfirm') }}</p>
+              <div class="flex justify-end gap-2">
+                <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDelete = false">{{ t('purchaseRequests.form.cancel') }}</button>
+                <button type="button" :disabled="deleting" class="btn-danger py-1 text-xs" @click="onDelete">{{ t('purchaseRequests.deleteButton') }}</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>

@@ -20,6 +20,7 @@ const orcamentoId = route.params.id as string
 const detail = ref<OrcamentoDetail | null>(null)
 const loading = ref(false)
 const loadError = ref('')
+const confirmingDelete = ref(false)
 const deleting = ref(false)
 const deleteError = ref('')
 
@@ -114,7 +115,6 @@ async function onRemoveItem(lineItemId: string) {
 }
 
 async function onDelete() {
-  if (!window.confirm(t('orcamento.deleteConfirm'))) return
   deleteError.value = ''
   deleting.value = true
   try {
@@ -123,6 +123,7 @@ async function onDelete() {
   } catch {
     deleteError.value = t('orcamento.deleteError')
     deleting.value = false
+    confirmingDelete.value = false
   }
 }
 
@@ -159,9 +160,18 @@ onMounted(load)
             </router-link>
           </div>
         </div>
-        <button v-if="isDraft" type="button" :disabled="deleting" class="btn-danger" @click="onDelete">
-          {{ t('orcamento.deleteButton') }}
-        </button>
+        <div v-if="isDraft" class="relative">
+          <button type="button" :disabled="deleting" class="btn-danger" @click="confirmingDelete = !confirmingDelete">
+            {{ t('orcamento.deleteButton') }}
+          </button>
+          <div v-if="confirmingDelete" class="modal-panel absolute right-0 top-full z-10 mt-2 w-72 p-3 shadow-lg" @click.stop>
+            <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('orcamento.deleteConfirm') }}</p>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDelete = false">{{ t('orcamento.form.cancel') }}</button>
+              <button type="button" :disabled="deleting" class="btn-danger py-1 text-xs" @click="onDelete">{{ t('orcamento.deleteButton') }}</button>
+            </div>
+          </div>
+        </div>
       </div>
       <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
 

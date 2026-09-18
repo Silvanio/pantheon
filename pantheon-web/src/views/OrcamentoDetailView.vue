@@ -49,15 +49,75 @@ const itemUnitPrice = ref('')
 const itemSubmitting = ref(false)
 const itemError = ref('')
 
+// Inline-editable unit price per line item — always a text field so only digits/one decimal
+// separator can ever be typed, rather than relying on a native number input's quirks.
+const priceDrafts = ref<Record<string, string>>({})
+const priceSaving = ref<Record<string, boolean>>({})
+const priceError = ref('')
+
+function syncPriceDrafts() {
+  const drafts: Record<string, string> = {}
+  for (const item of detail.value?.lineItems ?? []) {
+    drafts[item.id] = item.unitPrice ?? ''
+  }
+  priceDrafts.value = drafts
+}
+
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
     detail.value = await getOrcamento(orcamentoId)
+    syncPriceDrafts()
   } catch {
     loadError.value = t('orcamento.loadError')
   } finally {
     loading.value = false
+  }
+}
+
+function sanitizeMoneyInput(value: string): string {
+  let result = ''
+  let seenSeparator = false
+  for (const char of value) {
+    if (char >= '0' && char <= '9') {
+      result += char
+    } else if ((char === '.' || char === ',') && !seenSeparator) {
+      result += '.'
+      seenSeparator = true
+    }
+  }
+  return result
+}
+
+function onPriceInput(itemId: string, event: Event) {
+  const input = event.target as HTMLInputElement
+  const sanitized = sanitizeMoneyInput(input.value)
+  priceDrafts.value[itemId] = sanitized
+  if (sanitized !== input.value) {
+    input.value = sanitized
+  }
+}
+
+async function onPriceBlur(item: OrcamentoLineItem) {
+  const newValue = priceDrafts.value[item.id] ?? ''
+  const currentValue = item.unitPrice ?? ''
+  if (newValue === currentValue) return
+  priceError.value = ''
+  priceSaving.value[item.id] = true
+  try {
+    await updateLineItem(orcamentoId, item.id, {
+      name: item.name,
+      type: item.type,
+      quantity: item.quantity,
+      unitPrice: newValue || null,
+    })
+    await load()
+  } catch {
+    priceError.value = t('orcamento.form.error')
+    priceDrafts.value[item.id] = currentValue
+  } finally {
+    priceSaving.value[item.id] = false
   }
 }
 
@@ -243,6 +303,7 @@ onMounted(load)
           </div>
         </form>
 
+        <p v-if="priceError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ priceError }}</p>
         <p v-if="detail.lineItems.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('orcamento.lineItemsEmpty') }}</p>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -262,7 +323,20 @@ onMounted(load)
                   <p v-if="item.type" class="text-xs text-steel-500 dark:text-steel-400">{{ item.type }}</p>
                 </td>
                 <td class="py-2.5 pr-3 text-steel-700 dark:text-steel-200">{{ item.quantity }}</td>
-                <td class="py-2.5 pr-3 text-steel-700 dark:text-steel-200">{{ item.unitPrice ?? '—' }}</td>
+                <td class="py-2.5 pr-3 text-steel-700 dark:text-steel-200">
+                  <input
+                    v-if="isDraft"
+                    type="text"
+                    inputmode="decimal"
+                    class="field-input w-28 py-1"
+                    :disabled="priceSaving[item.id]"
+                    :value="priceDrafts[item.id]"
+                    @input="onPriceInput(item.id, $event)"
+                    @blur="onPriceBlur(item)"
+                    @keyup.enter="($event.target as HTMLInputElement).blur()"
+                  />
+                  <span v-else>{{ item.unitPrice ?? '—' }}</span>
+                </td>
                 <td class="py-2.5 pr-3">
                   <span v-if="item.selected" class="badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
                     {{ t('orcamento.selectedLabel') }}

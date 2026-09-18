@@ -18,6 +18,7 @@ import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import TasksBoardPanel from '../components/TasksBoardPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import ProfileMenu from '../components/ProfileMenu.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -101,6 +102,7 @@ onMounted(load)
         </template>
       </template>
       <template #right>
+        <ProfileMenu />
         <ThemeToggle />
         <button
           v-if="site && heroCollapsed"

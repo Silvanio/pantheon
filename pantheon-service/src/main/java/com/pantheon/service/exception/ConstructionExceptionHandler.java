@@ -162,4 +162,14 @@ public class ConstructionExceptionHandler {
     public ResponseEntity<String> handleOrcamentoNotLinkedToPurchaseRequest(OrcamentoNotLinkedToPurchaseRequestException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
+
+    @ExceptionHandler(PurchaseRequestNotDeletableException.class)
+    public ResponseEntity<String> handlePurchaseRequestNotDeletable(PurchaseRequestNotDeletableException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrcamentoNotDeletableException.class)
+    public ResponseEntity<String> handleOrcamentoNotDeletable(OrcamentoNotDeletableException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
 }

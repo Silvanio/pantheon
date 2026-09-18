@@ -109,4 +109,10 @@ public class OrcamentoController {
         orcamentoService.removeLineItem(id, lineItemId, user.getId());
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/api/orcamentos/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        orcamentoService.delete(id, user.getId());
+        return ResponseEntity.noContent().build();
+    }
 }

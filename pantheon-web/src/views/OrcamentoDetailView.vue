@@ -14,12 +14,14 @@ import StatusBadge from '../components/StatusBadge.vue'
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { getOrcamento, addLineItem, updateLineItem, removeLineItem } = useOrcamentos()
+const { getOrcamento, addLineItem, updateLineItem, removeLineItem, deleteOrcamento } = useOrcamentos()
 
 const orcamentoId = route.params.id as string
 const detail = ref<OrcamentoDetail | null>(null)
 const loading = ref(false)
 const loadError = ref('')
+const deleting = ref(false)
+const deleteError = ref('')
 
 const isDraft = computed(() => detail.value?.orcamento.status === 'DRAFT')
 
@@ -111,6 +113,19 @@ async function onRemoveItem(lineItemId: string) {
   }
 }
 
+async function onDelete() {
+  if (!window.confirm(t('orcamento.deleteConfirm'))) return
+  deleteError.value = ''
+  deleting.value = true
+  try {
+    await deleteOrcamento(orcamentoId)
+    router.back()
+  } catch {
+    deleteError.value = t('orcamento.deleteError')
+    deleting.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -144,7 +159,11 @@ onMounted(load)
             </router-link>
           </div>
         </div>
+        <button v-if="isDraft" type="button" :disabled="deleting" class="btn-danger" @click="onDelete">
+          {{ t('orcamento.deleteButton') }}
+        </button>
       </div>
+      <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
 
       <!-- Supplier -->
       <section class="card card-pad">

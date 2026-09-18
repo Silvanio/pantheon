@@ -22,8 +22,10 @@ import com.pantheon.service.entity.OrcamentoStatus;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestItem;
+import com.pantheon.service.entity.PurchaseRequestItemStatus;
 import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
+import com.pantheon.service.exception.OrcamentoNotDeletableException;
 import com.pantheon.service.exception.OrcamentoNotDraftException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
@@ -274,5 +276,104 @@ class OrcamentoServiceTest {
         service.list(siteId, UUID.randomUUID(), null, null, null, PageRequest.of(0, 20));
 
         verify(orcamentoRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void deleteRemovesStandaloneDraftOrcamentoAndItsLineItems() {
+        Orcamento standalone = orcamento(null);
+        List<OrcamentoLineItem> lineItems = List.of(new OrcamentoLineItem(
+                UUID.randomUUID(), standalone.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, null));
+        when(orcamentoRepository.findById(standalone.getId())).thenReturn(Optional.of(standalone));
+        when(lineItemRepository.findByOrcamentoId(standalone.getId())).thenReturn(lineItems);
+
+        service.delete(standalone.getId(), UUID.randomUUID());
+
+        verify(lineItemRepository).deleteAll(lineItems);
+        verify(orcamentoRepository).delete(standalone);
+        verify(purchaseRequestItemRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteRejectsLockedOrcamento() {
+        Orcamento locked = orcamento(null);
+        locked.lock();
+        when(orcamentoRepository.findById(locked.getId())).thenReturn(Optional.of(locked));
+
+        assertThatThrownBy(() -> service.delete(locked.getId(), UUID.randomUUID()))
+                .isInstanceOf(OrcamentoNotDeletableException.class);
+        verify(orcamentoRepository, never()).delete(any(Orcamento.class));
+    }
+
+    @Test
+    void deleteRejectsMemberWithoutManageAccess() {
+        Orcamento standalone = orcamento(null);
+        when(orcamentoRepository.findById(standalone.getId())).thenReturn(Optional.of(standalone));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.ORCAMENTO_MANAGE))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.ORCAMENTO_MANAGE));
+
+        assertThatThrownBy(() -> service.delete(standalone.getId(), UUID.randomUUID()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+        verify(orcamentoRepository, never()).delete(any(Orcamento.class));
+    }
+
+    @Test
+    void deleteRevertsConvertedItemsToPendingAndClearsStaleSelection() {
+        PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
+        Orcamento converted = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(converted.getId())).thenReturn(Optional.of(converted));
+
+        PurchaseRequestItem convertedItem = purchaseRequestItem(purchaseRequest.getId());
+        UUID lineItemId = UUID.randomUUID();
+        convertedItem.convertTo(converted.getId(), Instant.now());
+        convertedItem.select(lineItemId);
+        when(purchaseRequestItemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId()))
+                .thenReturn(List.of(convertedItem));
+
+        OrcamentoLineItem lineItem = new OrcamentoLineItem(
+                lineItemId, converted.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, convertedItem.getId());
+        when(lineItemRepository.findByOrcamentoId(converted.getId())).thenReturn(List.of(lineItem));
+        when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        service.delete(converted.getId(), UUID.randomUUID());
+
+        assertThat(convertedItem.getStatus()).isEqualTo(PurchaseRequestItemStatus.PENDING);
+        assertThat(convertedItem.getConvertedToOrcamentoId()).isNull();
+        assertThat(convertedItem.getSelectedOrcamentoLineItemId()).isNull();
+        verify(purchaseRequestItemRepository).save(convertedItem);
+    }
+
+    @Test
+    void deleteRevertsHeaderToIniciadoWhenLastLinkedOrcamentoIsRemoved() {
+        PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
+        Orcamento onlyLinked = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(onlyLinked.getId())).thenReturn(Optional.of(onlyLinked));
+        when(purchaseRequestItemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId()))
+                .thenReturn(List.of());
+        when(lineItemRepository.findByOrcamentoId(onlyLinked.getId())).thenReturn(List.of());
+        when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        service.delete(onlyLinked.getId(), UUID.randomUUID());
+
+        assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.INICIADO);
+        verify(purchaseRequestRepository).save(purchaseRequest);
+    }
+
+    @Test
+    void deleteLeavesHeaderOrcadoWhenAnotherOrcamentoIsStillLinked() {
+        PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
+        Orcamento first = orcamento(purchaseRequest.getId());
+        Orcamento second = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(first.getId())).thenReturn(Optional.of(first));
+        when(purchaseRequestItemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId()))
+                .thenReturn(List.of());
+        when(lineItemRepository.findByOrcamentoId(first.getId())).thenReturn(List.of());
+        when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of(second));
+
+        service.delete(first.getId(), UUID.randomUUID());
+
+        assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.ORCADO);
+        verify(purchaseRequestRepository, never()).findById(purchaseRequest.getId());
     }
 }

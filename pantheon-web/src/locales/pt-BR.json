@@ -442,6 +442,9 @@
     "addItemButton": "Adicionar item",
     "removeItemButton": "Remover",
     "editItemButton": "Editar",
+    "deleteButton": "Excluir",
+    "deleteConfirm": "Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.",
+    "deleteError": "Não foi possível excluir o orçamento.",
     "form": {
       "name": "Nome",
       "type": "Tipo",
@@ -493,6 +496,9 @@
     "addRowButton": "+ Adicionar item",
     "removeRowButton": "Remover",
     "linkedOrcamentosTitle": "Orçamentos vinculados",
+    "deleteButton": "Excluir",
+    "deleteConfirm": "Tem certeza que deseja excluir este pedido de compra? Esta ação não pode ser desfeita.",
+    "deleteError": "Não foi possível excluir o pedido de compra.",
     "form": {
       "name": "Nome",
       "type": "Tipo",

@@ -20,6 +20,7 @@ const router = useRouter()
 const { t } = useI18n()
 const {
   getPurchaseRequest,
+  deletePurchaseRequest,
   convertToOrcamento,
   setItemSelection,
   getComparison,
@@ -56,6 +57,8 @@ const rejectReason = ref('')
 const showRejectForm = ref(false)
 const concluding = ref(false)
 const concludeError = ref('')
+const deleting = ref(false)
+const deleteError = ref('')
 
 const materialActionError = ref('')
 const photosByMaterial = ref<Record<string, File[]>>({})
@@ -101,6 +104,7 @@ const canSubmit = computed(() => {
   return detail.value.items.every((item) => !!item.selectedOrcamentoLineItemId)
 })
 
+const canDelete = computed(() => detail.value?.purchaseRequest.status === 'INICIADO')
 const canConclude = computed(() => detail.value?.purchaseRequest.status === 'CONFERIDO')
 const isConcluded = computed(() => detail.value?.purchaseRequest.status === 'CONCLUIDO')
 const selectionEditable = computed(() => detail.value?.purchaseRequest.status === 'ORCADO')
@@ -241,6 +245,19 @@ async function onRejectStep() {
   }
 }
 
+async function onDelete() {
+  if (!window.confirm(t('purchaseRequests.deleteConfirm'))) return
+  deleteError.value = ''
+  deleting.value = true
+  try {
+    await deletePurchaseRequest(purchaseRequestId)
+    router.back()
+  } catch {
+    deleteError.value = t('purchaseRequests.deleteError')
+    deleting.value = false
+  }
+}
+
 async function onConclude() {
   concludeError.value = ''
   concluding.value = true
@@ -310,8 +327,12 @@ onMounted(load)
           <button v-if="canConclude" type="button" :disabled="concluding" class="btn-primary" @click="onConclude">
             {{ t('purchaseRequests.concludeButton') }}
           </button>
+          <button v-if="canDelete" type="button" :disabled="deleting" class="btn-danger" @click="onDelete">
+            {{ t('purchaseRequests.deleteButton') }}
+          </button>
         </div>
       </div>
+      <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
 
       <!-- Status stepper -->
       <section class="card card-pad">

@@ -74,6 +74,11 @@ public class PurchaseRequest {
         this.status = PurchaseRequestStatus.ORCADO;
     }
 
+    /** Undoes {@link #markOrcado}, called when the header's last remaining linked Orcamento is deleted. */
+    public void revertToIniciado() {
+        this.status = PurchaseRequestStatus.INICIADO;
+    }
+
     /** Starts a new approval cycle. Stays ORCADO until the cycle's final step is approved. */
     public void submitForApproval(Instant now) {
         this.submittedAt = now;

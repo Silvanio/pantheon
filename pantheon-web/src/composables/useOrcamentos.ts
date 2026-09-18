@@ -117,6 +117,10 @@ export function useOrcamentos() {
     return authFetch(`/api/orcamentos/${orcamentoId}/line-items/${lineItemId}`, { method: 'DELETE' })
   }
 
+  function deleteOrcamento(orcamentoId: string): Promise<void> {
+    return authFetch(`/api/orcamentos/${orcamentoId}`, { method: 'DELETE' })
+  }
+
   return {
     listOrcamentos,
     createOrcamento,
@@ -124,5 +128,6 @@ export function useOrcamentos() {
     addLineItem,
     updateLineItem,
     removeLineItem,
+    deleteOrcamento,
   }
 }

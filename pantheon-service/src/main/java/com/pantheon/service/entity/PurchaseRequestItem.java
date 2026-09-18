@@ -84,6 +84,13 @@ public class PurchaseRequestItem {
         this.convertedAt = now;
     }
 
+    /** Undoes {@link #convertTo}, called when the Orcamento it was converted into is deleted. */
+    public void revertConversion() {
+        this.status = PurchaseRequestItemStatus.PENDING;
+        this.convertedToOrcamentoId = null;
+        this.convertedAt = null;
+    }
+
     /**
      * Records which {@code OrcamentoLineItem} (and therefore which supplier's quote) fulfills
      * this item — see {@code purchase-requests}' "Per-item supplier selection". A plain field

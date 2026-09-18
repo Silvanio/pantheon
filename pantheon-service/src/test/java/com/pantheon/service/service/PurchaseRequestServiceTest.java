@@ -29,6 +29,7 @@ import com.pantheon.service.entity.SitePurchaseRequestApprovalLevel;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
+import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
 import com.pantheon.service.exception.PurchaseRequestSelectionIncompleteException;
 import com.pantheon.service.messaging.EventPublisher;
@@ -475,5 +476,41 @@ class PurchaseRequestServiceTest {
         PurchaseRequestComparisonResponse comparison = service.getComparison(purchaseRequest.getId(), UUID.randomUUID());
 
         assertThat(comparison.rows().get(0).cells()).isEmpty();
+    }
+
+    @Test
+    void deleteRemovesIniciadoHeaderAndItsItems() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        List<PurchaseRequestItem> items = List.of(item(purchaseRequest.getId()));
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(items);
+
+        service.delete(purchaseRequest.getId(), UUID.randomUUID());
+
+        verify(itemRepository).deleteAll(items);
+        verify(purchaseRequestRepository).delete(purchaseRequest);
+    }
+
+    @Test
+    void deleteRejectsWhenNotIniciado() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        assertThatThrownBy(() -> service.delete(purchaseRequest.getId(), UUID.randomUUID()))
+                .isInstanceOf(PurchaseRequestNotDeletableException.class);
+        verify(purchaseRequestRepository, never()).delete(any(PurchaseRequest.class));
+    }
+
+    @Test
+    void deleteRejectsMemberWithoutManageAccess() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.delete(purchaseRequest.getId(), UUID.randomUUID()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+        verify(purchaseRequestRepository, never()).delete(any(PurchaseRequest.class));
     }
 }

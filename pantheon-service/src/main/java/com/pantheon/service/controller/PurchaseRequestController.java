@@ -30,6 +30,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -98,6 +99,12 @@ public class PurchaseRequestController {
                 .toList();
         var response = PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id));
         return ResponseEntity.ok(new PurchaseRequestDetailResponse(response, items, approvals));
+    }
+
+    @DeleteMapping("/api/purchase-requests/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        purchaseRequestService.delete(id, user.getId());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/api/purchase-requests/{id}/convert-to-orcamento")

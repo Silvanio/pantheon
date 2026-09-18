@@ -12,6 +12,7 @@ import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestItem;
 import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.OrcamentoNotDeletableException;
 import com.pantheon.service.exception.OrcamentoNotDraftException;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
@@ -145,6 +146,55 @@ public class OrcamentoService {
 
         OrcamentoLineItem item = requireLineItem(orcamentoId, lineItemId);
         lineItemRepository.delete(item);
+    }
+
+    /**
+     * Only while {@code DRAFT}. If this Orcamento was converted from a Pedido de Compra, its
+     * converted items revert to {@code PENDING} and any selection pointing at one of its line
+     * items is cleared; if it was the header's last linked Orcamento, the header reverts from
+     * {@code ORCADO} back to {@code INICIADO}.
+     */
+    @Transactional
+    public void delete(UUID orcamentoId, UUID actingUserId) {
+        Orcamento orcamento = requireOrcamento(orcamentoId);
+        requireManage(orcamento.getConstructionSiteId(), actingUserId);
+        if (orcamento.getStatus() != OrcamentoStatus.DRAFT) {
+            throw new OrcamentoNotDeletableException(orcamentoId);
+        }
+
+        UUID sourcePurchaseRequestId = orcamento.getSourcePurchaseRequestId();
+        if (sourcePurchaseRequestId != null) {
+            List<OrcamentoLineItem> lineItems = lineItemRepository.findByOrcamentoId(orcamentoId);
+            List<UUID> lineItemIds = lineItems.stream().map(OrcamentoLineItem::getId).toList();
+            for (PurchaseRequestItem item : purchaseRequestItemRepository
+                    .findByPurchaseRequestIdOrderByCreatedAtDesc(sourcePurchaseRequestId)) {
+                boolean changed = false;
+                if (orcamentoId.equals(item.getConvertedToOrcamentoId())) {
+                    item.revertConversion();
+                    changed = true;
+                }
+                if (item.getSelectedOrcamentoLineItemId() != null
+                        && lineItemIds.contains(item.getSelectedOrcamentoLineItemId())) {
+                    item.clearSelection();
+                    changed = true;
+                }
+                if (changed) {
+                    purchaseRequestItemRepository.save(item);
+                }
+            }
+        }
+
+        lineItemRepository.deleteAll(lineItemRepository.findByOrcamentoId(orcamentoId));
+        orcamentoRepository.delete(orcamento);
+
+        if (sourcePurchaseRequestId != null && orcamentoRepository.findBySourcePurchaseRequestId(sourcePurchaseRequestId).isEmpty()) {
+            purchaseRequestRepository.findById(sourcePurchaseRequestId).ifPresent(purchaseRequest -> {
+                if (purchaseRequest.getStatus() == PurchaseRequestStatus.ORCADO) {
+                    purchaseRequest.revertToIniciado();
+                    purchaseRequestRepository.save(purchaseRequest);
+                }
+            });
+        }
     }
 
     /** Called from {@code PurchaseRequestService.approveStep} when a cycle's final step is approved. */

@@ -18,6 +18,7 @@ import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.NoPendingApprovalStepException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
+import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
 import com.pantheon.service.exception.PurchaseRequestSelectionIncompleteException;
@@ -260,6 +261,19 @@ public class PurchaseRequestService {
 
         materialService.createFromPurchaseRequestSelections(purchaseRequest, selectedLineItems);
         return purchaseRequest;
+    }
+
+    /** Only while still {@code INICIADO} — no Orcamento has been created from it yet, so nothing else to clean up. */
+    @Transactional
+    public void delete(UUID purchaseRequestId, UUID actingUserId) {
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
+        requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
+        if (purchaseRequest.getStatus() != PurchaseRequestStatus.INICIADO) {
+            throw new PurchaseRequestNotDeletableException(purchaseRequestId);
+        }
+
+        itemRepository.deleteAll(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId));
+        purchaseRequestRepository.delete(purchaseRequest);
     }
 
     /** Read-only, derived comparison grid: rows are the header's items, columns are its linked Orcamentos. */

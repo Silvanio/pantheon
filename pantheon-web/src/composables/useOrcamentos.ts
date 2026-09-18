@@ -1,7 +1,7 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 import type { Material } from './useMaterialDeliveries'
-import type { FornecedorInput } from './useFornecedores'
+import type { FornecedorInput, FornecedorPaymentMethod } from './useFornecedores'
 import type { PageResponse } from './usePurchaseRequests'
 
 export type OrcamentoStatus = 'DRAFT' | 'LOCKED'
@@ -17,6 +17,8 @@ export interface Orcamento {
   fornecedorEndereco: string | null
   fornecedorContatoNome: string | null
   fornecedorContatoTelefone: string | null
+  fornecedorFormaPagamento: FornecedorPaymentMethod | null
+  fornecedorPixKey: string | null
   sourcePurchaseRequestId: string | null
   sourcePurchaseRequestName: string | null
 }

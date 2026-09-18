@@ -16,6 +16,7 @@ import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.dto.OrcamentoLineItemRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.Fornecedor;
+import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.OrcamentoStatus;
@@ -97,7 +98,7 @@ class OrcamentoServiceTest {
             FornecedorRequest req = inv.getArgument(2);
             return new Fornecedor(
                     UUID.randomUUID(), companyId, req.cnpj(), req.name(), req.address(), req.contactName(),
-                    req.contactPhone(), UUID.randomUUID(), Instant.now());
+                    req.contactPhone(), req.paymentMethod(), req.pixKey(), UUID.randomUUID(), Instant.now());
         });
     }
 
@@ -107,13 +108,13 @@ class OrcamentoServiceTest {
     }
 
     private FornecedorRequest fornecedorRequest() {
-        return new FornecedorRequest("12345678000199", "Fornecedor Teste", null, null, null);
+        return new FornecedorRequest("12345678000199", "Fornecedor Teste", null, null, null, null, null);
     }
 
     private Orcamento orcamento(UUID sourcePurchaseRequestId) {
         return new Orcamento(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor Teste",
-                null, null, null, null, sourcePurchaseRequestId);
+                null, null, null, null, null, null, sourcePurchaseRequestId);
     }
 
     private PurchaseRequestItem purchaseRequestItem(UUID purchaseRequestId) {
@@ -149,10 +150,22 @@ class OrcamentoServiceTest {
     }
 
     @Test
+    void createSnapshotsResolvedFornecedorsPaymentMethodAndPixKey() {
+        UUID actingUserId = UUID.randomUUID();
+        FornecedorRequest pixRequest = new FornecedorRequest(
+                "12345678000199", "Fornecedor Teste", null, null, null, FornecedorPaymentMethod.PIX, "chave@pix.com");
+
+        Orcamento result = service.create(siteId, actingUserId, List.of(), pixRequest);
+
+        assertThat(result.getFornecedorFormaPagamento()).isEqualTo(FornecedorPaymentMethod.PIX);
+        assertThat(result.getFornecedorPixKey()).isEqualTo("chave@pix.com");
+    }
+
+    @Test
     void createReusesExistingFornecedorForSameCnpj() {
         UUID actingUserId = UUID.randomUUID();
         Fornecedor existing = new Fornecedor(
-                UUID.randomUUID(), companyId, "12345678000199", "Fornecedor Existente", null, null, null,
+                UUID.randomUUID(), companyId, "12345678000199", "Fornecedor Existente", null, null, null, null, null,
                 UUID.randomUUID(), Instant.now());
         when(fornecedorService.findOrCreate(eq(companyId), any(), any())).thenReturn(existing);
 
@@ -341,6 +354,35 @@ class OrcamentoServiceTest {
         assertThat(convertedItem.getConvertedToOrcamentoId()).isNull();
         assertThat(convertedItem.getSelectedOrcamentoLineItemId()).isNull();
         verify(purchaseRequestItemRepository).save(convertedItem);
+    }
+
+    @Test
+    void deleteRepointsConversionInsteadOfRevertingWhenItemIsStillQuotedByAnotherOrcamento() {
+        PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
+        Orcamento deletedOne = orcamento(purchaseRequest.getId());
+        Orcamento stillLinked = orcamento(purchaseRequest.getId());
+        when(orcamentoRepository.findById(deletedOne.getId())).thenReturn(Optional.of(deletedOne));
+        when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId()))
+                .thenReturn(List.of(deletedOne, stillLinked));
+
+        PurchaseRequestItem convertedItem = purchaseRequestItem(purchaseRequest.getId());
+        convertedItem.convertTo(deletedOne.getId(), Instant.now());
+        when(purchaseRequestItemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId()))
+                .thenReturn(List.of(convertedItem));
+        when(lineItemRepository.findByOrcamentoId(deletedOne.getId())).thenReturn(List.of());
+
+        OrcamentoLineItem quoteInOtherOrcamento = new OrcamentoLineItem(
+                UUID.randomUUID(), stillLinked.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, convertedItem.getId());
+        when(lineItemRepository.findByOrcamentoIdInAndSourcePurchaseRequestItemId(
+                List.of(stillLinked.getId()), convertedItem.getId()))
+                .thenReturn(List.of(quoteInOtherOrcamento));
+
+        service.delete(deletedOne.getId(), UUID.randomUUID());
+
+        assertThat(convertedItem.getStatus()).isEqualTo(PurchaseRequestItemStatus.CONVERTED);
+        assertThat(convertedItem.getConvertedToOrcamentoId()).isEqualTo(stillLinked.getId());
+        verify(purchaseRequestItemRepository).save(convertedItem);
+        verify(purchaseRequestRepository, never()).findById(any());
     }
 
     @Test

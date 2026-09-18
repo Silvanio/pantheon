@@ -63,11 +63,6 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
-    @ExceptionHandler(PurchaseRequestItemAlreadyConvertedException.class)
-    public ResponseEntity<String> handlePurchaseRequestItemAlreadyConverted(PurchaseRequestItemAlreadyConvertedException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-    }
-
     @ExceptionHandler(MaterialNotFoundException.class)
     public ResponseEntity<String> handleMaterialNotFound(MaterialNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
@@ -171,5 +166,15 @@ public class ConstructionExceptionHandler {
     @ExceptionHandler(OrcamentoNotDeletableException.class)
     public ResponseEntity<String> handleOrcamentoNotDeletable(OrcamentoNotDeletableException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestInvoiceNotFoundException.class)
+    public ResponseEntity<String> handlePurchaseRequestInvoiceNotFound(PurchaseRequestInvoiceNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PixKeyRequiredException.class)
+    public ResponseEntity<String> handlePixKeyRequired(PixKeyRequiredException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 }

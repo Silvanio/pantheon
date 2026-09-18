@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
  * `redesign-purchase-request-approval-and-comparison`'s design.md decision 9.
  */
 const props = defineProps<{
-  kind: 'purchaseRequest' | 'orcamento' | 'approval'
+  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval'
   status: string
 }>()
 
@@ -25,6 +25,10 @@ const CLASS_MAP: Record<string, Record<string, string>> = {
     DRAFT: 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200',
     LOCKED: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
   },
+  purchaseRequestItem: {
+    PENDING: 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200',
+    CONVERTED: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
+  },
   approval: {
     PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
     APPROVED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
@@ -34,6 +38,7 @@ const CLASS_MAP: Record<string, Record<string, string>> = {
 
 const LABEL_KEY: Record<string, string> = {
   purchaseRequest: 'purchaseRequests.status',
+  purchaseRequestItem: 'purchaseRequests.status',
   orcamento: 'orcamento.status',
   approval: 'purchaseRequests.approvalStatus',
 }

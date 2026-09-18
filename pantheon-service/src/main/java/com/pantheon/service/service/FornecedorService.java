@@ -3,8 +3,10 @@ package com.pantheon.service.service;
 import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.Fornecedor;
+import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.exception.CnpjPrefixTooShortException;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.PixKeyRequiredException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.FornecedorRepository;
 import java.time.Instant;
@@ -37,10 +39,16 @@ public class FornecedorService {
     /** Reuses an existing Fornecedor for (companyId, cnpj) if present, ignoring any differences in the other fields. */
     @Transactional
     Fornecedor findOrCreate(UUID companyId, UUID actingUserId, FornecedorRequest request) {
-        return fornecedorRepository.findByCompanyIdAndCnpj(companyId, request.cnpj()).orElseGet(() ->
-                fornecedorRepository.save(new Fornecedor(
-                        UUID.randomUUID(), companyId, request.cnpj(), request.name(), request.address(),
-                        request.contactName(), request.contactPhone(), actingUserId, Instant.now())));
+        return fornecedorRepository.findByCompanyIdAndCnpj(companyId, request.cnpj()).orElseGet(() -> {
+            boolean isPix = request.paymentMethod() == FornecedorPaymentMethod.PIX;
+            if (isPix && (request.pixKey() == null || request.pixKey().isBlank())) {
+                throw new PixKeyRequiredException();
+            }
+            return fornecedorRepository.save(new Fornecedor(
+                    UUID.randomUUID(), companyId, request.cnpj(), request.name(), request.address(),
+                    request.contactName(), request.contactPhone(), request.paymentMethod(),
+                    isPix ? request.pixKey() : null, actingUserId, Instant.now()));
+        });
     }
 
     public List<Fornecedor> searchByCnpjPrefix(UUID siteId, UUID actingUserId, String cnpjPrefix) {

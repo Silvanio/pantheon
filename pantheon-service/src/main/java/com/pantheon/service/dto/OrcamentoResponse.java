@@ -1,5 +1,6 @@
 package com.pantheon.service.dto;
 
+import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoStatus;
 import java.time.Instant;
@@ -16,6 +17,8 @@ public record OrcamentoResponse(
         String fornecedorEndereco,
         String fornecedorContatoNome,
         String fornecedorContatoTelefone,
+        FornecedorPaymentMethod fornecedorFormaPagamento,
+        String fornecedorPixKey,
         UUID sourcePurchaseRequestId,
         String sourcePurchaseRequestName) {
 
@@ -28,7 +31,7 @@ public record OrcamentoResponse(
                 orcamento.getId(), orcamento.getConstructionSiteId(), orcamento.getStatus(), orcamento.getCreatedBy(),
                 orcamento.getCreatedAt(), orcamento.getFornecedorCnpj(), orcamento.getFornecedorNome(),
                 orcamento.getFornecedorEndereco(), orcamento.getFornecedorContatoNome(),
-                orcamento.getFornecedorContatoTelefone(), orcamento.getSourcePurchaseRequestId(),
-                sourcePurchaseRequestName);
+                orcamento.getFornecedorContatoTelefone(), orcamento.getFornecedorFormaPagamento(),
+                orcamento.getFornecedorPixKey(), orcamento.getSourcePurchaseRequestId(), sourcePurchaseRequestName);
     }
 }

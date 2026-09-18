@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useFornecedores, type FornecedorInput, type FornecedorSuggestion } from '../composables/useFornecedores'
+import {
+  useFornecedores,
+  type FornecedorInput,
+  type FornecedorPaymentMethod,
+  type FornecedorSuggestion,
+} from '../composables/useFornecedores'
 
 const props = defineProps<{ siteId: string }>()
 const emit = defineEmits<{ confirm: [FornecedorInput]; cancel: [] }>()
@@ -9,11 +14,21 @@ const emit = defineEmits<{ confirm: [FornecedorInput]; cancel: [] }>()
 const { t } = useI18n()
 const { searchByCnpjPrefix } = useFornecedores()
 
+const PAYMENT_METHODS: FornecedorPaymentMethod[] = ['CARTAO', 'BOLETO', 'PIX', 'DINHEIRO']
+
 const cnpj = ref('')
 const name = ref('')
 const address = ref('')
 const contactName = ref('')
 const contactPhone = ref('')
+const paymentMethod = ref<FornecedorPaymentMethod | ''>('')
+const pixKey = ref('')
+
+function onPaymentMethodChange() {
+  if (paymentMethod.value !== 'PIX') {
+    pixKey.value = ''
+  }
+}
 
 const suggestions = ref<FornecedorSuggestion[]>([])
 const searching = ref(false)
@@ -47,6 +62,8 @@ function selectSuggestion(suggestion: FornecedorSuggestion) {
   address.value = suggestion.address ?? ''
   contactName.value = suggestion.contactName ?? ''
   contactPhone.value = suggestion.contactPhone ?? ''
+  paymentMethod.value = suggestion.paymentMethod ?? ''
+  pixKey.value = suggestion.paymentMethod === 'PIX' ? (suggestion.pixKey ?? '') : ''
   suggestions.value = []
   searchedOnce.value = false
 }
@@ -57,12 +74,18 @@ function onContinue() {
     errorMessage.value = t('fornecedor.error')
     return
   }
+  if (paymentMethod.value === 'PIX' && !pixKey.value.trim()) {
+    errorMessage.value = t('fornecedor.pixKeyRequiredError')
+    return
+  }
   emit('confirm', {
     cnpj: cnpj.value.trim(),
     name: name.value.trim(),
     address: address.value.trim() || null,
     contactName: contactName.value.trim() || null,
     contactPhone: contactPhone.value.trim() || null,
+    paymentMethod: paymentMethod.value || null,
+    pixKey: paymentMethod.value === 'PIX' ? pixKey.value.trim() : null,
   })
 }
 
@@ -124,6 +147,19 @@ onBeforeUnmount(() => {
       <div>
         <label class="field-label">{{ t('fornecedor.contactPhoneLabel') }}</label>
         <input v-model="contactPhone" type="text" class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">{{ t('fornecedor.paymentMethodLabel') }}</label>
+        <select v-model="paymentMethod" class="field-input" @change="onPaymentMethodChange">
+          <option value="">—</option>
+          <option v-for="method in PAYMENT_METHODS" :key="method" :value="method">
+            {{ t(`fornecedor.paymentMethod.${method}`) }}
+          </option>
+        </select>
+      </div>
+      <div v-if="paymentMethod === 'PIX'">
+        <label class="field-label">{{ t('fornecedor.pixKeyLabel') }}</label>
+        <input v-model="pixKey" type="text" class="field-input" />
       </div>
     </div>
 

@@ -2,6 +2,8 @@ package com.pantheon.service.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -39,6 +41,13 @@ public class Fornecedor {
     @Column(name = "contact_phone")
     private String contactPhone;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private FornecedorPaymentMethod paymentMethod;
+
+    @Column(name = "pix_key")
+    private String pixKey;
+
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
 
@@ -51,7 +60,8 @@ public class Fornecedor {
 
     public Fornecedor(
             UUID id, UUID companyId, String cnpj, String name, String address, String contactName,
-            String contactPhone, UUID createdBy, Instant createdAt) {
+            String contactPhone, FornecedorPaymentMethod paymentMethod, String pixKey, UUID createdBy,
+            Instant createdAt) {
         this.id = id;
         this.companyId = companyId;
         this.cnpj = cnpj;
@@ -59,6 +69,8 @@ public class Fornecedor {
         this.address = address;
         this.contactName = contactName;
         this.contactPhone = contactPhone;
+        this.paymentMethod = paymentMethod;
+        this.pixKey = pixKey;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
     }
@@ -89,6 +101,14 @@ public class Fornecedor {
 
     public String getContactPhone() {
         return contactPhone;
+    }
+
+    public FornecedorPaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public String getPixKey() {
+        return pixKey;
     }
 
     public UUID getCreatedBy() {

@@ -4,6 +4,7 @@
 Defines the "Pedido de Compra" (purchase request) flow: grouping requested materials under a named header per construction site, its status lifecycle (`INICIADO` → `ORCADO` → `CONFERIDO` → `CONCLUIDO`), converting a header's pending items into an Orçamento, selecting each item's fulfilling supplier once multiple Orçamentos are linked, and comparing/printing the resulting supplier mix. Submission for approval, acting on approval steps, and conclusion are defined in `purchase-request-approval-workflow`.
 
 ## Requirements
+
 ### Requirement: Pedido de Compra header creation
 `pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` access to create a `PurchaseRequest` (Pedido de Compra) for that site consisting of one or more `PurchaseRequestItem`s submitted together, each with a free-text name, an optional type, a quantity, and an optional unit of measure, all starting in `PENDING` status. `pantheon-service` SHALL generate the `PurchaseRequest`'s name as `"Pedido " + <creation date as dd/MM/yyyy> + " #" + <sequence>`, where `<sequence>` is one more than the number of `PurchaseRequest`s already created for that site on the same calendar day. Every new `PurchaseRequest` SHALL start in `INICIADO` status.
 
@@ -35,7 +36,7 @@ Defines the "Pedido de Compra" (purchase request) flow: grouping requested mater
 - **THEN** `pantheon-service` returns every item of that header that has not yet been converted into an Orçamento
 
 ### Requirement: Converting purchase-request items into an Orçamento
-`pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` access to select one or more `PENDING` `PurchaseRequestItem`s belonging to the same `PurchaseRequest` header and create a new `Orcamento` whose line items are copied from the selected items' name, type, and quantity and whose `sourcePurchaseRequestId` is set to that header's id. Converted items SHALL transition to `CONVERTED` status and record which Orçamento they were converted into; items of that header not selected SHALL remain `PENDING` and available for a later conversion into a different Orçamento.
+`pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` access to select one or more `PurchaseRequestItem`s belonging to the same `PurchaseRequest` header — regardless of whether any of them have already been converted before — and create a new `Orcamento` whose line items are copied from the selected items' name, type, and quantity and whose `sourcePurchaseRequestId` is set to that header's id. The first time a given item is converted, it SHALL transition to `CONVERTED` status and record which Orçamento it was first converted into; converting it again (into a further Orçamento) SHALL leave its `status` and recorded Orçamento unchanged. Items of that header not selected SHALL remain in their current status and available for a later conversion into a different Orçamento.
 
 #### Scenario: Selected items become a new Orçamento
 - **WHEN** a construction site member selects two `PENDING` items from the same Pedido de Compra and chooses "Criar orçamento"
@@ -49,12 +50,12 @@ Defines the "Pedido de Compra" (purchase request) flow: grouping requested mater
 - **WHEN** a construction site member attempts to convert a selection of `PurchaseRequestItem`s spanning more than one `PurchaseRequest` header in a single action
 - **THEN** `pantheon-service` rejects the request
 
-#### Scenario: Already-converted items cannot be converted again
-- **WHEN** a construction site member attempts to convert a `PurchaseRequestItem` that is already `CONVERTED`
-- **THEN** `pantheon-service` rejects the request
+#### Scenario: An already-converted item can be quoted by a second supplier
+- **WHEN** a construction site member selects a `CONVERTED` item (already part of an earlier Orçamento) and converts it again with a different supplier
+- **THEN** `pantheon-service` creates a second `Orcamento` whose line items include that item, leaves the item's `status` `CONVERTED` and its originally-recorded Orçamento unchanged, and the item is now quoted by both Orçamentos
 
 ### Requirement: Purchase-request views
-`pantheon-web` SHALL provide, on a construction site's "Pedido de Compra" tab, a header separating the "Filtrar" action (opening a filter panel for status and date) from the "Novo pedido" creation action; a paginated card list where each card shows the Pedido de Compra's name, its status badge (Iniciado/Orçado/Conferido/Concluído), its item count, and the count of Orçamentos linked to it; and, on the detail view, the header's items (each showing its current selection when one exists), a link to every linked Orçamento, the comparison table (once at least one Orçamento is linked) with a per-supplier "Imprimir PDF" action, and — once submitted — the approval timeline and post-conclusion materials. All copy SHALL be sourced from the `pt-BR` locale resource file.
+`pantheon-web` SHALL provide, on a construction site's "Pedido de Compra" tab, a header separating the "Filtrar" action (opening a filter panel for status and date) from the "Novo pedido" creation action; a paginated card list where each card shows the Pedido de Compra's name, its status badge (Iniciado/Orçado/Conferido/Concluído), its item count, and the count of Orçamentos linked to it; and, on the detail view, the header's items — both pending and already-converted, each selectable for a new conversion regardless of its current status — showing each item's current selection when one exists, a link to every linked Orçamento, the comparison table (once at least one Orçamento is linked) with a per-supplier "Imprimir PDF" action, and — once submitted — the approval timeline and post-conclusion materials. All copy SHALL be sourced from the `pt-BR` locale resource file.
 
 #### Scenario: Member creates a Pedido de Compra from the UI
 - **WHEN** a construction site member opens "Novo pedido", fills in one or more items, and submits the form
@@ -71,6 +72,10 @@ Defines the "Pedido de Compra" (purchase request) flow: grouping requested mater
 #### Scenario: Detail view lists every linked Orçamento
 - **WHEN** a construction site member opens a Pedido de Compra that has two linked Orçamentos
 - **THEN** `pantheon-web` shows both as links that navigate to their respective Orçamento detail views
+
+#### Scenario: Member requests a second quote for an already-converted item
+- **WHEN** a construction site member checks one or more items in the "Convertidos em orçamento" section and clicks "Criar orçamento"
+- **THEN** `pantheon-web` submits that selection to `pantheon-service` the same way it would for pending items, and navigates to the newly created Orçamento
 
 ### Requirement: Pedido de Compra status lifecycle
 `pantheon-service` SHALL track each `PurchaseRequest`'s lifecycle with `PurchaseRequestStatus{INICIADO, ORCADO, CONFERIDO, CONCLUIDO}`. A header SHALL start `INICIADO`. It SHALL transition to `ORCADO` automatically the first time an `Orcamento` is created with that header as its `sourcePurchaseRequestId`. Transitions to `CONFERIDO` and `CONCLUIDO`, and back to `ORCADO` on rejection, are governed by the approval workflow (see `purchase-request-approval-workflow`).
@@ -133,11 +138,15 @@ Defines the "Pedido de Compra" (purchase request) flow: grouping requested mater
 - **THEN** `pantheon-service` excludes those line items from that Orçamento's PDF
 
 ### Requirement: Pedido de Compra deletion
-`pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` access to permanently delete a `PurchaseRequest` header, together with all of its `PurchaseRequestItem`s, only while that header is `INICIADO`. `pantheon-service` SHALL reject a deletion attempt on a header in any other status (`ORCADO`, `CONFERIDO`, or `CONCLUIDO`).
+`pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` access to permanently delete a `PurchaseRequest` header, together with all of its `PurchaseRequestItem`s and any `PurchaseRequestInvoice`s attached to it (including their stored files), only while that header is `INICIADO`. `pantheon-service` SHALL reject a deletion attempt on a header in any other status (`ORCADO`, `CONFERIDO`, or `CONCLUIDO`).
 
 #### Scenario: Deleting an Iniciado header
 - **WHEN** a construction site member with `PURCHASE_REQUEST` access deletes a Pedido de Compra that is still `INICIADO`
 - **THEN** `pantheon-service` permanently removes the `PurchaseRequest` and all of its `PurchaseRequestItem`s
+
+#### Scenario: Deleting a header also removes its attached invoices
+- **WHEN** a construction site member deletes an `INICIADO` Pedido de Compra that has one or more `PurchaseRequestInvoice`s attached
+- **THEN** `pantheon-service` deletes those invoices' stored files from object storage and their database rows, alongside the header and its items
 
 #### Scenario: Cannot delete once Orçado or later
 - **WHEN** a construction site member attempts to delete a Pedido de Compra that is `ORCADO`, `CONFERIDO`, or `CONCLUIDO`
@@ -157,3 +166,45 @@ Defines the "Pedido de Compra" (purchase request) flow: grouping requested mater
 #### Scenario: Delete action hidden once Orçado or later
 - **WHEN** a construction site member opens a Pedido de Compra that is `Orçado`, `Conferido`, or `Concluído`
 - **THEN** `pantheon-web` does not show the "Excluir" action
+
+### Requirement: Pedido de Compra invoice attachments
+`pantheon-service` SHALL allow a construction site member with `PURCHASE_REQUEST` manage access to upload one or more invoice files (`PurchaseRequestInvoice`) to a `PurchaseRequest`, at any point in its lifecycle, storing each file in object storage together with its original filename and content type. Accepted file extensions SHALL be `pdf`, `xml`, `jpg`, `jpeg`, and `png`; any other extension, or an empty file, SHALL be rejected. `pantheon-service` SHALL allow any construction site member visible to `PURCHASE_REQUEST` to list a header's invoices and download one's content, and SHALL allow a member with `PURCHASE_REQUEST` manage access to delete one, removing both its database row and its stored file.
+
+#### Scenario: Uploading an invoice
+- **WHEN** a construction site member with `PURCHASE_REQUEST` access uploads a PDF file to a Pedido de Compra
+- **THEN** `pantheon-service` stores the file in object storage and records a new `PurchaseRequestInvoice` with its original filename and content type, linked to that header
+
+#### Scenario: Uploading regardless of header status
+- **WHEN** a construction site member uploads an invoice to a Pedido de Compra that is `ORCADO`, `CONFERIDO`, or `CONCLUIDO`
+- **THEN** `pantheon-service` accepts the upload the same way it would for an `INICIADO` header
+
+#### Scenario: Rejecting a disallowed file type
+- **WHEN** a construction site member attempts to upload a file whose extension is not `pdf`, `xml`, `jpg`, `jpeg`, or `png`
+- **THEN** `pantheon-service` rejects the request
+
+#### Scenario: Member lists and downloads invoices
+- **WHEN** an authenticated member visible to `PURCHASE_REQUEST` requests a Pedido de Compra's invoices, then requests one's content
+- **THEN** `pantheon-service` returns the list of attached invoices, and separately returns that invoice's stored bytes with its original filename and content type
+
+#### Scenario: Deleting an invoice
+- **WHEN** a construction site member with `PURCHASE_REQUEST` access deletes one of a header's invoices
+- **THEN** `pantheon-service` removes that invoice's database row and deletes its file from object storage, leaving the header's other invoices (if any) untouched
+
+#### Scenario: Member without access blocked
+- **WHEN** a construction site member with no `PURCHASE_REQUEST` access attempts to upload or delete an invoice
+- **THEN** `pantheon-service` rejects the request with HTTP 403
+
+### Requirement: Pedido de Compra invoice section in the UI
+`pantheon-web` SHALL provide, on the Pedido de Compra detail view, a "Notas fiscais" section — visible regardless of the header's status — listing every attached invoice with its filename and a download link, an upload control to attach a new file, and a remove action per invoice that confirms via the existing inline-popover pattern before deleting.
+
+#### Scenario: Member uploads an invoice from the UI
+- **WHEN** a construction site member selects a PDF file in the "Notas fiscais" section's upload control
+- **THEN** `pantheon-web` uploads it to `pantheon-service` and shows it in the section's file list
+
+#### Scenario: Member downloads an invoice from the UI
+- **WHEN** a construction site member clicks an attached invoice's download link
+- **THEN** `pantheon-web` fetches its content and saves it locally under its original filename
+
+#### Scenario: Member removes an invoice from the UI
+- **WHEN** a construction site member clicks an invoice's remove action and confirms the popover
+- **THEN** `pantheon-web` deletes it and removes it from the section's file list

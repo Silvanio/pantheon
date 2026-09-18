@@ -110,6 +110,15 @@ export interface PurchaseRequestComparison {
   rows: ComparisonRow[]
 }
 
+export interface PurchaseRequestInvoice {
+  id: string
+  purchaseRequestId: string
+  originalName: string
+  contentType: string
+  uploadedBy: string
+  createdAt: string
+}
+
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const { token } = useAuth()
   const response = await fetch(`${SERVICE_BASE_URL}${path}`, {
@@ -125,6 +134,19 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
   }
   if (response.status === 204) {
     return undefined as T
+  }
+  return (await response.json()) as T
+}
+
+async function authUpload<T>(path: string, formData: FormData): Promise<T> {
+  const { token } = useAuth()
+  const response = await fetch(`${SERVICE_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token.value}` },
+    body: formData,
+  })
+  if (!response.ok) {
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
   }
   return (await response.json()) as T
 }
@@ -223,6 +245,24 @@ export function usePurchaseRequests() {
     return authFetch(`/api/purchase-requests/${purchaseRequestId}/conclude`, { method: 'POST' })
   }
 
+  function uploadInvoice(purchaseRequestId: string, file: File): Promise<PurchaseRequestInvoice> {
+    const formData = new FormData()
+    formData.set('file', file)
+    return authUpload(`/api/purchase-requests/${purchaseRequestId}/invoices`, formData)
+  }
+
+  function listInvoices(purchaseRequestId: string): Promise<PurchaseRequestInvoice[]> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/invoices`)
+  }
+
+  function deleteInvoice(invoiceId: string): Promise<void> {
+    return authFetch(`/api/purchase-request-invoices/${invoiceId}`, { method: 'DELETE' })
+  }
+
+  function getInvoiceContentBlob(invoiceId: string): Promise<{ blob: Blob; filename: string | null }> {
+    return authFetchBlob(`/api/purchase-request-invoices/${invoiceId}/content`)
+  }
+
   return {
     listPurchaseRequests,
     createPurchaseRequest,
@@ -236,5 +276,9 @@ export function usePurchaseRequests() {
     approveStep,
     rejectStep,
     conclude,
+    uploadInvoice,
+    listInvoices,
+    deleteInvoice,
+    getInvoiceContentBlob,
   }
 }

@@ -45,4 +45,10 @@ public final class StorageKeys {
         return "construction-sites/%s/materials/%s/delivery-photos/%s.%s"
                 .formatted(constructionSiteId, materialId, photoId, extension);
     }
+
+    public static String purchaseRequestInvoiceKey(
+            UUID constructionSiteId, UUID purchaseRequestId, UUID invoiceId, String extension) {
+        return "construction-sites/%s/purchase-requests/%s/invoices/%s.%s"
+                .formatted(constructionSiteId, purchaseRequestId, invoiceId, extension);
+    }
 }

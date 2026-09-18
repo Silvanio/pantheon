@@ -6,6 +6,7 @@ import {
   usePurchaseRequests,
   type PurchaseRequestDetail,
   type PurchaseRequestComparison,
+  type PurchaseRequestInvoice,
   type PurchaseRequestStatus,
 } from '../composables/usePurchaseRequests'
 import { useMaterialDeliveries, type Material } from '../composables/useMaterialDeliveries'
@@ -29,6 +30,10 @@ const {
   approveStep,
   rejectStep,
   conclude,
+  uploadInvoice,
+  listInvoices,
+  deleteInvoice,
+  getInvoiceContentBlob,
 } = usePurchaseRequests()
 const { listMaterials, markDelivered, markChecked } = useMaterialDeliveries()
 
@@ -36,6 +41,7 @@ const purchaseRequestId = route.params.id as string
 const detail = ref<PurchaseRequestDetail | null>(null)
 const comparison = ref<PurchaseRequestComparison | null>(null)
 const materials = ref<Material[]>([])
+const invoices = ref<PurchaseRequestInvoice[]>([])
 const loading = ref(false)
 const loadError = ref('')
 
@@ -64,8 +70,12 @@ const deleteError = ref('')
 const materialActionError = ref('')
 const photosByMaterial = ref<Record<string, File[]>>({})
 
-const pendingItems = computed(() => detail.value?.items.filter((i) => i.status === 'PENDING') ?? [])
-const convertedItems = computed(() => detail.value?.items.filter((i) => i.status === 'CONVERTED') ?? [])
+const uploadingInvoice = ref(false)
+const invoiceError = ref('')
+const confirmingDeleteInvoiceId = ref<string | null>(null)
+
+const items = computed(() => detail.value?.items ?? [])
+const allSelected = computed(() => items.value.length > 0 && items.value.every((i) => selectedIds.value.has(i.id)))
 
 const currentStepIndex = computed(() => (detail.value ? STEPS.indexOf(detail.value.purchaseRequest.status) : 0))
 
@@ -146,12 +156,16 @@ async function loadMaterials() {
   materials.value = lists.flat()
 }
 
+async function loadInvoices() {
+  invoices.value = await listInvoices(purchaseRequestId)
+}
+
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
     await loadDetail()
-    await Promise.all([loadComparison(), loadMaterials()])
+    await Promise.all([loadComparison(), loadMaterials(), loadInvoices()])
   } catch {
     loadError.value = t('purchaseRequests.loadError')
   } finally {
@@ -166,6 +180,10 @@ function toggleSelection(itemId: string) {
     selectedIds.value.add(itemId)
   }
   selectedIds.value = new Set(selectedIds.value)
+}
+
+function toggleSelectAll() {
+  selectedIds.value = allSelected.value ? new Set() : new Set(items.value.map((i) => i.id))
 }
 
 async function onConvertConfirmed(fornecedor: FornecedorInput) {
@@ -256,6 +274,49 @@ async function onDelete() {
     deleteError.value = t('purchaseRequests.deleteError')
     deleting.value = false
     confirmingDelete.value = false
+  }
+}
+
+async function onUploadInvoice(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  invoiceError.value = ''
+  uploadingInvoice.value = true
+  try {
+    await uploadInvoice(purchaseRequestId, file)
+    await loadInvoices()
+  } catch {
+    invoiceError.value = t('purchaseRequests.invoices.uploadError')
+  } finally {
+    uploadingInvoice.value = false
+  }
+}
+
+async function onDownloadInvoice(invoice: PurchaseRequestInvoice) {
+  invoiceError.value = ''
+  try {
+    const { blob, filename } = await getInvoiceContentBlob(invoice.id)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename ?? invoice.originalName
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    invoiceError.value = t('purchaseRequests.invoices.downloadError')
+  }
+}
+
+async function onDeleteInvoice(invoiceId: string) {
+  invoiceError.value = ''
+  try {
+    await deleteInvoice(invoiceId)
+    confirmingDeleteInvoiceId.value = null
+    await loadInvoices()
+  } catch {
+    invoiceError.value = t('purchaseRequests.invoices.removeError')
   }
 }
 
@@ -393,16 +454,47 @@ onMounted(load)
         </ul>
       </section>
 
+      <!-- Invoices -->
+      <section class="card card-pad">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.invoices.title') }}</h2>
+          <label class="btn-secondary cursor-pointer px-3 py-1.5 text-xs" :class="{ 'pointer-events-none opacity-60': uploadingInvoice }">
+            {{ uploadingInvoice ? t('purchaseRequests.invoices.uploading') : t('purchaseRequests.invoices.uploadButton') }}
+            <input type="file" accept=".pdf,.xml,.jpg,.jpeg,.png" class="hidden" :disabled="uploadingInvoice" @change="onUploadInvoice" />
+          </label>
+        </div>
+        <p v-if="invoiceError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ invoiceError }}</p>
+        <p v-if="invoices.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.invoices.empty') }}</p>
+        <ul v-else class="divide-y divide-steel-100 dark:divide-steel-800">
+          <li v-for="invoice in invoices" :key="invoice.id" class="flex items-center justify-between gap-3 py-2 text-sm">
+            <button type="button" class="truncate text-left font-medium text-blueprint-600 hover:underline dark:text-blueprint-400" @click="onDownloadInvoice(invoice)">
+              {{ invoice.originalName }}
+            </button>
+            <div class="relative shrink-0">
+              <button type="button" class="text-xs font-medium text-safety-600 hover:underline dark:text-safety-500" @click="confirmingDeleteInvoiceId = invoice.id">
+                {{ t('purchaseRequests.invoices.removeButton') }}
+              </button>
+              <div v-if="confirmingDeleteInvoiceId === invoice.id" class="modal-panel absolute right-0 top-full z-10 mt-2 w-64 p-3 shadow-lg" @click.stop>
+                <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('purchaseRequests.invoices.removeConfirm') }}</p>
+                <div class="flex justify-end gap-2">
+                  <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDeleteInvoiceId = null">{{ t('purchaseRequests.form.cancel') }}</button>
+                  <button type="button" class="btn-danger py-1 text-xs" @click="onDeleteInvoice(invoice.id)">{{ t('purchaseRequests.invoices.removeButton') }}</button>
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <!-- Items -->
       <section class="card card-pad">
-        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-sm font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
-            {{ t('purchaseRequests.pendingTitle') }}
+            {{ t('purchaseRequests.itemsTitle') }}
           </h2>
           <button
-            v-if="selectedIds.size > 0 && !showFornecedorPicker"
             type="button"
-            :disabled="converting"
+            :disabled="selectedIds.size === 0 || converting"
             class="btn-primary px-3 py-1.5 text-xs"
             @click="showFornecedorPicker = true"
           >
@@ -415,46 +507,61 @@ onMounted(load)
         </div>
         <p v-if="convertError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ convertError }}</p>
 
-        <p v-if="!loading && pendingItems.length === 0" class="mb-5 text-sm text-steel-500 dark:text-steel-400">
-          {{ t('purchaseRequests.noPendingItems') }}
+        <p v-if="!loading && items.length === 0" class="text-sm text-steel-500 dark:text-steel-400">
+          {{ t('purchaseRequests.noItems') }}
         </p>
-        <ul v-else class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <li
-            v-for="item in pendingItems"
-            :key="item.id"
-            class="flex items-center gap-3 rounded-lg border px-4 py-3 transition"
-            :class="selectedIds.has(item.id) ? 'border-blueprint-500 bg-blueprint-50 dark:bg-blueprint-900/30' : 'border-steel-200 dark:border-steel-700'"
-          >
-            <input type="checkbox" :checked="selectedIds.has(item.id)" class="h-4 w-4 shrink-0" @change="toggleSelection(item.id)" />
-            <div class="min-w-0 flex-1">
-              <p class="truncate font-medium text-steel-800 dark:text-steel-50">{{ item.name }}</p>
-              <p class="truncate text-sm text-steel-500 dark:text-steel-400">
-                {{ item.type ? `${item.type} — ` : '' }}{{ item.quantity }}{{ item.unit ? ` ${item.unit}` : '' }}
-              </p>
-            </div>
-          </li>
-        </ul>
-
-        <template v-if="convertedItems.length > 0">
-          <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
-            {{ t('purchaseRequests.convertedTitle') }}
-          </h2>
-          <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <li v-for="item in convertedItems" :key="item.id" class="rounded-lg border border-steel-200 px-4 py-3 text-sm dark:border-steel-700">
-              <div class="flex items-center justify-between gap-2">
-                <span class="truncate font-medium text-steel-700 dark:text-steel-200">{{ item.name }}</span>
-                <router-link :to="`/orcamentos/${item.convertedToOrcamentoId}`" class="shrink-0 text-xs text-blueprint-600 hover:underline dark:text-blueprint-400">
-                  {{ t('orcamento.label') }}
-                </router-link>
-              </div>
-              <p v-if="selectionByItemId.get(item.id)" class="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
-                {{ t('purchaseRequests.selectedFrom', { supplier: selectionByItemId.get(item.id)!.supplierName }) }}
-                <span v-if="selectionByItemId.get(item.id)!.unitPrice"> · {{ selectionByItemId.get(item.id)!.unitPrice }}</span>
-              </p>
-              <p v-else class="mt-1 text-xs text-steel-400 dark:text-steel-500">{{ t('purchaseRequests.noSelectionYet') }}</p>
-            </li>
-          </ul>
-        </template>
+        <div v-else class="max-h-[28rem] overflow-y-auto overflow-x-auto rounded-lg border border-steel-200 dark:border-steel-700">
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-white dark:bg-steel-800">
+              <tr class="border-b border-steel-200 text-left text-xs uppercase tracking-wide text-steel-500 dark:border-steel-700 dark:text-steel-400">
+                <th class="w-8 py-2 pl-3">
+                  <input type="checkbox" :checked="allSelected" class="h-4 w-4" @change="toggleSelectAll" />
+                </th>
+                <th class="py-2 pr-3 font-medium">{{ t('purchaseRequests.table.product') }}</th>
+                <th class="py-2 pr-3 font-medium">{{ t('purchaseRequests.table.quantity') }}</th>
+                <th class="py-2 pr-3 font-medium">{{ t('purchaseRequests.table.status') }}</th>
+                <th class="py-2 pr-3 font-medium">{{ t('purchaseRequests.table.selectedSupplier') }}</th>
+                <th class="py-2 pr-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in items"
+                :key="item.id"
+                class="border-b border-steel-100 last:border-0 dark:border-steel-800"
+                :class="selectedIds.has(item.id) ? 'bg-blueprint-50 dark:bg-blueprint-900/20' : ''"
+              >
+                <td class="py-1.5 pl-3">
+                  <input type="checkbox" :checked="selectedIds.has(item.id)" class="h-4 w-4" @change="toggleSelection(item.id)" />
+                </td>
+                <td class="max-w-xs truncate py-1.5 pr-3">
+                  <span class="font-medium text-steel-800 dark:text-steel-50">{{ item.name }}</span>
+                  <span v-if="item.type" class="text-steel-500 dark:text-steel-400"> · {{ item.type }}</span>
+                </td>
+                <td class="whitespace-nowrap py-1.5 pr-3 text-steel-700 dark:text-steel-200">
+                  {{ item.quantity }}{{ item.unit ? ` ${item.unit}` : '' }}
+                </td>
+                <td class="py-1.5 pr-3"><StatusBadge kind="purchaseRequestItem" :status="item.status" /></td>
+                <td class="py-1.5 pr-3 text-xs">
+                  <span v-if="selectionByItemId.get(item.id)" class="text-emerald-700 dark:text-emerald-400">
+                    {{ selectionByItemId.get(item.id)!.supplierName }}
+                    <span v-if="selectionByItemId.get(item.id)!.unitPrice"> · {{ selectionByItemId.get(item.id)!.unitPrice }}</span>
+                  </span>
+                  <span v-else class="text-steel-400 dark:text-steel-500">—</span>
+                </td>
+                <td class="py-1.5 pr-3">
+                  <router-link
+                    v-if="item.convertedToOrcamentoId"
+                    :to="`/orcamentos/${item.convertedToOrcamentoId}`"
+                    class="whitespace-nowrap text-xs text-blueprint-600 hover:underline dark:text-blueprint-400"
+                  >
+                    {{ t('orcamento.label') }}
+                  </router-link>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Comparison table -->

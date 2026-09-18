@@ -22,12 +22,15 @@ import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestApproval;
 import com.pantheon.service.entity.PurchaseRequestApprovalStatus;
+import com.pantheon.service.entity.PurchaseRequestInvoice;
 import com.pantheon.service.entity.PurchaseRequestItem;
 import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.SitePurchaseRequestApprovalLevel;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
+import com.pantheon.service.exception.InvalidFileException;
+import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
@@ -39,9 +42,11 @@ import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
 import com.pantheon.service.repository.PurchaseRequestApprovalRepository;
+import com.pantheon.service.repository.PurchaseRequestInvoiceRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.storage.StorageService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -58,6 +63,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class PurchaseRequestServiceTest {
@@ -70,6 +76,9 @@ class PurchaseRequestServiceTest {
 
     @Mock
     private PurchaseRequestApprovalRepository approvalRepository;
+
+    @Mock
+    private PurchaseRequestInvoiceRepository invoiceRepository;
 
     @Mock
     private ConstructionSiteRepository siteRepository;
@@ -104,6 +113,9 @@ class PurchaseRequestServiceTest {
     @Mock
     private EventPublisher eventPublisher;
 
+    @Mock
+    private StorageService storageService;
+
     private PurchaseRequestService service;
 
     private UUID siteId;
@@ -111,9 +123,10 @@ class PurchaseRequestServiceTest {
     @BeforeEach
     void setUp() {
         service = new PurchaseRequestService(
-                purchaseRequestRepository, itemRepository, approvalRepository, siteRepository, siteMembershipRepository,
-                userRepository, orcamentoRepository, orcamentoLineItemRepository, siteAccessService, permissionService,
-                approvalLevelService, orcamentoService, materialService, eventPublisher);
+                purchaseRequestRepository, itemRepository, approvalRepository, invoiceRepository, siteRepository,
+                siteMembershipRepository, userRepository, orcamentoRepository, orcamentoLineItemRepository,
+                siteAccessService, permissionService, approvalLevelService, orcamentoService, materialService,
+                eventPublisher, storageService);
 
         siteId = UUID.randomUUID();
         lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));
@@ -419,10 +432,10 @@ class PurchaseRequestServiceTest {
 
         Orcamento orcamentoA = new Orcamento(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "111", "Fornecedor A", null, null, null,
-                null, purchaseRequest.getId());
+                null, null, null, purchaseRequest.getId());
         Orcamento orcamentoB = new Orcamento(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "222", "Fornecedor B", null, null, null,
-                null, purchaseRequest.getId());
+                null, null, null, purchaseRequest.getId());
         when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId()))
                 .thenReturn(List.of(orcamentoA, orcamentoB));
 
@@ -468,7 +481,7 @@ class PurchaseRequestServiceTest {
 
         Orcamento orcamentoA = new Orcamento(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "111", "Fornecedor A", null, null, null,
-                null, purchaseRequest.getId());
+                null, null, null, purchaseRequest.getId());
         when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of(orcamentoA));
         when(orcamentoLineItemRepository.findByOrcamentoIdInAndSourcePurchaseRequestItemId(
                 List.of(orcamentoA.getId()), prItem.getId())).thenReturn(List.of());
@@ -512,5 +525,140 @@ class PurchaseRequestServiceTest {
         assertThatThrownBy(() -> service.delete(purchaseRequest.getId(), UUID.randomUUID()))
                 .isInstanceOf(ForbiddenCapabilityException.class);
         verify(purchaseRequestRepository, never()).delete(any(PurchaseRequest.class));
+    }
+
+    @Test
+    void deleteAlsoDeletesAttachedInvoiceStorageObjectsAndRows() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        PurchaseRequestInvoice invoice = new PurchaseRequestInvoice(
+                UUID.randomUUID(), purchaseRequest.getId(), "some/key.pdf", "application/pdf", "nf.pdf",
+                UUID.randomUUID(), Instant.now());
+        when(invoiceRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId()))
+                .thenReturn(List.of(invoice));
+
+        service.delete(purchaseRequest.getId(), UUID.randomUUID());
+
+        verify(storageService).deleteObject("some/key.pdf");
+        verify(invoiceRepository).deleteAll(List.of(invoice));
+    }
+
+    @Test
+    void uploadInvoicePersistsEntityAndStoresFile() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        MockMultipartFile file = new MockMultipartFile("file", "nf-123.pdf", "application/pdf", "conteudo".getBytes());
+
+        PurchaseRequestInvoice result = service.uploadInvoice(purchaseRequest.getId(), UUID.randomUUID(), file);
+
+        assertThat(result.getPurchaseRequestId()).isEqualTo(purchaseRequest.getId());
+        assertThat(result.getOriginalName()).isEqualTo("nf-123.pdf");
+        assertThat(result.getContentType()).isEqualTo("application/pdf");
+        verify(storageService).putObject(eq(result.getStorageKey()), any(), eq("application/pdf"));
+    }
+
+    @Test
+    void uploadInvoiceAllowedRegardlessOfHeaderStatus() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        purchaseRequest.approve(Instant.now());
+        purchaseRequest.complete(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        MockMultipartFile file = new MockMultipartFile("file", "nf.pdf", "application/pdf", "conteudo".getBytes());
+
+        PurchaseRequestInvoice result = service.uploadInvoice(purchaseRequest.getId(), UUID.randomUUID(), file);
+
+        assertThat(result.getOriginalName()).isEqualTo("nf.pdf");
+    }
+
+    @Test
+    void uploadInvoiceRejectsDisallowedExtension() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        MockMultipartFile file = new MockMultipartFile("file", "clipe.mp4", "video/mp4", "conteudo".getBytes());
+
+        assertThatThrownBy(() -> service.uploadInvoice(purchaseRequest.getId(), UUID.randomUUID(), file))
+                .isInstanceOf(InvalidFileException.class);
+    }
+
+    @Test
+    void uploadInvoiceRejectsEmptyFile() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        MockMultipartFile file = new MockMultipartFile("file", "vazio.pdf", "application/pdf", new byte[0]);
+
+        assertThatThrownBy(() -> service.uploadInvoice(purchaseRequest.getId(), UUID.randomUUID(), file))
+                .isInstanceOf(InvalidFileException.class);
+    }
+
+    @Test
+    void listInvoicesRejectsMemberHiddenFromPurchaseRequest() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireVisible(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.listInvoices(purchaseRequest.getId(), UUID.randomUUID()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void getInvoiceContentThrowsWhenInvoiceMissing() {
+        UUID invoiceId = UUID.randomUUID();
+        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getInvoiceContent(invoiceId, UUID.randomUUID()))
+                .isInstanceOf(PurchaseRequestInvoiceNotFoundException.class);
+    }
+
+    @Test
+    void getInvoiceContentReturnsStoredBytesAndMetadata() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        PurchaseRequestInvoice invoice = new PurchaseRequestInvoice(
+                UUID.randomUUID(), purchaseRequest.getId(), "some/key.pdf", "application/pdf", "nf.pdf",
+                UUID.randomUUID(), Instant.now());
+        when(invoiceRepository.findById(invoice.getId())).thenReturn(Optional.of(invoice));
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(storageService.getObject("some/key.pdf")).thenReturn("conteudo".getBytes());
+
+        var content = service.getInvoiceContent(invoice.getId(), UUID.randomUUID());
+
+        assertThat(content.originalName()).isEqualTo("nf.pdf");
+        assertThat(content.contentType()).isEqualTo("application/pdf");
+        assertThat(content.bytes()).isEqualTo("conteudo".getBytes());
+    }
+
+    @Test
+    void deleteInvoiceRemovesStorageObjectAndRow() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        PurchaseRequestInvoice invoice = new PurchaseRequestInvoice(
+                UUID.randomUUID(), purchaseRequest.getId(), "some/key.pdf", "application/pdf", "nf.pdf",
+                UUID.randomUUID(), Instant.now());
+        when(invoiceRepository.findById(invoice.getId())).thenReturn(Optional.of(invoice));
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        service.deleteInvoice(invoice.getId(), UUID.randomUUID());
+
+        verify(storageService).deleteObject("some/key.pdf");
+        verify(invoiceRepository).delete(invoice);
+    }
+
+    @Test
+    void deleteInvoiceRejectsMemberWithoutManageAccess() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        PurchaseRequestInvoice invoice = new PurchaseRequestInvoice(
+                UUID.randomUUID(), purchaseRequest.getId(), "some/key.pdf", "application/pdf", "nf.pdf",
+                UUID.randomUUID(), Instant.now());
+        when(invoiceRepository.findById(invoice.getId())).thenReturn(Optional.of(invoice));
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.deleteInvoice(invoice.getId(), UUID.randomUUID()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+        verify(invoiceRepository, never()).delete(any());
     }
 }

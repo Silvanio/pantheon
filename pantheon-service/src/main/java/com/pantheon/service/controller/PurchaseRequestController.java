@@ -6,6 +6,7 @@ import com.pantheon.service.dto.PurchaseRequestApprovalResponse;
 import com.pantheon.service.dto.PurchaseRequestComparisonResponse;
 import com.pantheon.service.dto.PurchaseRequestCreationRequest;
 import com.pantheon.service.dto.PurchaseRequestDetailResponse;
+import com.pantheon.service.dto.PurchaseRequestInvoiceResponse;
 import com.pantheon.service.dto.PurchaseRequestItemResponse;
 import com.pantheon.service.dto.PurchaseRequestResponse;
 import com.pantheon.service.dto.RejectPurchaseRequestRequest;
@@ -38,6 +39,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 public class PurchaseRequestController {
@@ -169,5 +171,37 @@ public class PurchaseRequestController {
     public ResponseEntity<PurchaseRequestResponse> conclude(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
         var purchaseRequest = purchaseRequestService.conclude(id, user.getId());
         return ResponseEntity.ok(PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id)));
+    }
+
+    @PostMapping(value = "/api/purchase-requests/{id}/invoices", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<PurchaseRequestInvoiceResponse> uploadInvoice(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @RequestParam MultipartFile file) {
+        var invoice = purchaseRequestService.uploadInvoice(id, user.getId(), file);
+        return ResponseEntity.status(HttpStatus.CREATED).body(PurchaseRequestInvoiceResponse.from(invoice));
+    }
+
+    @GetMapping("/api/purchase-requests/{id}/invoices")
+    public ResponseEntity<List<PurchaseRequestInvoiceResponse>> listInvoices(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        var invoices = purchaseRequestService.listInvoices(id, user.getId()).stream()
+                .map(PurchaseRequestInvoiceResponse::from)
+                .toList();
+        return ResponseEntity.ok(invoices);
+    }
+
+    @GetMapping("/api/purchase-request-invoices/{id}/content")
+    public ResponseEntity<byte[]> getInvoiceContent(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        var content = purchaseRequestService.getInvoiceContent(id, user.getId());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(content.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(content.originalName()).build().toString())
+                .body(content.bytes());
+    }
+
+    @DeleteMapping("/api/purchase-request-invoices/{id}")
+    public ResponseEntity<Void> deleteInvoice(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        purchaseRequestService.deleteInvoice(id, user.getId());
+        return ResponseEntity.noContent().build();
     }
 }

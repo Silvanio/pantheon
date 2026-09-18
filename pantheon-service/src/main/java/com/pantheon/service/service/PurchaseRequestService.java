@@ -10,13 +10,16 @@ import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestApproval;
 import com.pantheon.service.entity.PurchaseRequestApprovalStatus;
+import com.pantheon.service.entity.PurchaseRequestInvoice;
 import com.pantheon.service.entity.PurchaseRequestItem;
 import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.SitePurchaseRequestApprovalLevel;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.InvalidFileException;
 import com.pantheon.service.exception.NoPendingApprovalStepException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
+import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
@@ -29,17 +32,24 @@ import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
 import com.pantheon.service.repository.PurchaseRequestApprovalRepository;
+import com.pantheon.service.repository.PurchaseRequestInvoiceRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.repository.PurchaseRequestSpecifications;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.storage.StorageKeys;
+import com.pantheon.service.storage.StorageService;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +58,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * The "Pedido de Compra" header/document: creation, listing, the item-selection comparison view,
@@ -58,10 +69,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class PurchaseRequestService {
 
     private static final DateTimeFormatter NAME_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Set<String> INVOICE_ALLOWED_EXTENSIONS = Set.of("pdf", "xml", "jpg", "jpeg", "png");
 
     private final PurchaseRequestRepository purchaseRequestRepository;
     private final PurchaseRequestItemRepository itemRepository;
     private final PurchaseRequestApprovalRepository approvalRepository;
+    private final PurchaseRequestInvoiceRepository invoiceRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteMembershipRepository siteMembershipRepository;
     private final AppUserRepository userRepository;
@@ -73,11 +86,13 @@ public class PurchaseRequestService {
     private final OrcamentoService orcamentoService;
     private final MaterialService materialService;
     private final EventPublisher eventPublisher;
+    private final StorageService storageService;
 
     public PurchaseRequestService(
             PurchaseRequestRepository purchaseRequestRepository,
             PurchaseRequestItemRepository itemRepository,
             PurchaseRequestApprovalRepository approvalRepository,
+            PurchaseRequestInvoiceRepository invoiceRepository,
             ConstructionSiteRepository siteRepository,
             SiteMembershipRepository siteMembershipRepository,
             AppUserRepository userRepository,
@@ -88,10 +103,12 @@ public class PurchaseRequestService {
             SitePurchaseRequestApprovalLevelService approvalLevelService,
             OrcamentoService orcamentoService,
             MaterialService materialService,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            StorageService storageService) {
         this.purchaseRequestRepository = purchaseRequestRepository;
         this.itemRepository = itemRepository;
         this.approvalRepository = approvalRepository;
+        this.invoiceRepository = invoiceRepository;
         this.siteRepository = siteRepository;
         this.siteMembershipRepository = siteMembershipRepository;
         this.userRepository = userRepository;
@@ -103,6 +120,7 @@ public class PurchaseRequestService {
         this.orcamentoService = orcamentoService;
         this.materialService = materialService;
         this.eventPublisher = eventPublisher;
+        this.storageService = storageService;
     }
 
     @Transactional
@@ -272,8 +290,90 @@ public class PurchaseRequestService {
             throw new PurchaseRequestNotDeletableException(purchaseRequestId);
         }
 
+        List<PurchaseRequestInvoice> invoices = invoiceRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
+        for (PurchaseRequestInvoice invoice : invoices) {
+            storageService.deleteObject(invoice.getStorageKey());
+        }
+        invoiceRepository.deleteAll(invoices);
+
         itemRepository.deleteAll(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId));
         purchaseRequestRepository.delete(purchaseRequest);
+    }
+
+    /** No status gate — an invoice can legitimately arrive before, during, or after approval/conclusion. */
+    @Transactional
+    public PurchaseRequestInvoice uploadInvoice(UUID purchaseRequestId, UUID actingUserId, MultipartFile file) {
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
+        requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
+
+        if (file == null || file.isEmpty()) {
+            throw new InvalidFileException("Uploaded file is empty");
+        }
+        String extension = extensionOf(file.getOriginalFilename());
+        if (!INVOICE_ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new InvalidFileException(
+                    "Only these file types are accepted: " + String.join(", ", INVOICE_ALLOWED_EXTENSIONS));
+        }
+
+        UUID invoiceId = UUID.randomUUID();
+        String key = StorageKeys.purchaseRequestInvoiceKey(
+                purchaseRequest.getConstructionSiteId(), purchaseRequestId, invoiceId, extension);
+        String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+        String originalName = file.getOriginalFilename() != null && !file.getOriginalFilename().isBlank()
+                ? file.getOriginalFilename()
+                : "arquivo." + extension;
+        storageService.putObject(key, readBytes(file), contentType);
+
+        return invoiceRepository.save(new PurchaseRequestInvoice(
+                invoiceId, purchaseRequestId, key, contentType, originalName, actingUserId, Instant.now()));
+    }
+
+    public List<PurchaseRequestInvoice> listInvoices(UUID purchaseRequestId, UUID actingUserId) {
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
+        var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        return invoiceRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
+    }
+
+    public FileContent getInvoiceContent(UUID invoiceId, UUID actingUserId) {
+        PurchaseRequestInvoice invoice = requireInvoice(invoiceId);
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(invoice.getPurchaseRequestId());
+        var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
+        permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        return new FileContent(storageService.getObject(invoice.getStorageKey()), invoice.getContentType(), invoice.getOriginalName());
+    }
+
+    @Transactional
+    public void deleteInvoice(UUID invoiceId, UUID actingUserId) {
+        PurchaseRequestInvoice invoice = requireInvoice(invoiceId);
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(invoice.getPurchaseRequestId());
+        requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
+
+        storageService.deleteObject(invoice.getStorageKey());
+        invoiceRepository.delete(invoice);
+    }
+
+    public record FileContent(byte[] bytes, String contentType, String originalName) {
+    }
+
+    private PurchaseRequestInvoice requireInvoice(UUID invoiceId) {
+        return invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new PurchaseRequestInvoiceNotFoundException(invoiceId));
+    }
+
+    private static String extensionOf(String originalFilename) {
+        if (originalFilename == null || !originalFilename.contains(".")) {
+            return "bin";
+        }
+        return originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private byte[] readBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** Read-only, derived comparison grid: rows are the header's items, columns are its linked Orcamentos. */

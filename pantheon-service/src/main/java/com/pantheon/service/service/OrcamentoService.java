@@ -28,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -114,7 +115,8 @@ public class OrcamentoService {
         Orcamento orcamento = new Orcamento(
                 UUID.randomUUID(), site.getId(), actingUserId, Instant.now(), fornecedor.getCnpj(),
                 fornecedor.getName(), fornecedor.getAddress(), fornecedor.getContactName(),
-                fornecedor.getContactPhone(), fornecedor.getId(), sourcePurchaseRequestId);
+                fornecedor.getContactPhone(), fornecedor.getPaymentMethod(), fornecedor.getPixKey(),
+                fornecedor.getId(), sourcePurchaseRequestId);
         return orcamentoRepository.save(orcamento);
     }
 
@@ -163,14 +165,31 @@ public class OrcamentoService {
         }
 
         UUID sourcePurchaseRequestId = orcamento.getSourcePurchaseRequestId();
+        List<UUID> otherOrcamentoIds = List.of();
         if (sourcePurchaseRequestId != null) {
+            otherOrcamentoIds = orcamentoRepository.findBySourcePurchaseRequestId(sourcePurchaseRequestId).stream()
+                    .map(Orcamento::getId)
+                    .filter(id -> !id.equals(orcamentoId))
+                    .toList();
+
             List<OrcamentoLineItem> lineItems = lineItemRepository.findByOrcamentoId(orcamentoId);
             List<UUID> lineItemIds = lineItems.stream().map(OrcamentoLineItem::getId).toList();
             for (PurchaseRequestItem item : purchaseRequestItemRepository
                     .findByPurchaseRequestIdOrderByCreatedAtDesc(sourcePurchaseRequestId)) {
                 boolean changed = false;
                 if (orcamentoId.equals(item.getConvertedToOrcamentoId())) {
-                    item.revertConversion();
+                    Optional<UUID> stillQuotedBy = otherOrcamentoIds.isEmpty()
+                            ? Optional.empty()
+                            : lineItemRepository
+                                    .findByOrcamentoIdInAndSourcePurchaseRequestItemId(otherOrcamentoIds, item.getId())
+                                    .stream()
+                                    .findFirst()
+                                    .map(OrcamentoLineItem::getOrcamentoId);
+                    if (stillQuotedBy.isPresent()) {
+                        item.repointConversion(stillQuotedBy.get());
+                    } else {
+                        item.revertConversion();
+                    }
                     changed = true;
                 }
                 if (item.getSelectedOrcamentoLineItemId() != null
@@ -187,7 +206,7 @@ public class OrcamentoService {
         lineItemRepository.deleteAll(lineItemRepository.findByOrcamentoId(orcamentoId));
         orcamentoRepository.delete(orcamento);
 
-        if (sourcePurchaseRequestId != null && orcamentoRepository.findBySourcePurchaseRequestId(sourcePurchaseRequestId).isEmpty()) {
+        if (sourcePurchaseRequestId != null && otherOrcamentoIds.isEmpty()) {
             purchaseRequestRepository.findById(sourcePurchaseRequestId).ifPresent(purchaseRequest -> {
                 if (purchaseRequest.getStatus() == PurchaseRequestStatus.ORCADO) {
                     purchaseRequest.revertToIniciado();

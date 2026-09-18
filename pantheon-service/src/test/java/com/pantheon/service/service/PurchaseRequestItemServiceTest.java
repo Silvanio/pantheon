@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,7 +19,6 @@ import com.pantheon.service.entity.PurchaseRequestItemStatus;
 import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.exception.ItemsSpanMultiplePurchaseRequestsException;
 import com.pantheon.service.exception.OrcamentoLineItemNotLinkedException;
-import com.pantheon.service.exception.PurchaseRequestItemAlreadyConvertedException;
 import com.pantheon.service.exception.SelectionNotAllowedException;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
@@ -94,13 +94,13 @@ class PurchaseRequestItemServiceTest {
     }
 
     private FornecedorRequest fornecedorRequest() {
-        return new FornecedorRequest("12345678000199", "Fornecedor Teste", null, null, null);
+        return new FornecedorRequest("12345678000199", "Fornecedor Teste", null, null, null, null, null);
     }
 
     private Orcamento orcamento(UUID sourcePurchaseRequestId) {
         return new Orcamento(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor Teste",
-                null, null, null, null, sourcePurchaseRequestId);
+                null, null, null, null, null, null, sourcePurchaseRequestId);
     }
 
     @Test
@@ -123,7 +123,7 @@ class PurchaseRequestItemServiceTest {
 
         Orcamento orcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor Teste", null,
-                null, null, null, purchaseRequestId);
+                null, null, null, null, null, purchaseRequestId);
         when(orcamentoService.createFromPurchaseRequestItems(
                 siteId, actingUserId, List.of(pending), purchaseRequestId, fornecedorRequest()))
                 .thenReturn(orcamento);
@@ -138,14 +138,26 @@ class PurchaseRequestItemServiceTest {
     }
 
     @Test
-    void convertToOrcamentoRejectsAlreadyConvertedItem() {
+    void convertToOrcamentoAllowsReconvertingAnAlreadyConvertedItemForASecondQuote() {
         UUID actingUserId = UUID.randomUUID();
         PurchaseRequestItem converted = item(PurchaseRequestItemStatus.CONVERTED);
+        UUID firstOrcamentoId = converted.getConvertedToOrcamentoId();
         when(itemRepository.findById(converted.getId())).thenReturn(Optional.of(converted));
 
-        assertThatThrownBy(() -> service.convertToOrcamento(
-                purchaseRequestId, actingUserId, List.of(converted.getId()), fornecedorRequest()))
-                .isInstanceOf(PurchaseRequestItemAlreadyConvertedException.class);
+        Orcamento secondOrcamento = new Orcamento(
+                UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor B", null,
+                null, null, null, null, null, purchaseRequestId);
+        when(orcamentoService.createFromPurchaseRequestItems(
+                siteId, actingUserId, List.of(converted), purchaseRequestId, fornecedorRequest()))
+                .thenReturn(secondOrcamento);
+
+        Orcamento result = service.convertToOrcamento(
+                purchaseRequestId, actingUserId, List.of(converted.getId()), fornecedorRequest());
+
+        assertThat(result).isEqualTo(secondOrcamento);
+        assertThat(converted.getStatus()).isEqualTo(PurchaseRequestItemStatus.CONVERTED);
+        assertThat(converted.getConvertedToOrcamentoId()).isEqualTo(firstOrcamentoId);
+        verify(itemRepository, never()).save(converted);
     }
 
     @Test
@@ -169,7 +181,7 @@ class PurchaseRequestItemServiceTest {
         when(itemRepository.findById(firstBatch.getId())).thenReturn(Optional.of(firstBatch));
         Orcamento firstOrcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor Teste", null,
-                null, null, null, purchaseRequestId);
+                null, null, null, null, null, purchaseRequestId);
         when(orcamentoService.createFromPurchaseRequestItems(
                 siteId, actingUserId, List.of(firstBatch), purchaseRequestId, fornecedorRequest()))
                 .thenReturn(firstOrcamento);
@@ -180,7 +192,7 @@ class PurchaseRequestItemServiceTest {
         when(itemRepository.findById(secondBatch.getId())).thenReturn(Optional.of(secondBatch));
         Orcamento secondOrcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor Teste", null,
-                null, null, null, purchaseRequestId);
+                null, null, null, null, null, purchaseRequestId);
         when(orcamentoService.createFromPurchaseRequestItems(
                 siteId, actingUserId, List.of(secondBatch), purchaseRequestId, fornecedorRequest()))
                 .thenReturn(secondOrcamento);

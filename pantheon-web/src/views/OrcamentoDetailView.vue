@@ -198,6 +198,14 @@ onMounted(load)
               <span v-if="detail.orcamento.fornecedorContatoTelefone"> · {{ detail.orcamento.fornecedorContatoTelefone }}</span>
             </dd>
           </div>
+          <div v-if="detail.orcamento.fornecedorFormaPagamento">
+            <dt class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.paymentMethodLabel') }}</dt>
+            <dd class="text-steel-700 dark:text-steel-200">{{ t(`fornecedor.paymentMethod.${detail.orcamento.fornecedorFormaPagamento}`) }}</dd>
+          </div>
+          <div v-if="detail.orcamento.fornecedorFormaPagamento === 'PIX'">
+            <dt class="text-steel-500 dark:text-steel-400">{{ t('fornecedor.pixKeyLabel') }}</dt>
+            <dd class="text-steel-700 dark:text-steel-200">{{ detail.orcamento.fornecedorPixKey }}</dd>
+          </div>
         </dl>
       </section>
 

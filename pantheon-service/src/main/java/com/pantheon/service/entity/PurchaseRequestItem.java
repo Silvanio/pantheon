@@ -84,11 +84,19 @@ public class PurchaseRequestItem {
         this.convertedAt = now;
     }
 
-    /** Undoes {@link #convertTo}, called when the Orcamento it was converted into is deleted. */
+    /** Undoes {@link #convertTo}, called when the Orcamento it was converted into is deleted and no other Orcamento still quotes it. */
     public void revertConversion() {
         this.status = PurchaseRequestItemStatus.PENDING;
         this.convertedToOrcamentoId = null;
         this.convertedAt = null;
+    }
+
+    /**
+     * Re-points the recorded Orcamento without touching {@code status}/{@code convertedAt} —
+     * called when the currently-recorded Orcamento is deleted but another still quotes this item.
+     */
+    public void repointConversion(UUID orcamentoId) {
+        this.convertedToOrcamentoId = orcamentoId;
     }
 
     /**

@@ -49,6 +49,13 @@ public class Orcamento {
     @Column(name = "fornecedor_contato_telefone")
     private String fornecedorContatoTelefone;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fornecedor_forma_pagamento")
+    private FornecedorPaymentMethod fornecedorFormaPagamento;
+
+    @Column(name = "fornecedor_pix_key")
+    private String fornecedorPixKey;
+
     @Column(name = "source_fornecedor_id")
     private UUID sourceFornecedorId;
 
@@ -62,7 +69,8 @@ public class Orcamento {
     public Orcamento(
             UUID id, UUID constructionSiteId, UUID createdBy, Instant createdAt, String fornecedorCnpj,
             String fornecedorNome, String fornecedorEndereco, String fornecedorContatoNome,
-            String fornecedorContatoTelefone, UUID sourceFornecedorId, UUID sourcePurchaseRequestId) {
+            String fornecedorContatoTelefone, FornecedorPaymentMethod fornecedorFormaPagamento,
+            String fornecedorPixKey, UUID sourceFornecedorId, UUID sourcePurchaseRequestId) {
         this.id = id;
         this.constructionSiteId = constructionSiteId;
         this.status = OrcamentoStatus.DRAFT;
@@ -73,6 +81,8 @@ public class Orcamento {
         this.fornecedorEndereco = fornecedorEndereco;
         this.fornecedorContatoNome = fornecedorContatoNome;
         this.fornecedorContatoTelefone = fornecedorContatoTelefone;
+        this.fornecedorFormaPagamento = fornecedorFormaPagamento;
+        this.fornecedorPixKey = fornecedorPixKey;
         this.sourceFornecedorId = sourceFornecedorId;
         this.sourcePurchaseRequestId = sourcePurchaseRequestId;
     }
@@ -125,6 +135,14 @@ public class Orcamento {
 
     public String getFornecedorContatoTelefone() {
         return fornecedorContatoTelefone;
+    }
+
+    public FornecedorPaymentMethod getFornecedorFormaPagamento() {
+        return fornecedorFormaPagamento;
+    }
+
+    public String getFornecedorPixKey() {
+        return fornecedorPixKey;
     }
 
     public UUID getSourceFornecedorId() {

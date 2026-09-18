@@ -69,7 +69,7 @@ class PurchaseRequestPdfServiceTest {
     private Orcamento orcamento(UUID sourcePurchaseRequestId) {
         return new Orcamento(
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor Teste",
-                null, null, null, null, sourcePurchaseRequestId);
+                null, null, null, null, null, null, sourcePurchaseRequestId);
     }
 
     @Test

@@ -1,6 +1,8 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 
+export type FornecedorPaymentMethod = 'CARTAO' | 'BOLETO' | 'PIX' | 'DINHEIRO'
+
 export interface FornecedorSuggestion {
   id: string
   cnpj: string
@@ -8,6 +10,8 @@ export interface FornecedorSuggestion {
   address: string | null
   contactName: string | null
   contactPhone: string | null
+  paymentMethod: FornecedorPaymentMethod | null
+  pixKey: string | null
 }
 
 export interface FornecedorInput {
@@ -16,6 +20,8 @@ export interface FornecedorInput {
   address: string | null
   contactName: string | null
   contactPhone: string | null
+  paymentMethod: FornecedorPaymentMethod | null
+  pixKey: string | null
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

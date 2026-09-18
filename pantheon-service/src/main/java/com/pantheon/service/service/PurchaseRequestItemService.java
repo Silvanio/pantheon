@@ -11,7 +11,6 @@ import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.exception.ItemsSpanMultiplePurchaseRequestsException;
 import com.pantheon.service.exception.OrcamentoLineItemNotLinkedException;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
-import com.pantheon.service.exception.PurchaseRequestItemAlreadyConvertedException;
 import com.pantheon.service.exception.PurchaseRequestItemNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
 import com.pantheon.service.exception.SelectionNotAllowedException;
@@ -79,9 +78,6 @@ public class PurchaseRequestItemService {
             if (!item.getPurchaseRequestId().equals(purchaseRequestId)) {
                 throw new ItemsSpanMultiplePurchaseRequestsException();
             }
-            if (item.getStatus() != PurchaseRequestItemStatus.PENDING) {
-                throw new PurchaseRequestItemAlreadyConvertedException(item.getId());
-            }
         }
 
         Orcamento orcamento =
@@ -89,8 +85,10 @@ public class PurchaseRequestItemService {
 
         Instant now = Instant.now();
         for (PurchaseRequestItem item : items) {
-            item.convertTo(orcamento.getId(), now);
-            itemRepository.save(item);
+            if (item.getStatus() == PurchaseRequestItemStatus.PENDING) {
+                item.convertTo(orcamento.getId(), now);
+                itemRepository.save(item);
+            }
         }
         return orcamento;
     }

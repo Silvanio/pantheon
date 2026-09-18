@@ -2,26 +2,38 @@ package com.pantheon.service.controller;
 
 import com.pantheon.service.dto.ConvertPurchaseRequestItemsRequest;
 import com.pantheon.service.dto.OrcamentoResponse;
+import com.pantheon.service.dto.PurchaseRequestApprovalResponse;
+import com.pantheon.service.dto.PurchaseRequestComparisonResponse;
 import com.pantheon.service.dto.PurchaseRequestCreationRequest;
 import com.pantheon.service.dto.PurchaseRequestDetailResponse;
 import com.pantheon.service.dto.PurchaseRequestItemResponse;
 import com.pantheon.service.dto.PurchaseRequestResponse;
+import com.pantheon.service.dto.RejectPurchaseRequestRequest;
+import com.pantheon.service.dto.SetItemSelectionRequest;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.PurchaseRequestItemStatus;
+import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.service.OrcamentoService;
 import com.pantheon.service.service.PurchaseRequestItemService;
+import com.pantheon.service.service.PurchaseRequestPdfService;
 import com.pantheon.service.service.PurchaseRequestService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,14 +44,17 @@ public class PurchaseRequestController {
     private final PurchaseRequestService purchaseRequestService;
     private final PurchaseRequestItemService purchaseRequestItemService;
     private final OrcamentoService orcamentoService;
+    private final PurchaseRequestPdfService purchaseRequestPdfService;
 
     public PurchaseRequestController(
             PurchaseRequestService purchaseRequestService,
             PurchaseRequestItemService purchaseRequestItemService,
-            OrcamentoService orcamentoService) {
+            OrcamentoService orcamentoService,
+            PurchaseRequestPdfService purchaseRequestPdfService) {
         this.purchaseRequestService = purchaseRequestService;
         this.purchaseRequestItemService = purchaseRequestItemService;
         this.orcamentoService = orcamentoService;
+        this.purchaseRequestPdfService = purchaseRequestPdfService;
     }
 
     @PostMapping("/api/construction-sites/{siteId}/purchase-requests")
@@ -52,16 +67,17 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/api/construction-sites/{siteId}/purchase-requests")
-    public ResponseEntity<List<PurchaseRequestResponse>> list(
+    public ResponseEntity<Page<PurchaseRequestResponse>> list(
             @AuthenticationPrincipal AppUser user,
             @PathVariable UUID siteId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<PurchaseRequestResponse> purchaseRequests = purchaseRequestService
-                .list(siteId, user.getId(), date)
-                .stream()
-                .map(PurchaseRequestResponse::from)
-                .toList();
-        return ResponseEntity.ok(purchaseRequests);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) PurchaseRequestStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<PurchaseRequestResponse> response = purchaseRequestService
+                .list(siteId, user.getId(), date, status, PageRequest.of(page, size))
+                .map(pr -> PurchaseRequestResponse.from(pr, purchaseRequestService.listLinkedOrcamentos(pr.getId())));
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/api/purchase-requests/{id}")
@@ -75,7 +91,13 @@ public class PurchaseRequestController {
                 .stream()
                 .map(PurchaseRequestItemResponse::from)
                 .toList();
-        return ResponseEntity.ok(new PurchaseRequestDetailResponse(PurchaseRequestResponse.from(purchaseRequest), items));
+        List<PurchaseRequestApprovalResponse> approvals = purchaseRequestService
+                .listApprovals(id)
+                .stream()
+                .map(PurchaseRequestApprovalResponse::from)
+                .toList();
+        var response = PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id));
+        return ResponseEntity.ok(new PurchaseRequestDetailResponse(response, items, approvals));
     }
 
     @PostMapping("/api/purchase-requests/{id}/convert-to-orcamento")
@@ -86,5 +108,59 @@ public class PurchaseRequestController {
         var orcamento = purchaseRequestItemService.convertToOrcamento(id, user.getId(), request.itemIds(), request.fornecedor());
         return ResponseEntity.status(HttpStatus.CREATED).body(OrcamentoResponse.from(
                 orcamento, orcamentoService.getSourcePurchaseRequestName(orcamento.getSourcePurchaseRequestId())));
+    }
+
+    @PutMapping("/api/purchase-requests/{id}/items/{itemId}/selection")
+    public ResponseEntity<PurchaseRequestItemResponse> setItemSelection(
+            @AuthenticationPrincipal AppUser user,
+            @PathVariable UUID id,
+            @PathVariable UUID itemId,
+            @RequestBody SetItemSelectionRequest request) {
+        var item = purchaseRequestItemService.setSelection(itemId, user.getId(), request.orcamentoLineItemId());
+        return ResponseEntity.ok(PurchaseRequestItemResponse.from(item));
+    }
+
+    @GetMapping("/api/purchase-requests/{id}/comparison")
+    public ResponseEntity<PurchaseRequestComparisonResponse> getComparison(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        return ResponseEntity.ok(purchaseRequestService.getComparison(id, user.getId()));
+    }
+
+    @GetMapping("/api/purchase-requests/{id}/orcamentos/{orcamentoId}/pdf")
+    public ResponseEntity<byte[]> getSupplierPdf(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID orcamentoId) {
+        byte[] pdf = purchaseRequestPdfService.generate(id, orcamentoId, user.getId());
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename("pedido-" + id + "-fornecedor-" + orcamentoId + ".pdf").build().toString())
+                .body(pdf);
+    }
+
+    @PostMapping("/api/purchase-requests/{id}/submit")
+    public ResponseEntity<PurchaseRequestResponse> submit(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        var purchaseRequest = purchaseRequestService.submitForApproval(id, user.getId());
+        return ResponseEntity.ok(PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id)));
+    }
+
+    @PostMapping("/api/purchase-requests/{id}/approve-step")
+    public ResponseEntity<PurchaseRequestResponse> approveStep(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @RequestParam(required = false) String comment) {
+        var purchaseRequest = purchaseRequestService.approveStep(id, user.getId(), comment);
+        return ResponseEntity.ok(PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id)));
+    }
+
+    @PostMapping("/api/purchase-requests/{id}/reject-step")
+    public ResponseEntity<PurchaseRequestResponse> rejectStep(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @Valid @RequestBody RejectPurchaseRequestRequest request) {
+        var purchaseRequest = purchaseRequestService.rejectStep(id, user.getId(), request.reason());
+        return ResponseEntity.ok(PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id)));
+    }
+
+    @PostMapping("/api/purchase-requests/{id}/conclude")
+    public ResponseEntity<PurchaseRequestResponse> conclude(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        var purchaseRequest = purchaseRequestService.conclude(id, user.getId());
+        return ResponseEntity.ok(PurchaseRequestResponse.from(purchaseRequest, purchaseRequestService.listLinkedOrcamentos(id)));
     }
 }

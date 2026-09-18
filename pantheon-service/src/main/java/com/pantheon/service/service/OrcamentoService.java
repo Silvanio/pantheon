@@ -2,93 +2,75 @@ package com.pantheon.service.service;
 
 import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.dto.OrcamentoLineItemRequest;
-import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.Fornecedor;
 import com.pantheon.service.entity.Orcamento;
-import com.pantheon.service.entity.OrcamentoApproval;
-import com.pantheon.service.entity.OrcamentoApprovalStatus;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.OrcamentoStatus;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestItem;
-import com.pantheon.service.entity.SiteMembership;
-import com.pantheon.service.entity.SiteOrcamentoApprovalLevel;
+import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
-import com.pantheon.service.exception.NoPendingApprovalStepException;
-import com.pantheon.service.exception.NotCurrentApprovalStepException;
-import com.pantheon.service.exception.OrcamentoEmptyException;
-import com.pantheon.service.exception.OrcamentoNotApprovedException;
 import com.pantheon.service.exception.OrcamentoNotDraftException;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
-import com.pantheon.service.messaging.EventPublisher;
-import com.pantheon.service.messaging.OrcamentoApprovalStepPendingEvent;
-import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
-import com.pantheon.service.repository.OrcamentoApprovalRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
+import com.pantheon.service.repository.OrcamentoSpecifications;
+import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
-import com.pantheon.service.repository.SiteMembershipRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * A construction site's budget/quote: free-text line items, a configurable sequential approval
- * chain, and the Rascunho/Em aprovação/Aprovado/Concluído lifecycle. See
- * {@code orcamento-approval-workflow}.
+ * A construction site's budget/quote from a single supplier: free-text line items and the
+ * Rascunho/Bloqueado lifecycle, which follows its originating Pedido de Compra's approval state
+ * (see {@link #lockAllForPurchaseRequest}/{@link #unlockAllForPurchaseRequest}). The approval
+ * chain itself now lives on {@code PurchaseRequestService}. See {@code orcamento-management}.
  */
 @Service
 public class OrcamentoService {
 
     private final OrcamentoRepository orcamentoRepository;
     private final OrcamentoLineItemRepository lineItemRepository;
-    private final OrcamentoApprovalRepository approvalRepository;
     private final ConstructionSiteRepository siteRepository;
-    private final SiteMembershipRepository siteMembershipRepository;
-    private final AppUserRepository userRepository;
     private final PurchaseRequestRepository purchaseRequestRepository;
+    private final PurchaseRequestItemRepository purchaseRequestItemRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
-    private final SiteOrcamentoApprovalLevelService approvalLevelService;
-    private final MaterialService materialService;
     private final FornecedorService fornecedorService;
-    private final EventPublisher eventPublisher;
 
     public OrcamentoService(
             OrcamentoRepository orcamentoRepository,
             OrcamentoLineItemRepository lineItemRepository,
-            OrcamentoApprovalRepository approvalRepository,
             ConstructionSiteRepository siteRepository,
-            SiteMembershipRepository siteMembershipRepository,
-            AppUserRepository userRepository,
             PurchaseRequestRepository purchaseRequestRepository,
+            PurchaseRequestItemRepository purchaseRequestItemRepository,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
-            SiteOrcamentoApprovalLevelService approvalLevelService,
-            MaterialService materialService,
-            FornecedorService fornecedorService,
-            EventPublisher eventPublisher) {
+            FornecedorService fornecedorService) {
         this.orcamentoRepository = orcamentoRepository;
         this.lineItemRepository = lineItemRepository;
-        this.approvalRepository = approvalRepository;
         this.siteRepository = siteRepository;
-        this.siteMembershipRepository = siteMembershipRepository;
-        this.userRepository = userRepository;
         this.purchaseRequestRepository = purchaseRequestRepository;
+        this.purchaseRequestItemRepository = purchaseRequestItemRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
-        this.approvalLevelService = approvalLevelService;
-        this.materialService = materialService;
         this.fornecedorService = fornecedorService;
-        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -115,6 +97,13 @@ public class OrcamentoService {
         for (PurchaseRequestItem item : items) {
             addLineItemInternal(orcamento.getId(), item.getName(), item.getType(), item.getQuantity(), null, item.getId());
         }
+
+        purchaseRequestRepository.findById(purchaseRequestId).ifPresent(purchaseRequest -> {
+            if (purchaseRequest.getStatus() == PurchaseRequestStatus.INICIADO) {
+                purchaseRequest.markOrcado();
+                purchaseRequestRepository.save(purchaseRequest);
+            }
+        });
         return orcamento;
     }
 
@@ -158,111 +147,50 @@ public class OrcamentoService {
         lineItemRepository.delete(item);
     }
 
+    /** Called from {@code PurchaseRequestService.approveStep} when a cycle's final step is approved. */
     @Transactional
-    public Orcamento submitForApproval(UUID orcamentoId, UUID actingUserId) {
-        Orcamento orcamento = requireOrcamento(orcamentoId);
-        requireManage(orcamento.getConstructionSiteId(), actingUserId);
-        requireDraft(orcamento);
-
-        List<OrcamentoLineItem> items = lineItemRepository.findByOrcamentoId(orcamentoId);
-        if (items.isEmpty()) {
-            throw new OrcamentoEmptyException(orcamentoId);
-        }
-
-        orcamento.submitForApproval(Instant.now());
-        orcamentoRepository.save(orcamento);
-
-        List<SiteOrcamentoApprovalLevel> levels = approvalLevelService.getEffectiveLevels(orcamento.getConstructionSiteId());
-        Instant now = Instant.now();
-        OrcamentoApproval firstStep = null;
-        for (SiteOrcamentoApprovalLevel level : levels) {
-            OrcamentoApproval step = approvalRepository.save(new OrcamentoApproval(
-                    UUID.randomUUID(), orcamentoId, orcamento.getCurrentApprovalCycle(), level.getStepOrder(),
-                    level.getApproverFunction(), now));
-            if (firstStep == null || step.getStepOrder() < firstStep.getStepOrder()) {
-                firstStep = step;
-            }
-        }
-        if (firstStep != null) {
-            notifyStepPending(orcamento, firstStep);
-        }
-        return orcamento;
-    }
-
-    @Transactional
-    public Orcamento approveStep(UUID orcamentoId, UUID actingUserId, String comment) {
-        Orcamento orcamento = requireOrcamento(orcamentoId);
-        OrcamentoApproval step = requirePendingStep(orcamento);
-        var access = requireStepAuthority(orcamento.getConstructionSiteId(), actingUserId, step);
-
-        UUID decidedBy = access.companyStaff() ? null : access.siteMembership().getId();
-        step.approve(decidedBy, comment, Instant.now());
-        approvalRepository.save(step);
-
-        var nextStep = approvalRepository.findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
-                orcamentoId, orcamento.getCurrentApprovalCycle(), OrcamentoApprovalStatus.PENDING);
-        if (nextStep.isPresent()) {
-            notifyStepPending(orcamento, nextStep.get());
-        } else {
-            orcamento.approve(Instant.now());
+    public void lockAllForPurchaseRequest(UUID purchaseRequestId) {
+        for (Orcamento orcamento : orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId)) {
+            orcamento.lock();
             orcamentoRepository.save(orcamento);
         }
-        return orcamento;
     }
 
+    /** Called from {@code PurchaseRequestService.rejectStep}. */
     @Transactional
-    public Orcamento rejectStep(UUID orcamentoId, UUID actingUserId, String reason) {
-        if (reason == null || reason.isBlank()) {
-            throw new IllegalArgumentException("A rejection reason is required");
+    public void unlockAllForPurchaseRequest(UUID purchaseRequestId) {
+        for (Orcamento orcamento : orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId)) {
+            orcamento.unlock();
+            orcamentoRepository.save(orcamento);
         }
-        Orcamento orcamento = requireOrcamento(orcamentoId);
-        OrcamentoApproval step = requirePendingStep(orcamento);
-        var access = requireStepAuthority(orcamento.getConstructionSiteId(), actingUserId, step);
-
-        UUID decidedBy = access.companyStaff() ? null : access.siteMembership().getId();
-        step.reject(decidedBy, reason, Instant.now());
-        approvalRepository.save(step);
-
-        orcamento.returnToDraftAfterRejection(reason);
-        return orcamentoRepository.save(orcamento);
     }
 
-    @Transactional
-    public Orcamento conclude(UUID orcamentoId, UUID actingUserId) {
-        Orcamento orcamento = requireOrcamento(orcamentoId);
-        requireManage(orcamento.getConstructionSiteId(), actingUserId);
-        if (orcamento.getStatus() != OrcamentoStatus.APPROVED) {
-            throw new OrcamentoNotApprovedException(orcamentoId);
-        }
-
-        orcamento.complete(Instant.now());
-        orcamentoRepository.save(orcamento);
-
-        List<OrcamentoLineItem> items = lineItemRepository.findByOrcamentoId(orcamentoId);
-        materialService.createFromOrcamento(orcamento, items);
-        return orcamento;
-    }
-
-    public List<Orcamento> list(UUID siteId, UUID actingUserId, LocalDate dateFilter, UUID purchaseRequestIdFilter) {
+    public Page<Orcamento> list(
+            UUID siteId, UUID actingUserId, LocalDate dateFilter, UUID purchaseRequestIdFilter, String supplierFilter,
+            Pageable pageable) {
         requireSite(siteId);
         var access = siteAccessService.requireAccess(siteId, actingUserId);
         permissionService.requireVisible(siteId, access, PermissionCapability.ORCAMENTO_MANAGE);
 
-        if (dateFilter == null && purchaseRequestIdFilter == null) {
-            return orcamentoRepository.findByConstructionSiteIdOrderByCreatedAtDesc(siteId);
+        Instant dayStart = dateFilter != null ? dateFilter.atStartOfDay(ZoneOffset.UTC).toInstant() : null;
+        Instant dayEnd = dateFilter != null ? dateFilter.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant() : null;
+
+        Specification<Orcamento> spec = OrcamentoSpecifications.siteId(siteId);
+        Specification<Orcamento> sourceSpec = OrcamentoSpecifications.sourcePurchaseRequestId(purchaseRequestIdFilter);
+        if (sourceSpec != null) {
+            spec = spec.and(sourceSpec);
         }
-        if (dateFilter == null) {
-            return orcamentoRepository.findByConstructionSiteIdAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
-                    siteId, purchaseRequestIdFilter);
+        Specification<Orcamento> supplierSpec = OrcamentoSpecifications.supplierContains(supplierFilter);
+        if (supplierSpec != null) {
+            spec = spec.and(supplierSpec);
         }
-        Instant dayStart = dateFilter.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant dayEnd = dateFilter.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        if (purchaseRequestIdFilter == null) {
-            return orcamentoRepository.findByConstructionSiteIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-                    siteId, dayStart, dayEnd);
+        Specification<Orcamento> dateSpec = OrcamentoSpecifications.createdOn(dayStart, dayEnd);
+        if (dateSpec != null) {
+            spec = spec.and(dateSpec);
         }
-        return orcamentoRepository.findByConstructionSiteIdAndCreatedAtBetweenAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
-                siteId, dayStart, dayEnd, purchaseRequestIdFilter);
+
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+        return orcamentoRepository.findAll(spec, sorted);
     }
 
     public Orcamento get(UUID orcamentoId, UUID actingUserId) {
@@ -284,46 +212,30 @@ public class OrcamentoService {
         return lineItemRepository.findByOrcamentoId(orcamentoId);
     }
 
-    public List<OrcamentoApproval> listApprovals(UUID orcamentoId) {
-        return approvalRepository.findByOrcamentoIdOrderByCycleNumberAscStepOrderAsc(orcamentoId);
+    /** Whether {@code lineItem} is currently the selected fulfillment of its source Pedido-de-Compra item, if any. */
+    public boolean isSelected(OrcamentoLineItem lineItem) {
+        if (lineItem.getSourcePurchaseRequestItemId() == null) {
+            return false;
+        }
+        return purchaseRequestItemRepository
+                .findById(lineItem.getSourcePurchaseRequestItemId())
+                .map(item -> lineItem.getId().equals(item.getSelectedOrcamentoLineItemId()))
+                .orElse(false);
+    }
+
+    /** Batch form of {@link #isSelected(OrcamentoLineItem)}, keyed by line item id, for detail/listing assembly. */
+    public Map<UUID, Boolean> selectedFlags(List<OrcamentoLineItem> lineItems) {
+        Map<UUID, Boolean> flags = new HashMap<>();
+        for (OrcamentoLineItem lineItem : lineItems) {
+            flags.put(lineItem.getId(), isSelected(lineItem));
+        }
+        return flags;
     }
 
     private OrcamentoLineItem addLineItemInternal(
             UUID orcamentoId, String name, String type, BigDecimal quantity, BigDecimal unitPrice, UUID sourceId) {
         return lineItemRepository.save(
                 new OrcamentoLineItem(UUID.randomUUID(), orcamentoId, name, type, quantity, unitPrice, sourceId));
-    }
-
-    private OrcamentoApproval requirePendingStep(Orcamento orcamento) {
-        return approvalRepository
-                .findFirstByOrcamentoIdAndCycleNumberAndStatusOrderByStepOrderAsc(
-                        orcamento.getId(), orcamento.getCurrentApprovalCycle(), OrcamentoApprovalStatus.PENDING)
-                .orElseThrow(() -> new NoPendingApprovalStepException(orcamento.getId()));
-    }
-
-    private SiteAccessContext requireStepAuthority(UUID siteId, UUID userId, OrcamentoApproval step) {
-        SiteAccessContext access = siteAccessService.requireAccess(siteId, userId);
-        if (access.companyStaff() || access.function() == step.getApproverFunction()) {
-            return access;
-        }
-        throw new NotCurrentApprovalStepException(step.getOrcamentoId());
-    }
-
-    private void notifyStepPending(Orcamento orcamento, OrcamentoApproval step) {
-        UUID siteId = orcamento.getConstructionSiteId();
-        ConstructionSite site =
-                siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
-        List<SiteMembership> approvers = siteMembershipRepository
-                .findByConstructionSiteIdAndFunction(siteId, step.getApproverFunction())
-                .stream()
-                .filter(m -> m.isActive() && m.getUserId() != null)
-                .toList();
-
-        for (SiteMembership approver : approvers) {
-            userRepository.findById(approver.getUserId()).map(AppUser::getEmail).ifPresent(email ->
-                    eventPublisher.publish(OrcamentoApprovalStepPendingEvent.TYPE, new OrcamentoApprovalStepPendingEvent(
-                            orcamento.getId(), siteId, site.getName(), step.getApproverFunction().name(), email)));
-        }
     }
 
     private void requireDraft(Orcamento orcamento) {

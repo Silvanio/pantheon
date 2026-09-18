@@ -1,21 +1,13 @@
 package com.pantheon.service.repository;
 
 import com.pantheon.service.entity.Orcamento;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface OrcamentoRepository extends JpaRepository<Orcamento, UUID> {
+public interface OrcamentoRepository extends JpaRepository<Orcamento, UUID>, JpaSpecificationExecutor<Orcamento> {
 
-    List<Orcamento> findByConstructionSiteIdOrderByCreatedAtDesc(UUID constructionSiteId);
-
-    List<Orcamento> findByConstructionSiteIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-            UUID constructionSiteId, Instant dayStart, Instant dayEnd);
-
-    List<Orcamento> findByConstructionSiteIdAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
-            UUID constructionSiteId, UUID sourcePurchaseRequestId);
-
-    List<Orcamento> findByConstructionSiteIdAndCreatedAtBetweenAndSourcePurchaseRequestIdOrderByCreatedAtDesc(
-            UUID constructionSiteId, Instant dayStart, Instant dayEnd, UUID sourcePurchaseRequestId);
+    /** Every Orcamento converted from a given Pedido de Compra — used to lock/unlock them together. */
+    List<Orcamento> findBySourcePurchaseRequestId(UUID sourcePurchaseRequestId);
 }

@@ -10,9 +10,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A construction site's budget/quote, with free-text line items (see {@link OrcamentoLineItem})
- * and a configurable sequential approval chain (see {@link OrcamentoApproval}). See
- * {@code orcamento-approval-workflow}.
+ * A construction site's budget/quote from a single supplier, with free-text line items (see
+ * {@link OrcamentoLineItem}). Its {@link OrcamentoStatus} follows its originating
+ * {@link PurchaseRequest}'s approval outcome, if any — see {@code orcamento-management}.
  */
 @Entity
 @Table(name = "orcamento")
@@ -33,21 +33,6 @@ public class Orcamento {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    @Column(name = "submitted_at")
-    private Instant submittedAt;
-
-    @Column(name = "approved_at")
-    private Instant approvedAt;
-
-    @Column(name = "completed_at")
-    private Instant completedAt;
-
-    @Column(name = "current_approval_cycle", nullable = false)
-    private int currentApprovalCycle;
-
-    @Column(name = "last_rejection_reason")
-    private String lastRejectionReason;
 
     @Column(name = "fornecedor_cnpj", nullable = false)
     private String fornecedorCnpj;
@@ -83,7 +68,6 @@ public class Orcamento {
         this.status = OrcamentoStatus.DRAFT;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
-        this.currentApprovalCycle = 0;
         this.fornecedorCnpj = fornecedorCnpj;
         this.fornecedorNome = fornecedorNome;
         this.fornecedorEndereco = fornecedorEndereco;
@@ -93,27 +77,14 @@ public class Orcamento {
         this.sourcePurchaseRequestId = sourcePurchaseRequestId;
     }
 
-    /** Starts a new approval cycle: DRAFT/rejected -> IN_APPROVAL. */
-    public void submitForApproval(Instant now) {
-        this.status = OrcamentoStatus.IN_APPROVAL;
-        this.submittedAt = now;
-        this.currentApprovalCycle += 1;
+    /** Called when its originating Pedido de Compra's approval reaches CONFERIDO/CONCLUIDO. */
+    public void lock() {
+        this.status = OrcamentoStatus.LOCKED;
     }
 
-    public void approve(Instant now) {
-        this.status = OrcamentoStatus.APPROVED;
-        this.approvedAt = now;
-    }
-
-    /** A rejection at any approval step bounces the whole Orcamento back to DRAFT for revision. */
-    public void returnToDraftAfterRejection(String reason) {
+    /** Called when its originating Pedido de Compra's approval is rejected back to ORCADO. */
+    public void unlock() {
         this.status = OrcamentoStatus.DRAFT;
-        this.lastRejectionReason = reason;
-    }
-
-    public void complete(Instant now) {
-        this.status = OrcamentoStatus.COMPLETED;
-        this.completedAt = now;
     }
 
     public UUID getId() {
@@ -134,26 +105,6 @@ public class Orcamento {
 
     public Instant getCreatedAt() {
         return createdAt;
-    }
-
-    public Instant getSubmittedAt() {
-        return submittedAt;
-    }
-
-    public Instant getApprovedAt() {
-        return approvedAt;
-    }
-
-    public Instant getCompletedAt() {
-        return completedAt;
-    }
-
-    public int getCurrentApprovalCycle() {
-        return currentApprovalCycle;
-    }
-
-    public String getLastRejectionReason() {
-        return lastRejectionReason;
     }
 
     public String getFornecedorCnpj() {

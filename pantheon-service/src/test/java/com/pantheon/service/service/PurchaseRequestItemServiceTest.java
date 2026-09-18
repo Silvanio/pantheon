@@ -10,12 +10,18 @@ import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.entity.Orcamento;
+import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestItem;
 import com.pantheon.service.entity.PurchaseRequestItemStatus;
+import com.pantheon.service.entity.PurchaseRequestStatus;
 import com.pantheon.service.exception.ItemsSpanMultiplePurchaseRequestsException;
+import com.pantheon.service.exception.OrcamentoLineItemNotLinkedException;
 import com.pantheon.service.exception.PurchaseRequestItemAlreadyConvertedException;
+import com.pantheon.service.exception.SelectionNotAllowedException;
+import com.pantheon.service.repository.OrcamentoLineItemRepository;
+import com.pantheon.service.repository.OrcamentoRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
 import java.math.BigDecimal;
@@ -39,6 +45,12 @@ class PurchaseRequestItemServiceTest {
     private PurchaseRequestRepository purchaseRequestRepository;
 
     @Mock
+    private OrcamentoRepository orcamentoRepository;
+
+    @Mock
+    private OrcamentoLineItemRepository orcamentoLineItemRepository;
+
+    @Mock
     private SiteAccessService siteAccessService;
 
     @Mock
@@ -51,16 +63,18 @@ class PurchaseRequestItemServiceTest {
 
     private UUID siteId;
     private UUID purchaseRequestId;
+    private PurchaseRequest purchaseRequest;
 
     @BeforeEach
     void setUp() {
         service = new PurchaseRequestItemService(
-                itemRepository, purchaseRequestRepository, siteAccessService, permissionService, orcamentoService);
+                itemRepository, purchaseRequestRepository, orcamentoRepository, orcamentoLineItemRepository,
+                siteAccessService, permissionService, orcamentoService);
 
         siteId = UUID.randomUUID();
         purchaseRequestId = UUID.randomUUID();
-        lenient().when(purchaseRequestRepository.findById(purchaseRequestId)).thenReturn(Optional.of(
-                new PurchaseRequest(purchaseRequestId, siteId, "Pedido 07/09/2026 #1", UUID.randomUUID(), Instant.now())));
+        purchaseRequest = new PurchaseRequest(purchaseRequestId, siteId, "Pedido 07/09/2026 #1", UUID.randomUUID(), Instant.now());
+        lenient().when(purchaseRequestRepository.findById(purchaseRequestId)).thenReturn(Optional.of(purchaseRequest));
         lenient().when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
     }
@@ -81,6 +95,12 @@ class PurchaseRequestItemServiceTest {
 
     private FornecedorRequest fornecedorRequest() {
         return new FornecedorRequest("12345678000199", "Fornecedor Teste", null, null, null);
+    }
+
+    private Orcamento orcamento(UUID sourcePurchaseRequestId) {
+        return new Orcamento(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor Teste",
+                null, null, null, null, sourcePurchaseRequestId);
     }
 
     @Test
@@ -170,5 +190,98 @@ class PurchaseRequestItemServiceTest {
 
         assertThat(result).isEqualTo(secondOrcamento);
         assertThat(result).isNotEqualTo(firstOrcamento);
+    }
+
+    @Test
+    void setSelectionBlockedWhenHeaderIsNotOrcado() {
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.setSelection(item.getId(), actingUserId, UUID.randomUUID()))
+                .isInstanceOf(SelectionNotAllowedException.class);
+    }
+
+    @Test
+    void setSelectionHappyPathRecordsSelection() {
+        purchaseRequest.markOrcado();
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        Orcamento orcamento = orcamento(purchaseRequestId);
+        OrcamentoLineItem lineItem = new OrcamentoLineItem(
+                UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, item.getId());
+        when(orcamentoLineItemRepository.findById(lineItem.getId())).thenReturn(Optional.of(lineItem));
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+
+        PurchaseRequestItem result = service.setSelection(item.getId(), actingUserId, lineItem.getId());
+
+        assertThat(result.getSelectedOrcamentoLineItemId()).isEqualTo(lineItem.getId());
+    }
+
+    @Test
+    void setSelectionClearsWhenTargetIsNull() {
+        purchaseRequest.markOrcado();
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        item.select(UUID.randomUUID());
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        PurchaseRequestItem result = service.setSelection(item.getId(), actingUserId, null);
+
+        assertThat(result.getSelectedOrcamentoLineItemId()).isNull();
+    }
+
+    @Test
+    void setSelectionRejectsLineItemFromUnrelatedOrcamento() {
+        purchaseRequest.markOrcado();
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        Orcamento unrelatedOrcamento = orcamento(UUID.randomUUID());
+        OrcamentoLineItem lineItem = new OrcamentoLineItem(
+                UUID.randomUUID(), unrelatedOrcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, item.getId());
+        when(orcamentoLineItemRepository.findById(lineItem.getId())).thenReturn(Optional.of(lineItem));
+        when(orcamentoRepository.findById(unrelatedOrcamento.getId())).thenReturn(Optional.of(unrelatedOrcamento));
+
+        assertThatThrownBy(() -> service.setSelection(item.getId(), actingUserId, lineItem.getId()))
+                .isInstanceOf(OrcamentoLineItemNotLinkedException.class);
+    }
+
+    @Test
+    void setSelectionRejectsLineItemQuotedAgainstADifferentItem() {
+        purchaseRequest.markOrcado();
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        Orcamento orcamento = orcamento(purchaseRequestId);
+        OrcamentoLineItem lineItem = new OrcamentoLineItem(
+                UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, UUID.randomUUID());
+        when(orcamentoLineItemRepository.findById(lineItem.getId())).thenReturn(Optional.of(lineItem));
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+
+        assertThatThrownBy(() -> service.setSelection(item.getId(), actingUserId, lineItem.getId()))
+                .isInstanceOf(OrcamentoLineItemNotLinkedException.class);
+    }
+
+    @Test
+    void setSelectionAllowsUntracedLineItemAgainstAnyItemOfTheHeader() {
+        purchaseRequest.markOrcado();
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        Orcamento orcamento = orcamento(purchaseRequestId);
+        OrcamentoLineItem untracedLineItem = new OrcamentoLineItem(
+                UUID.randomUUID(), orcamento.getId(), "Item ad hoc", null, BigDecimal.ONE, BigDecimal.ONE, null);
+        when(orcamentoLineItemRepository.findById(untracedLineItem.getId())).thenReturn(Optional.of(untracedLineItem));
+        when(orcamentoRepository.findById(orcamento.getId())).thenReturn(Optional.of(orcamento));
+
+        PurchaseRequestItem result = service.setSelection(item.getId(), actingUserId, untracedLineItem.getId());
+
+        assertThat(result.getSelectedOrcamentoLineItemId()).isEqualTo(untracedLineItem.getId());
     }
 }

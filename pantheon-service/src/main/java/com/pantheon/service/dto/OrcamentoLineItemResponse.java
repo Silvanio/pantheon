@@ -11,11 +11,12 @@ public record OrcamentoLineItemResponse(
         String type,
         BigDecimal quantity,
         BigDecimal unitPrice,
-        UUID sourcePurchaseRequestItemId) {
+        UUID sourcePurchaseRequestItemId,
+        boolean selected) {
 
-    public static OrcamentoLineItemResponse from(OrcamentoLineItem item) {
+    public static OrcamentoLineItemResponse from(OrcamentoLineItem item, boolean selected) {
         return new OrcamentoLineItemResponse(
                 item.getId(), item.getOrcamentoId(), item.getName(), item.getType(), item.getQuantity(),
-                item.getUnitPrice(), item.getSourcePurchaseRequestItemId());
+                item.getUnitPrice(), item.getSourcePurchaseRequestItemId(), selected);
     }
 }

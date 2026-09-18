@@ -48,16 +48,6 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
-    @ExceptionHandler(OrcamentoNotApprovedException.class)
-    public ResponseEntity<String> handleOrcamentoNotApproved(OrcamentoNotApprovedException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-    }
-
-    @ExceptionHandler(OrcamentoEmptyException.class)
-    public ResponseEntity<String> handleOrcamentoEmpty(OrcamentoEmptyException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-    }
-
     @ExceptionHandler(NoPendingApprovalStepException.class)
     public ResponseEntity<String> handleNoPendingApprovalStep(NoPendingApprovalStepException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
@@ -141,5 +131,35 @@ public class ConstructionExceptionHandler {
     @ExceptionHandler(PersonBelongsToAnotherCompanyException.class)
     public ResponseEntity<String> handlePersonBelongsToAnotherCompany(PersonBelongsToAnotherCompanyException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(SelectionNotAllowedException.class)
+    public ResponseEntity<String> handleSelectionNotAllowed(SelectionNotAllowedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrcamentoLineItemNotLinkedException.class)
+    public ResponseEntity<String> handleOrcamentoLineItemNotLinked(OrcamentoLineItemNotLinkedException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestNotOrcadoException.class)
+    public ResponseEntity<String> handlePurchaseRequestNotOrcado(PurchaseRequestNotOrcadoException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestSelectionIncompleteException.class)
+    public ResponseEntity<String> handlePurchaseRequestSelectionIncomplete(PurchaseRequestSelectionIncompleteException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PurchaseRequestNotConferidoException.class)
+    public ResponseEntity<String> handlePurchaseRequestNotConferido(PurchaseRequestNotConferidoException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrcamentoNotLinkedToPurchaseRequestException.class)
+    public ResponseEntity<String> handleOrcamentoNotLinkedToPurchaseRequest(OrcamentoNotLinkedToPurchaseRequestException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 }

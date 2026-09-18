@@ -1,12 +1,14 @@
 package com.pantheon.service.service;
 
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MaterialDeliveryPhoto;
 import com.pantheon.service.entity.MaterialDeliveryStatus;
-import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.InvalidFileException;
 import com.pantheon.service.exception.MaterialDeliveryStatusOrderException;
 import com.pantheon.service.exception.MaterialNotFoundException;
@@ -27,9 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Delivery-tracking {@link Material} records: created only from a concluded {@link Orcamento}
- * (see {@link OrcamentoService#conclude}), never any other way. See
- * {@code material-delivery-tracking}.
+ * Delivery-tracking {@link Material} records: created only from a concluded
+ * {@link PurchaseRequest} (see {@code PurchaseRequestService#conclude}), never any other way.
+ * See {@code material-delivery-tracking}.
  */
 @Service
 public class MaterialService {
@@ -59,13 +61,16 @@ public class MaterialService {
         this.storageService = storageService;
     }
 
-    /** Called only from {@link OrcamentoService#conclude} — one Material per line item, never any other way. */
+    /**
+     * Called only from {@code PurchaseRequestService.conclude} — one Material per selected line
+     * item, possibly drawn from several different Orcamentos/suppliers, never any other way.
+     */
     @Transactional
-    void createFromOrcamento(Orcamento orcamento, List<OrcamentoLineItem> lineItems) {
+    void createFromPurchaseRequestSelections(PurchaseRequest purchaseRequest, List<OrcamentoLineItem> selectedLineItems) {
         Instant now = Instant.now();
-        for (OrcamentoLineItem item : lineItems) {
+        for (OrcamentoLineItem item : selectedLineItems) {
             materialRepository.save(new Material(
-                    UUID.randomUUID(), orcamento.getConstructionSiteId(), item.getId(), item.getName(),
+                    UUID.randomUUID(), purchaseRequest.getConstructionSiteId(), item.getId(), item.getName(),
                     item.getType(), item.getQuantity(), now));
         }
     }
@@ -113,7 +118,7 @@ public class MaterialService {
     public List<Material> list(UUID siteId, UUID actingUserId, UUID orcamentoIdFilter) {
         requireSite(siteId);
         var access = siteAccessService.requireAccess(siteId, actingUserId);
-        permissionService.requireVisible(siteId, access, PermissionCapability.ORCAMENTO_MANAGE);
+        requireVisibleToOrcamentoOrPurchaseRequest(siteId, access);
         List<Material> materials = materialRepository.findByConstructionSiteId(siteId);
         if (orcamentoIdFilter == null) {
             return materials;
@@ -137,8 +142,22 @@ public class MaterialService {
                 .orElseThrow(() -> new InvalidFileException("Photo not found: " + photoId));
         Material material = requireMaterial(photo.getMaterialId());
         var access = siteAccessService.requireAccess(material.getConstructionSiteId(), actingUserId);
-        permissionService.requireVisible(material.getConstructionSiteId(), access, PermissionCapability.ORCAMENTO_MANAGE);
+        requireVisibleToOrcamentoOrPurchaseRequest(material.getConstructionSiteId(), access);
         return storageService.getObject(photo.getStorageKey());
+    }
+
+    /**
+     * Materials are surfaced both from the Orçamento detail view and, post-conclusion, from the
+     * Pedido de Compra detail view — visible to a member with either capability, not just one.
+     */
+    private void requireVisibleToOrcamentoOrPurchaseRequest(UUID siteId, SiteAccessContext access) {
+        boolean hiddenFromOrcamento =
+                permissionService.resolve(siteId, access, PermissionCapability.ORCAMENTO_MANAGE) == AccessLevel.HIDDEN;
+        boolean hiddenFromPurchaseRequest =
+                permissionService.resolve(siteId, access, PermissionCapability.PURCHASE_REQUEST) == AccessLevel.HIDDEN;
+        if (hiddenFromOrcamento && hiddenFromPurchaseRequest) {
+            throw new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST);
+        }
     }
 
     private Material requireMaterial(UUID materialId) {

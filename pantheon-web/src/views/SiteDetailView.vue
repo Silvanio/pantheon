@@ -10,7 +10,7 @@ import SitePhoto from '../components/SitePhoto.vue'
 import SiteTeamPanel from '../components/SiteTeamPanel.vue'
 import SiteDocumentProjectsPanel from '../components/SiteDocumentProjectsPanel.vue'
 import SitePermissionsPanel from '../components/SitePermissionsPanel.vue'
-import SiteOrcamentoApprovalLevelsPanel from '../components/SiteOrcamentoApprovalLevelsPanel.vue'
+import SitePurchaseRequestApprovalLevelsPanel from '../components/SitePurchaseRequestApprovalLevelsPanel.vue'
 import EquipmentPanel from '../components/EquipmentPanel.vue'
 import PurchaseRequestPanel from '../components/PurchaseRequestPanel.vue'
 import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
@@ -259,7 +259,7 @@ onMounted(load)
         />
         <template v-if="activeTab === 'permissions' && isCompanyAdmin">
           <SitePermissionsPanel :site-id="siteId" />
-          <SiteOrcamentoApprovalLevelsPanel :site-id="siteId" />
+          <SitePurchaseRequestApprovalLevelsPanel :site-id="siteId" />
         </template>
       </main>
     </template>

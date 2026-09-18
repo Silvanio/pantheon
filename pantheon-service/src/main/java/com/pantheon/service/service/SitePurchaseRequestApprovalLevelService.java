@@ -1,9 +1,9 @@
 package com.pantheon.service.service;
 
-import com.pantheon.service.dto.OrcamentoApprovalLevelEntry;
+import com.pantheon.service.dto.PurchaseRequestApprovalLevelEntry;
 import com.pantheon.service.entity.ConstructionFunction;
-import com.pantheon.service.entity.SiteOrcamentoApprovalLevel;
-import com.pantheon.service.repository.SiteOrcamentoApprovalLevelRepository;
+import com.pantheon.service.entity.SitePurchaseRequestApprovalLevel;
+import com.pantheon.service.repository.SitePurchaseRequestApprovalLevelRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,17 +12,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * A construction site's configured, ordered Orcamento approval chain. See
- * {@code orcamento-approval-workflow}'s "Per-site Orçamento approval levels". Callers are
- * responsible for authorizing the acting user (company staff only) before calling
+ * A construction site's configured, ordered Pedido de Compra approval chain. See
+ * {@code purchase-request-approval-workflow}'s "Per-site Pedido de Compra approval levels".
+ * Callers are responsible for authorizing the acting user (company staff only) before calling
  * {@link #setLevels}.
  */
 @Service
-public class SiteOrcamentoApprovalLevelService {
+public class SitePurchaseRequestApprovalLevelService {
 
-    private final SiteOrcamentoApprovalLevelRepository repository;
+    private final SitePurchaseRequestApprovalLevelRepository repository;
 
-    public SiteOrcamentoApprovalLevelService(SiteOrcamentoApprovalLevelRepository repository) {
+    public SitePurchaseRequestApprovalLevelService(SitePurchaseRequestApprovalLevelRepository repository) {
         this.repository = repository;
     }
 
@@ -31,27 +31,28 @@ public class SiteOrcamentoApprovalLevelService {
      * if none are configured, so a freshly created obra needs no configuration to behave like
      * the pre-multi-level-approval default.
      */
-    public List<SiteOrcamentoApprovalLevel> getEffectiveLevels(UUID constructionSiteId) {
-        List<SiteOrcamentoApprovalLevel> configured =
+    public List<SitePurchaseRequestApprovalLevel> getEffectiveLevels(UUID constructionSiteId) {
+        List<SitePurchaseRequestApprovalLevel> configured =
                 repository.findByConstructionSiteIdAndActiveOrderByStepOrder(constructionSiteId, true);
         if (!configured.isEmpty()) {
             return configured;
         }
-        return List.of(new SiteOrcamentoApprovalLevel(
+        return List.of(new SitePurchaseRequestApprovalLevel(
                 UUID.randomUUID(), constructionSiteId, 1, ConstructionFunction.ENGINEER, Instant.now()));
     }
 
     @Transactional
-    public List<SiteOrcamentoApprovalLevel> setLevels(UUID constructionSiteId, List<OrcamentoApprovalLevelEntry> levels) {
+    public List<SitePurchaseRequestApprovalLevel> setLevels(
+            UUID constructionSiteId, List<PurchaseRequestApprovalLevelEntry> levels) {
         Instant now = Instant.now();
         repository.findByConstructionSiteIdAndActiveOrderByStepOrder(constructionSiteId, true).forEach(existing -> {
             existing.deactivate(now);
             repository.save(existing);
         });
 
-        List<SiteOrcamentoApprovalLevel> created = new ArrayList<>();
-        for (OrcamentoApprovalLevelEntry entry : levels) {
-            created.add(repository.save(new SiteOrcamentoApprovalLevel(
+        List<SitePurchaseRequestApprovalLevel> created = new ArrayList<>();
+        for (PurchaseRequestApprovalLevelEntry entry : levels) {
+            created.add(repository.save(new SitePurchaseRequestApprovalLevel(
                     UUID.randomUUID(), constructionSiteId, entry.stepOrder(), entry.approverFunction(), now)));
         }
         return created;

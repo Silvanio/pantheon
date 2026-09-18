@@ -10,14 +10,14 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One step of a construction site's configured Orcamento approval chain: at {@code stepOrder},
- * a member with function {@code approverFunction} (or any company staff) must approve. A site
- * with no rows here uses the single-{@code ENGINEER} default instead — see
- * {@code orcamento-approval-workflow}'s "Per-site Orçamento approval levels".
+ * One step of a construction site's configured Pedido de Compra approval chain: at
+ * {@code stepOrder}, a member with function {@code approverFunction} (or any company staff) must
+ * approve. A site with no rows here uses the single-{@code ENGINEER} default instead — see
+ * {@code purchase-request-approval-workflow}'s "Per-site Pedido de Compra approval levels".
  */
 @Entity
-@Table(name = "site_orcamento_approval_level")
-public class SiteOrcamentoApprovalLevel {
+@Table(name = "site_purchase_request_approval_level")
+public class SitePurchaseRequestApprovalLevel {
 
     @Id
     private UUID id;
@@ -41,11 +41,11 @@ public class SiteOrcamentoApprovalLevel {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected SiteOrcamentoApprovalLevel() {
+    protected SitePurchaseRequestApprovalLevel() {
         // JPA
     }
 
-    public SiteOrcamentoApprovalLevel(
+    public SitePurchaseRequestApprovalLevel(
             UUID id, UUID constructionSiteId, int stepOrder, ConstructionFunction approverFunction, Instant now) {
         this.id = id;
         this.constructionSiteId = constructionSiteId;

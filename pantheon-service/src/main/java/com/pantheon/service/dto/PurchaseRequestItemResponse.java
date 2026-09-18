@@ -18,12 +18,14 @@ public record PurchaseRequestItemResponse(
         UUID createdBy,
         Instant createdAt,
         UUID convertedToOrcamentoId,
-        Instant convertedAt) {
+        Instant convertedAt,
+        UUID selectedOrcamentoLineItemId) {
 
     public static PurchaseRequestItemResponse from(PurchaseRequestItem item) {
         return new PurchaseRequestItemResponse(
                 item.getId(), item.getConstructionSiteId(), item.getPurchaseRequestId(), item.getName(),
                 item.getType(), item.getQuantity(), item.getUnit(), item.getStatus(), item.getCreatedBy(),
-                item.getCreatedAt(), item.getConvertedToOrcamentoId(), item.getConvertedAt());
+                item.getCreatedAt(), item.getConvertedToOrcamentoId(), item.getConvertedAt(),
+                item.getSelectedOrcamentoLineItemId());
     }
 }

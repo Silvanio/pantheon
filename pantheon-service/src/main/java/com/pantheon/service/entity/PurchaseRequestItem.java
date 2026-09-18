@@ -56,6 +56,9 @@ public class PurchaseRequestItem {
     @Column(name = "converted_at")
     private Instant convertedAt;
 
+    @Column(name = "selected_orcamento_line_item_id")
+    private UUID selectedOrcamentoLineItemId;
+
     protected PurchaseRequestItem() {
         // JPA
     }
@@ -79,6 +82,19 @@ public class PurchaseRequestItem {
         this.status = PurchaseRequestItemStatus.CONVERTED;
         this.convertedToOrcamentoId = orcamentoId;
         this.convertedAt = now;
+    }
+
+    /**
+     * Records which {@code OrcamentoLineItem} (and therefore which supplier's quote) fulfills
+     * this item — see {@code purchase-requests}' "Per-item supplier selection". A plain field
+     * write with no side effects on this item's own status.
+     */
+    public void select(UUID orcamentoLineItemId) {
+        this.selectedOrcamentoLineItemId = orcamentoLineItemId;
+    }
+
+    public void clearSelection() {
+        this.selectedOrcamentoLineItemId = null;
     }
 
     public UUID getId() {
@@ -127,5 +143,9 @@ public class PurchaseRequestItem {
 
     public Instant getConvertedAt() {
         return convertedAt;
+    }
+
+    public UUID getSelectedOrcamentoLineItemId() {
+        return selectedOrcamentoLineItemId;
     }
 }

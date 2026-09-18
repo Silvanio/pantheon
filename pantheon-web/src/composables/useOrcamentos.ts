@@ -2,10 +2,9 @@ import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 import type { Material } from './useMaterialDeliveries'
 import type { FornecedorInput } from './useFornecedores'
+import type { PageResponse } from './usePurchaseRequests'
 
-export type OrcamentoStatus = 'DRAFT' | 'IN_APPROVAL' | 'APPROVED' | 'COMPLETED'
-export type OrcamentoApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type OrcamentoApproverFunction = 'CLIENT' | 'ARCHITECT' | 'ENGINEER' | 'SITE_FOREMAN' | 'SERVICE_PROVIDER' | 'OTHER'
+export type OrcamentoStatus = 'DRAFT' | 'LOCKED'
 
 export interface Orcamento {
   id: string
@@ -13,11 +12,6 @@ export interface Orcamento {
   status: OrcamentoStatus
   createdBy: string
   createdAt: string
-  submittedAt: string | null
-  approvedAt: string | null
-  completedAt: string | null
-  currentApprovalCycle: number
-  lastRejectionReason: string | null
   fornecedorCnpj: string
   fornecedorNome: string
   fornecedorEndereco: string | null
@@ -30,6 +24,9 @@ export interface Orcamento {
 export interface OrcamentoListFilter {
   date?: string
   purchaseRequestId?: string
+  supplier?: string
+  page?: number
+  size?: number
 }
 
 export interface OrcamentoLineItem {
@@ -40,6 +37,7 @@ export interface OrcamentoLineItem {
   quantity: string
   unitPrice: string | null
   sourcePurchaseRequestItemId: string | null
+  selected: boolean
 }
 
 export interface OrcamentoLineItemInput {
@@ -49,36 +47,10 @@ export interface OrcamentoLineItemInput {
   unitPrice: string | null
 }
 
-export interface OrcamentoApproval {
-  id: string
-  orcamentoId: string
-  cycleNumber: number
-  stepOrder: number
-  approverFunction: OrcamentoApproverFunction
-  status: OrcamentoApprovalStatus
-  decidedBySiteMembershipId: string | null
-  decidedAt: string | null
-  comment: string | null
-  createdAt: string
-}
-
 export interface OrcamentoDetail {
   orcamento: Orcamento
   lineItems: OrcamentoLineItem[]
-  approvals: OrcamentoApproval[]
   materials: Material[]
-}
-
-export interface SiteOrcamentoApprovalLevel {
-  id: string
-  constructionSiteId: string
-  stepOrder: number
-  approverFunction: OrcamentoApproverFunction
-}
-
-export interface OrcamentoApprovalLevelInput {
-  stepOrder: number
-  approverFunction: OrcamentoApproverFunction
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -101,12 +73,14 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
 }
 
 export function useOrcamentos() {
-  function listOrcamentos(siteId: string, filter: OrcamentoListFilter = {}): Promise<Orcamento[]> {
+  function listOrcamentos(siteId: string, filter: OrcamentoListFilter = {}): Promise<PageResponse<Orcamento>> {
     const params = new URLSearchParams()
     if (filter.date) params.set('date', filter.date)
     if (filter.purchaseRequestId) params.set('purchaseRequestId', filter.purchaseRequestId)
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return authFetch(`/api/construction-sites/${siteId}/orcamentos${query}`)
+    if (filter.supplier) params.set('supplier', filter.supplier)
+    params.set('page', String(filter.page ?? 0))
+    params.set('size', String(filter.size ?? 20))
+    return authFetch(`/api/construction-sites/${siteId}/orcamentos?${params.toString()}`)
   }
 
   function createOrcamento(
@@ -143,37 +117,6 @@ export function useOrcamentos() {
     return authFetch(`/api/orcamentos/${orcamentoId}/line-items/${lineItemId}`, { method: 'DELETE' })
   }
 
-  function submitForApproval(orcamentoId: string): Promise<Orcamento> {
-    return authFetch(`/api/orcamentos/${orcamentoId}/submit`, { method: 'POST' })
-  }
-
-  function approveStep(orcamentoId: string, comment?: string): Promise<Orcamento> {
-    const query = comment ? `?comment=${encodeURIComponent(comment)}` : ''
-    return authFetch(`/api/orcamentos/${orcamentoId}/approve-step${query}`, { method: 'POST' })
-  }
-
-  function rejectStep(orcamentoId: string, reason: string): Promise<Orcamento> {
-    return authFetch(`/api/orcamentos/${orcamentoId}/reject-step`, { method: 'POST', body: JSON.stringify({ reason }) })
-  }
-
-  function conclude(orcamentoId: string): Promise<Orcamento> {
-    return authFetch(`/api/orcamentos/${orcamentoId}/conclude`, { method: 'POST' })
-  }
-
-  function getApprovalLevels(siteId: string): Promise<SiteOrcamentoApprovalLevel[]> {
-    return authFetch(`/api/construction-sites/${siteId}/orcamento-approval-levels`)
-  }
-
-  function setApprovalLevels(
-    siteId: string,
-    levels: OrcamentoApprovalLevelInput[],
-  ): Promise<SiteOrcamentoApprovalLevel[]> {
-    return authFetch(`/api/construction-sites/${siteId}/orcamento-approval-levels`, {
-      method: 'PUT',
-      body: JSON.stringify({ levels }),
-    })
-  }
-
   return {
     listOrcamentos,
     createOrcamento,
@@ -181,11 +124,5 @@ export function useOrcamentos() {
     addLineItem,
     updateLineItem,
     removeLineItem,
-    submitForApproval,
-    approveStep,
-    rejectStep,
-    conclude,
-    getApprovalLevels,
-    setApprovalLevels,
   }
 }

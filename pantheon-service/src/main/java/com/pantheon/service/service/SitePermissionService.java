@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service;
  * below (matching the pre-permission-configuration role rules, so a freshly created obra needs
  * no configuration to behave correctly). {@code PURCHASE_REQUEST}/{@code ORCAMENTO_MANAGE}
  * have no real "view" mode - {@link AccessLevel#MANAGE} means granted, {@link AccessLevel#VIEW}
- * means denied. Orcamento approval-step authority is resolved separately, from that site's
- * {@code SiteOrcamentoApprovalLevel} configuration, not from a capability here.
+ * means denied. Pedido de Compra approval-step authority is resolved separately, from that
+ * site's {@code SitePurchaseRequestApprovalLevel} configuration, not from a capability here.
  */
 @Service
 public class SitePermissionService {

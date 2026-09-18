@@ -1,14 +1,42 @@
 package com.pantheon.service.dto;
 
+import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.PurchaseRequest;
+import com.pantheon.service.entity.PurchaseRequestStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
-public record PurchaseRequestResponse(UUID id, UUID constructionSiteId, String name, UUID createdBy, Instant createdAt) {
+public record PurchaseRequestResponse(
+        UUID id,
+        UUID constructionSiteId,
+        String name,
+        PurchaseRequestStatus status,
+        UUID createdBy,
+        Instant createdAt,
+        Instant submittedAt,
+        Instant approvedAt,
+        Instant completedAt,
+        String lastRejectionReason,
+        List<LinkedOrcamentoSummary> linkedOrcamentos) {
+
+    public record LinkedOrcamentoSummary(UUID id, String fornecedorNome) {
+
+        public static LinkedOrcamentoSummary from(Orcamento orcamento) {
+            return new LinkedOrcamentoSummary(orcamento.getId(), orcamento.getFornecedorNome());
+        }
+    }
 
     public static PurchaseRequestResponse from(PurchaseRequest purchaseRequest) {
+        return from(purchaseRequest, List.of());
+    }
+
+    public static PurchaseRequestResponse from(PurchaseRequest purchaseRequest, List<Orcamento> linkedOrcamentos) {
         return new PurchaseRequestResponse(
                 purchaseRequest.getId(), purchaseRequest.getConstructionSiteId(), purchaseRequest.getName(),
-                purchaseRequest.getCreatedBy(), purchaseRequest.getCreatedAt());
+                purchaseRequest.getStatus(), purchaseRequest.getCreatedBy(), purchaseRequest.getCreatedAt(),
+                purchaseRequest.getSubmittedAt(), purchaseRequest.getApprovedAt(), purchaseRequest.getCompletedAt(),
+                purchaseRequest.getLastRejectionReason(),
+                linkedOrcamentos.stream().map(LinkedOrcamentoSummary::from).toList());
     }
 }

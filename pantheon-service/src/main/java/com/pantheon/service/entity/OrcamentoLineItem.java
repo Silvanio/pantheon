@@ -11,7 +11,9 @@ import java.util.UUID;
  * A free-text line item of an {@link Orcamento} — name/type/quantity are always typed in by the
  * creator (copied from a {@link PurchaseRequestItem} when converting one, or entered from
  * scratch), never a live catalog reference. {@code sourcePurchaseRequestItemId} is kept purely
- * for traceability. See {@code orcamento-approval-workflow}'s "Orçamento line item management".
+ * for traceability, and is also how the comparison table (see {@code purchase-requests}' "Pedido
+ * de Compra comparison table") matches a supplier's quote back to the Pedido-de-Compra item it
+ * was quoted against. See {@code orcamento-management}'s "Orçamento line item management".
  */
 @Entity
 @Table(name = "orcamento_line_item")

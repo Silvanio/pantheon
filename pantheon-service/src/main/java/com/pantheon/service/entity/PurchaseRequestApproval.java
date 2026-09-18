@@ -10,21 +10,21 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One instance of an approval step for one submission cycle of an {@link Orcamento}, snapshotted
- * from that site's {@link SiteOrcamentoApprovalLevel} configuration (or the default) at submit
- * time. Rows from earlier, rejected cycles are kept for history — see
- * {@code orcamento-approval-workflow}'s "Submitting an Orçamento for approval" and "Acting on an
- * approval step".
+ * One instance of an approval step for one submission cycle of a {@link PurchaseRequest},
+ * snapshotted from that site's {@link SitePurchaseRequestApprovalLevel} configuration (or the
+ * default) at submit time. Rows from earlier, rejected cycles are kept for history — see
+ * {@code purchase-request-approval-workflow}'s "Submitting a Pedido de Compra for approval" and
+ * "Acting on an approval step".
  */
 @Entity
-@Table(name = "orcamento_approval")
-public class OrcamentoApproval {
+@Table(name = "purchase_request_approval")
+public class PurchaseRequestApproval {
 
     @Id
     private UUID id;
 
-    @Column(name = "orcamento_id", nullable = false)
-    private UUID orcamentoId;
+    @Column(name = "purchase_request_id", nullable = false)
+    private UUID purchaseRequestId;
 
     @Column(name = "cycle_number", nullable = false)
     private int cycleNumber;
@@ -38,7 +38,7 @@ public class OrcamentoApproval {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrcamentoApprovalStatus status;
+    private PurchaseRequestApprovalStatus status;
 
     @Column(name = "decided_by_site_membership_id")
     private UUID decidedBySiteMembershipId;
@@ -52,31 +52,31 @@ public class OrcamentoApproval {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    protected OrcamentoApproval() {
+    protected PurchaseRequestApproval() {
         // JPA
     }
 
-    public OrcamentoApproval(
-            UUID id, UUID orcamentoId, int cycleNumber, int stepOrder, ConstructionFunction approverFunction,
+    public PurchaseRequestApproval(
+            UUID id, UUID purchaseRequestId, int cycleNumber, int stepOrder, ConstructionFunction approverFunction,
             Instant createdAt) {
         this.id = id;
-        this.orcamentoId = orcamentoId;
+        this.purchaseRequestId = purchaseRequestId;
         this.cycleNumber = cycleNumber;
         this.stepOrder = stepOrder;
         this.approverFunction = approverFunction;
-        this.status = OrcamentoApprovalStatus.PENDING;
+        this.status = PurchaseRequestApprovalStatus.PENDING;
         this.createdAt = createdAt;
     }
 
     public void approve(UUID decidedBySiteMembershipId, String comment, Instant now) {
-        this.status = OrcamentoApprovalStatus.APPROVED;
+        this.status = PurchaseRequestApprovalStatus.APPROVED;
         this.decidedBySiteMembershipId = decidedBySiteMembershipId;
         this.comment = comment;
         this.decidedAt = now;
     }
 
     public void reject(UUID decidedBySiteMembershipId, String comment, Instant now) {
-        this.status = OrcamentoApprovalStatus.REJECTED;
+        this.status = PurchaseRequestApprovalStatus.REJECTED;
         this.decidedBySiteMembershipId = decidedBySiteMembershipId;
         this.comment = comment;
         this.decidedAt = now;
@@ -86,8 +86,8 @@ public class OrcamentoApproval {
         return id;
     }
 
-    public UUID getOrcamentoId() {
-        return orcamentoId;
+    public UUID getPurchaseRequestId() {
+        return purchaseRequestId;
     }
 
     public int getCycleNumber() {
@@ -102,7 +102,7 @@ public class OrcamentoApproval {
         return approverFunction;
     }
 
-    public OrcamentoApprovalStatus getStatus() {
+    public PurchaseRequestApprovalStatus getStatus() {
         return status;
     }
 

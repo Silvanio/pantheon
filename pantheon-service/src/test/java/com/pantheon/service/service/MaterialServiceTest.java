@@ -11,9 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MaterialDeliveryStatus;
-import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.exception.MaterialDeliveryStatusOrderException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MaterialDeliveryPhotoRepository;
@@ -75,15 +75,15 @@ class MaterialServiceTest {
     }
 
     @Test
-    void createFromOrcamentoCreatesOneMaterialPerLineItem() {
-        Orcamento orcamento = new Orcamento(
-                UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor Teste",
-                null, null, null, null, null);
+    void createFromPurchaseRequestSelectionsCreatesOneMaterialPerLineItem() {
+        PurchaseRequest purchaseRequest = new PurchaseRequest(
+                UUID.randomUUID(), siteId, "Pedido 07/09/2026 #1", UUID.randomUUID(), Instant.now());
+        UUID orcamentoId = UUID.randomUUID();
         List<OrcamentoLineItem> items = List.of(
-                new OrcamentoLineItem(UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, null),
-                new OrcamentoLineItem(UUID.randomUUID(), orcamento.getId(), "Areia", "m3", BigDecimal.ONE, BigDecimal.ONE, null));
+                new OrcamentoLineItem(UUID.randomUUID(), orcamentoId, "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, null),
+                new OrcamentoLineItem(UUID.randomUUID(), orcamentoId, "Areia", "m3", BigDecimal.ONE, BigDecimal.ONE, null));
 
-        service.createFromOrcamento(orcamento, items);
+        service.createFromPurchaseRequestSelections(purchaseRequest, items);
 
         verify(materialRepository, org.mockito.Mockito.times(2)).save(any());
     }

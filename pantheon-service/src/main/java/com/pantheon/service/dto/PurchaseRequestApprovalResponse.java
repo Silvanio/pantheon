@@ -1,26 +1,26 @@
 package com.pantheon.service.dto;
 
 import com.pantheon.service.entity.ConstructionFunction;
-import com.pantheon.service.entity.OrcamentoApproval;
-import com.pantheon.service.entity.OrcamentoApprovalStatus;
+import com.pantheon.service.entity.PurchaseRequestApproval;
+import com.pantheon.service.entity.PurchaseRequestApprovalStatus;
 import java.time.Instant;
 import java.util.UUID;
 
-public record OrcamentoApprovalResponse(
+public record PurchaseRequestApprovalResponse(
         UUID id,
-        UUID orcamentoId,
+        UUID purchaseRequestId,
         int cycleNumber,
         int stepOrder,
         ConstructionFunction approverFunction,
-        OrcamentoApprovalStatus status,
+        PurchaseRequestApprovalStatus status,
         UUID decidedBySiteMembershipId,
         Instant decidedAt,
         String comment,
         Instant createdAt) {
 
-    public static OrcamentoApprovalResponse from(OrcamentoApproval approval) {
-        return new OrcamentoApprovalResponse(
-                approval.getId(), approval.getOrcamentoId(), approval.getCycleNumber(), approval.getStepOrder(),
+    public static PurchaseRequestApprovalResponse from(PurchaseRequestApproval approval) {
+        return new PurchaseRequestApprovalResponse(
+                approval.getId(), approval.getPurchaseRequestId(), approval.getCycleNumber(), approval.getStepOrder(),
                 approval.getApproverFunction(), approval.getStatus(), approval.getDecidedBySiteMembershipId(),
                 approval.getDecidedAt(), approval.getComment(), approval.getCreatedAt());
     }

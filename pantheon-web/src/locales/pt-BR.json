@@ -429,7 +429,7 @@
   "orcamento": {
     "title": "Orçamentos",
     "label": "Orçamento",
-    "subtitle": "Orçamentos desta obra e seu status de aprovação.",
+    "subtitle": "Orçamentos de fornecedores desta obra.",
     "newButton": "Novo orçamento",
     "empty": "Nenhum orçamento criado ainda.",
     "back": "Voltar",
@@ -437,22 +437,11 @@
     "loadError": "Não foi possível carregar o orçamento.",
     "lineItemsTitle": "Itens do orçamento",
     "lineItemsEmpty": "Nenhum item adicionado ainda.",
+    "lockedHint": "Este orçamento está bloqueado e não pode ser editado enquanto o pedido de compra estiver em conferência ou concluído.",
+    "selectedLabel": "Selecionado",
     "addItemButton": "Adicionar item",
     "removeItemButton": "Remover",
     "editItemButton": "Editar",
-    "submitButton": "Enviar para aprovação",
-    "submitError": "Não foi possível enviar o orçamento para aprovação. Adicione ao menos um item.",
-    "concludeButton": "Concluir orçamento",
-    "approveStepButton": "Aprovar",
-    "rejectStepButton": "Rejeitar",
-    "rejectReasonPlaceholder": "Motivo da rejeição",
-    "confirmReject": "Confirmar rejeição",
-    "lastRejectionReason": "Motivo da última rejeição",
-    "approvalHistoryTitle": "Histórico de aprovação",
-    "cycleLabel": "Ciclo",
-    "stepLabel": "Etapa",
-    "materialsTitle": "Materiais gerados",
-    "materialsEmpty": "Nenhum material gerado ainda.",
     "form": {
       "name": "Nome",
       "type": "Tipo",
@@ -464,10 +453,103 @@
     },
     "status": {
       "DRAFT": "Rascunho",
-      "IN_APPROVAL": "Em aprovação",
-      "APPROVED": "Aprovado",
-      "COMPLETED": "Concluído"
+      "LOCKED": "Bloqueado"
     },
+    "filter": {
+      "button": "Filtrar",
+      "apply": "Aplicar"
+    },
+    "pagination": {
+      "summary": "Página {page} de {totalPages} · {totalElements} orçamentos",
+      "previous": "Anterior",
+      "next": "Próxima"
+    },
+    "dateFilterLabel": "Filtrar por data",
+    "supplierFilterLabel": "Filtrar por fornecedor",
+    "supplierFilterPlaceholder": "Nome do fornecedor",
+    "purchaseRequestFilterLabel": "Filtrar por pedido de compra",
+    "clearFilterButton": "Limpar filtros",
+    "sourcePurchaseRequestLabel": "Originado do pedido",
+    "supplierSectionTitle": "Fornecedor",
+    "totalLabel": "Total",
+    "changeSupplierButton": "Trocar fornecedor"
+  },
+  "purchaseRequests": {
+    "title": "Pedido de Compra",
+    "subtitle": "Pedidos de materiais que esta obra precisa comprar.",
+    "toggleLabel": "Pedido de Compra",
+    "empty": "Nenhum pedido de compra criado ainda.",
+    "newButton": "Novo pedido",
+    "loadError": "Não foi possível carregar o pedido de compra.",
+    "backToList": "Voltar aos pedidos",
+    "detailTitle": "Itens do pedido",
+    "pendingTitle": "Pendentes",
+    "noPendingItems": "Nenhum item pendente. Todos os itens deste pedido já foram convertidos em orçamento.",
+    "convertedTitle": "Convertidos em orçamento",
+    "convertButton": "Criar orçamento",
+    "convertError": "Não foi possível criar o orçamento a partir dos itens selecionados.",
+    "noSelectionYet": "Nenhum fornecedor selecionado ainda.",
+    "selectedFrom": "Selecionado de {supplier}",
+    "addRowButton": "+ Adicionar item",
+    "removeRowButton": "Remover",
+    "linkedOrcamentosTitle": "Orçamentos vinculados",
+    "form": {
+      "name": "Nome",
+      "type": "Tipo",
+      "quantity": "Quantidade",
+      "unit": "Unidade",
+      "submit": "Criar pedido",
+      "cancel": "Cancelar",
+      "error": "Não foi possível criar o pedido. Verifique os dados informados."
+    },
+    "status": {
+      "PENDING": "Pendente",
+      "CONVERTED": "Convertido",
+      "INICIADO": "Iniciado",
+      "ORCADO": "Orçado",
+      "CONFERIDO": "Conferido",
+      "CONCLUIDO": "Concluído"
+    },
+    "card": {
+      "linkedOrcamentos": "{count} orçamento(s) vinculado(s)"
+    },
+    "filter": {
+      "button": "Filtrar",
+      "apply": "Aplicar",
+      "clear": "Limpar",
+      "statusLabel": "Status",
+      "allStatuses": "Todos os status",
+      "dateLabel": "Data"
+    },
+    "pagination": {
+      "summary": "Página {page} de {totalPages} · {totalElements} pedidos",
+      "previous": "Anterior",
+      "next": "Próxima"
+    },
+    "comparison": {
+      "title": "Comparativo de fornecedores",
+      "subtitle": "Compare os preços cotados por cada fornecedor e escolha, por item, de quem comprar.",
+      "itemColumn": "Item",
+      "printLabel": "Imprimir",
+      "printButton": "Imprimir PDF",
+      "printing": "Gerando...",
+      "printError": "Não foi possível gerar o PDF deste fornecedor.",
+      "selectError": "Não foi possível salvar a seleção deste item."
+    },
+    "submitButton": "Enviar para aprovação",
+    "submitError": "Não foi possível enviar o pedido para aprovação. Selecione um fornecedor para cada item.",
+    "concludeButton": "Concluir pedido",
+    "approveStepButton": "Aprovar",
+    "rejectStepButton": "Rejeitar",
+    "rejectReasonPlaceholder": "Motivo da rejeição",
+    "confirmReject": "Confirmar rejeição",
+    "lastRejectionReason": "Motivo da última rejeição",
+    "approvalError": "Não foi possível concluir a ação. Tente novamente.",
+    "approvalHistoryTitle": "Histórico de aprovação",
+    "cycleLabel": "Ciclo",
+    "stepLabel": "Etapa",
+    "materialsTitle": "Materiais gerados",
+    "materialsEmpty": "Nenhum material gerado ainda.",
     "approvalStatus": {
       "PENDING": "Pendente",
       "APPROVED": "Aprovado",
@@ -482,52 +564,14 @@
       "OTHER": "Outro"
     },
     "approvalLevels": {
-      "title": "Níveis de aprovação de orçamento",
-      "subtitle": "Defina a sequência de funções que devem aprovar um orçamento nesta obra. Sem configuração, um único nível (Engenheiro) é usado.",
+      "title": "Níveis de aprovação de pedido de compra",
+      "subtitle": "Defina a sequência de funções que devem aprovar um pedido de compra nesta obra. Sem configuração, um único nível (Engenheiro) é usado.",
       "stepLabel": "Etapa",
       "addLevelButton": "Adicionar nível",
       "removeLevelButton": "Remover",
       "saveButton": "Salvar níveis",
       "error": "Não foi possível salvar os níveis de aprovação.",
       "saved": "Níveis de aprovação salvos."
-    },
-    "dateFilterLabel": "Filtrar por data",
-    "purchaseRequestFilterLabel": "Filtrar por pedido de compra",
-    "clearFilterButton": "Limpar filtros",
-    "sourcePurchaseRequestLabel": "Originado do pedido",
-    "supplierSectionTitle": "Fornecedor",
-    "totalLabel": "Total",
-    "changeSupplierButton": "Trocar fornecedor"
-  },
-  "purchaseRequests": {
-    "title": "Pedido de Compra",
-    "subtitle": "Pedidos de materiais que esta obra precisa comprar.",
-    "toggleLabel": "Pedido de Compra",
-    "empty": "Nenhum pedido de compra criado ainda.",
-    "newButton": "Novo pedido",
-    "dateFilterLabel": "Filtrar por data",
-    "clearFilterButton": "Limpar filtro",
-    "backToList": "Voltar aos pedidos",
-    "detailTitle": "Itens do pedido",
-    "pendingTitle": "Pendentes",
-    "noPendingItems": "Nenhum item pendente. Todos os itens deste pedido já foram convertidos em orçamento.",
-    "convertedTitle": "Convertidos em orçamento",
-    "convertButton": "Criar orçamento",
-    "convertError": "Não foi possível criar o orçamento a partir dos itens selecionados.",
-    "addRowButton": "+ Adicionar item",
-    "removeRowButton": "Remover",
-    "form": {
-      "name": "Nome",
-      "type": "Tipo",
-      "quantity": "Quantidade",
-      "unit": "Unidade",
-      "submit": "Criar pedido",
-      "cancel": "Cancelar",
-      "error": "Não foi possível criar o pedido. Verifique os dados informados."
-    },
-    "status": {
-      "PENDING": "Pendente",
-      "CONVERTED": "Convertido"
     }
   },
   "materialDelivery": {

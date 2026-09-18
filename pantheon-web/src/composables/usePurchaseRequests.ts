@@ -1,15 +1,38 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 import type { FornecedorInput } from './useFornecedores'
+import type { PurchaseRequestApproverFunction } from './usePurchaseRequestApprovalLevels'
 
 export type PurchaseRequestItemStatus = 'PENDING' | 'CONVERTED'
+export type PurchaseRequestStatus = 'INICIADO' | 'ORCADO' | 'CONFERIDO' | 'CONCLUIDO'
+export type PurchaseRequestApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+/** A `Page<T>` envelope as returned by Spring's paginated list endpoints. */
+export interface PageResponse<T> {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
+}
+
+export interface LinkedOrcamentoSummary {
+  id: string
+  fornecedorNome: string
+}
 
 export interface PurchaseRequest {
   id: string
   constructionSiteId: string
   name: string
+  status: PurchaseRequestStatus
   createdBy: string
   createdAt: string
+  submittedAt: string | null
+  approvedAt: string | null
+  completedAt: string | null
+  lastRejectionReason: string | null
+  linkedOrcamentos: LinkedOrcamentoSummary[]
 }
 
 export interface PurchaseRequestItem {
@@ -25,6 +48,7 @@ export interface PurchaseRequestItem {
   createdAt: string
   convertedToOrcamentoId: string | null
   convertedAt: string | null
+  selectedOrcamentoLineItemId: string | null
 }
 
 export interface PurchaseRequestItemCreationData {
@@ -34,9 +58,56 @@ export interface PurchaseRequestItemCreationData {
   unit: string | null
 }
 
+export interface PurchaseRequestApproval {
+  id: string
+  purchaseRequestId: string
+  cycleNumber: number
+  stepOrder: number
+  approverFunction: PurchaseRequestApproverFunction
+  status: PurchaseRequestApprovalStatus
+  decidedBySiteMembershipId: string | null
+  decidedAt: string | null
+  comment: string | null
+  createdAt: string
+}
+
 export interface PurchaseRequestDetail {
   purchaseRequest: PurchaseRequest
   items: PurchaseRequestItem[]
+  approvals: PurchaseRequestApproval[]
+}
+
+export interface PurchaseRequestListFilter {
+  date?: string
+  status?: PurchaseRequestStatus
+  page?: number
+  size?: number
+}
+
+export interface ComparisonColumn {
+  orcamentoId: string
+  supplierName: string
+}
+
+export interface ComparisonCell {
+  orcamentoId: string
+  lineItemId: string
+  unitPrice: string | null
+  quantity: string
+  selected: boolean
+}
+
+export interface ComparisonRow {
+  itemId: string
+  itemName: string
+  quantity: string
+  unit: string | null
+  cells: ComparisonCell[]
+}
+
+export interface PurchaseRequestComparison {
+  columns: ComparisonColumn[]
+  rows: ComparisonRow[]
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -55,10 +126,30 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
   return (await response.json()) as T
 }
 
+async function authFetchBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const { token } = useAuth()
+  const response = await fetch(`${SERVICE_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token.value}` },
+  })
+  if (!response.ok) {
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename="?([^"]+)"?/.exec(disposition)
+  return { blob: await response.blob(), filename: match ? match[1] : null }
+}
+
 export function usePurchaseRequests() {
-  function listPurchaseRequests(siteId: string, date?: string): Promise<PurchaseRequest[]> {
-    const query = date ? `?date=${date}` : ''
-    return authFetch(`/api/construction-sites/${siteId}/purchase-requests${query}`)
+  function listPurchaseRequests(
+    siteId: string,
+    filter: PurchaseRequestListFilter = {},
+  ): Promise<PageResponse<PurchaseRequest>> {
+    const params = new URLSearchParams()
+    if (filter.date) params.set('date', filter.date)
+    if (filter.status) params.set('status', filter.status)
+    params.set('page', String(filter.page ?? 0))
+    params.set('size', String(filter.size ?? 20))
+    return authFetch(`/api/construction-sites/${siteId}/purchase-requests?${params.toString()}`)
   }
 
   function createPurchaseRequest(siteId: string, items: PurchaseRequestItemCreationData[]): Promise<PurchaseRequest> {
@@ -83,5 +174,59 @@ export function usePurchaseRequests() {
     })
   }
 
-  return { listPurchaseRequests, createPurchaseRequest, getPurchaseRequest, convertToOrcamento }
+  function setItemSelection(
+    purchaseRequestId: string,
+    itemId: string,
+    orcamentoLineItemId: string | null,
+  ): Promise<PurchaseRequestItem> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/items/${itemId}/selection`, {
+      method: 'PUT',
+      body: JSON.stringify({ orcamentoLineItemId }),
+    })
+  }
+
+  function getComparison(purchaseRequestId: string): Promise<PurchaseRequestComparison> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/comparison`)
+  }
+
+  function getSupplierPdfBlob(
+    purchaseRequestId: string,
+    orcamentoId: string,
+  ): Promise<{ blob: Blob; filename: string | null }> {
+    return authFetchBlob(`/api/purchase-requests/${purchaseRequestId}/orcamentos/${orcamentoId}/pdf`)
+  }
+
+  function submitForApproval(purchaseRequestId: string): Promise<PurchaseRequest> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/submit`, { method: 'POST' })
+  }
+
+  function approveStep(purchaseRequestId: string, comment?: string): Promise<PurchaseRequest> {
+    const query = comment ? `?comment=${encodeURIComponent(comment)}` : ''
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/approve-step${query}`, { method: 'POST' })
+  }
+
+  function rejectStep(purchaseRequestId: string, reason: string): Promise<PurchaseRequest> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/reject-step`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
+  }
+
+  function conclude(purchaseRequestId: string): Promise<PurchaseRequest> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/conclude`, { method: 'POST' })
+  }
+
+  return {
+    listPurchaseRequests,
+    createPurchaseRequest,
+    getPurchaseRequest,
+    convertToOrcamento,
+    setItemSelection,
+    getComparison,
+    getSupplierPdfBlob,
+    submitForApproval,
+    approveStep,
+    rejectStep,
+    conclude,
+  }
 }

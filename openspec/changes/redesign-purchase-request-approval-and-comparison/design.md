@@ -1,0 +1,73 @@
+## Context
+
+`add-suppliers-and-purchase-request-headers` (implemented, archived) gave Pedido de Compra a real header entity that can spawn more than one Orçamento over time, and gave every Orçamento a snapshotted supplier. But it left the approval chain, the `DRAFT→IN_APPROVAL→APPROVED→COMPLETED` status machine, and the conclusion-into-`Material` action all on the Orçamento itself — one supplier's document. That made sense when a Pedido de Compra was expected to resolve into a single Orçamento, but it does not model the actual buying decision: a Pedido de Compra with three quoted suppliers is approved and purchased *once*, as a single document, potentially buying different products from different suppliers to minimize total cost. Approving three separate Orçamentos independently has no way to express "buy item A from supplier 1 and item B from supplier 2." This change moves the whole approval/conclusion lifecycle to `PurchaseRequest`, adds a per-item supplier selection, and adds the comparison table and per-supplier PDF that make picking the cheapest mix an actual UI affordance instead of something done by memory.
+
+This is a pre-production environment (no real customers), so this change follows the same clean-cut migration precedent as both prior changes in this domain — existing dev `Orcamento`/approval rows are cleared rather than backfilled into the new shape.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Make the Pedido de Compra the single unit of approval and conclusion, covering possibly-mixed products from multiple Orçamentos/suppliers.
+- Let a user pick, per requested product, which supplier's quote to buy from, and see all suppliers' prices for that product side by side.
+- Print a supplier-scoped PDF of exactly the items being bought from that supplier, for handoff/record-keeping.
+- Reduce the Orçamento to what it conceptually is: one supplier's priced quote, freely editable until it's locked in by an approved Pedido de Compra.
+- Redesign both list/detail screens around pagination, a clear filter-vs-create header split, and status/relationship visibility (which fits the new, denser cross-entity information).
+
+**Non-Goals:**
+- Changing `Material`/delivery-tracking's own status machine (`AWAITING_DELIVERY`→`DELIVERED`→`DELIVERED_AND_CHECKED`) — unaffected, only its creation trigger moves.
+- Changing `Fornecedor`/supplier registry semantics (company-scoped, find-or-create, CNPJ autocomplete) — unaffected.
+- Supporting a single `OrcamentoLineItem` being split/partially selected across multiple Pedido-de-Compra items, or partial-quantity selection — a selection is "this whole line item fulfills this whole Pedido-de-Compra item," matching how quantities are already entered today (no partial-quantity model exists anywhere in this domain).
+- Retroactively migrating real approval/material data — none exists outside dev QA rows.
+
+## Decisions
+
+### 1. Approval moves wholesale from `Orcamento` to `PurchaseRequest`; new entity names reflect the new owner
+`OrcamentoApproval` → `PurchaseRequestApproval` (same shape: `id`, `purchaseRequestId`, `cycleNumber`, `stepOrder`, `approverFunction`, `status` (`PENDING`/`APPROVED`/`REJECTED`), `decidedBySiteMembershipId`, `decidedAt`, `comment`, `createdAt`). `SiteOrcamentoApprovalLevel` → `SitePurchaseRequestApprovalLevel` (same shape, `constructionSiteId` scoped). `submittedAt`, `approvedAt`, `completedAt`, `currentApprovalCycle`, `lastRejectionReason` move from `Orcamento` to `PurchaseRequest`. The authority rule is unchanged: company staff, or a site member whose active `SiteMembership.function` matches the current cycle's lowest-order `PENDING` step, may act on it; an unconfigured site still defaults to one implicit `ENGINEER` step. `OrcamentoService`'s `submitForApproval`/`approveStep`/`rejectStep`/`conclude` methods move (renamed target) into `PurchaseRequestService`; `OrcamentoService` keeps only creation and line-item CRUD.
+
+**Alternative considered**: keep `OrcamentoApproval` pointed at `Orcamento` and add a second, parallel PO-level approval on top. Rejected — that models two approvals for one purchase decision and gives no way to say "this PO's approval covers these specific line items from these specific Orçamentos," which is the actual requirement.
+
+### 2. `PurchaseRequestStatus{INICIADO,ORCADO,CONFERIDO,CONCLUIDO}` drives the whole header lifecycle
+- `INICIADO`: set at creation.
+- `ORCADO`: set automatically the first time an `Orcamento` is created with `sourcePurchaseRequestId` pointing at this header (in `OrcamentoService.createFromPurchaseRequestItems`, after persisting the Orçamento). A header only ever moves `INICIADO→ORCADO` once; later Orçamentos linked to an already-`ORCADO` header don't re-trigger anything.
+- `CONFERIDO`: set when the last pending `PurchaseRequestApproval` step of the current cycle is approved. Submitting for approval (`INICIADO`/`ORCADO`→ pending cycle) requires the header to be `ORCADO` and every one of its `PurchaseRequestItem`s to have a non-null `selectedOrcamentoLineItemId` — the mix must be fully decided before it goes to approval. A step rejection returns the header to `ORCADO` and records the reason in `lastRejectionReason`, mirroring the old Orçamento rejection behavior.
+- `CONCLUIDO`: set by an explicit `conclude` action, only from `CONFERIDO`.
+
+**Alternative considered**: fold `CONFERIDO` and `CONCLUIDO` into a single "Aprovado" status like the old Orçamento had, with conclusion as a same-status side effect. Rejected — the user explicitly asked for four distinct, named statuses (iniciado/orçado/conferido/concluído), and keeping them distinct also gives the UI a real four-step progress stepper instead of a fuzzy "approved-ish" state.
+
+### 3. Per-item selection: `PurchaseRequestItem.selectedOrcamentoLineItemId`
+A nullable FK on `PurchaseRequestItem` to `OrcamentoLineItem`. `PUT /api/purchase-requests/{id}/items/{itemId}/selection` sets or clears it (body `{orcamentoLineItemId}` or `{orcamentoLineItemId: null}`), only while the header is `ORCADO`. Validation: the target `OrcamentoLineItem`'s `Orcamento` must have `sourcePurchaseRequestId == id`, and if that line item has a `sourcePurchaseRequestItemId`, it must equal `itemId` (a line item is only selectable for the Pedido-de-Compra item it was quoted against, or for a manually-added Orçamento line item with no traceable source — in that edge case, selection is allowed against any item since the API has no other way to know intent, and the comparison table simply won't have auto-populated that cell). Selecting is a plain field write with no side effects on `Orcamento` or `PurchaseRequestItem` status — the header-level `ORCADO`/`CONFERIDO`/`CONCLUIDO` machine is what actually gates things.
+
+This single field is what makes "mixed" purchasing possible: two different `PurchaseRequestItem`s under the same header can point at `OrcamentoLineItem`s belonging to two different `Orcamento`s (two different suppliers), and the comparison table (Decision 4) is exactly a view over this field plus the available quotes.
+
+**Alternative considered**: a separate join entity (`PurchaseRequestItemSelection`) instead of a field on `PurchaseRequestItem`. Rejected — a `PurchaseRequestItem` is selected against at most one `OrcamentoLineItem` at a time (Non-Goal: no partial/split selection), so a nullable scalar FK captures the full relationship with no extra table, consistent with how `sourcePurchaseRequestId`/`sourcePurchaseRequestItemId` already model 1:1-at-a-time links in this domain.
+
+### 4. Comparison table is a read-only derived endpoint, not stored state
+`GET /api/purchase-requests/{id}/comparison` loads all `PurchaseRequestItem`s of the header (rows) and all `Orcamento`s with `sourcePurchaseRequestId == id` (columns, each carrying its supplier snapshot), then for each row×column looks up an `OrcamentoLineItem` in that Orçamento whose `sourcePurchaseRequestItemId` equals the row's item id (at most one such line item is expected per Orçamento per item, since a single conversion batch produces at most one line item per selected `PurchaseRequestItem`). Each populated cell carries the line item's id, unit price, quantity, and whether it is the item's `selectedOrcamentoLineItemId`. This is computed on read, not persisted — it can never drift from the underlying `Orcamento`/`PurchaseRequestItem` rows.
+
+**Alternative considered**: materialize the comparison grid as its own table, updated on every Orçamento line-item write. Rejected — unnecessary complexity for what's a bounded, cheap join (a Pedido de Compra realistically has a handful of items and a handful of quotes), and read-derived state can't go stale.
+
+### 5. Orçamento lock follows its Pedido de Compra's status, not its own independent machine
+`OrcamentoStatus{DRAFT,LOCKED}`. Line-item CRUD is allowed only in `DRAFT`, same rule as before. `OrcamentoService` sets every Orçamento with `sourcePurchaseRequestId == id` to `LOCKED` when that header's approval reaches `CONFERIDO`, and back to `DRAFT` when a rejection returns the header to `ORCADO`. This is one extra write inside the same transaction as the header's own status change (`PurchaseRequestService.approveStep`/`rejectStep`), not a separately triggered process. A from-scratch Orçamento with no `sourcePurchaseRequestId` never locks — it has no header to follow, and stays `DRAFT` indefinitely (matching today's supported "quote with no Pedido de Compra" creation path).
+
+**Alternative considered**: derive "is this Orçamento editable" purely from its header's status at read/write time, with no stored `Orcamento.status` at all. Rejected — line-item write endpoints (`OrcamentoController`) would then need to reach through to the header on every call, and a supplier-scoped detail view showing "Bloqueado" needs a status to display even when the caller hasn't also loaded the header; a denormalized, transactionally-kept-in-sync field is simpler for both.
+
+### 6. Conclusion creates `Material` from selections, across possibly-multiple Orçamentos
+`MaterialService.createFromOrcamento(orcamento, items)` → `MaterialService.createFromPurchaseRequestSelections(purchaseRequest, items)`: for every `PurchaseRequestItem` of the header, read its `selectedOrcamentoLineItemId`'s `OrcamentoLineItem` (name, type, quantity, unitPrice) and create one `Material` from it, same denormalized-copy convention as before. Because submission to approval already required every item to have a selection (Decision 2), conclusion never encounters an unselected item.
+
+### 7. Pagination and filters extend the existing list endpoints; no new listing routes
+`GET .../purchase-requests?date=&status=&page=&size=` and `GET .../orcamentos?date=&purchaseRequestId=&supplier=&page=&size=` — `page`/`size` return a standard Spring `Page` envelope (`content`, `totalElements`, `totalPages`, `number`), matching how paginated lists elsewhere in `pantheon-service` are already shaped. `supplier` on the Orçamento listing does a case-insensitive contains match on the snapshotted `fornecedorNome`.
+
+### 8. PDF generation via OpenPDF
+`pom.xml` has no existing PDF dependency (checked: no `itext`/`openpdf`/`pdfbox` anywhere in the backend). Add `com.github.librepdf:openpdf` (LGPL/MPL-dual-licensed fork of iText 4, no commercial licensing concerns, widely used in Spring Boot services). `GET /api/purchase-requests/{id}/orcamentos/{orcamentoId}/pdf` builds a simple one-page-per-need document server-side (Pedido de Compra name/date, supplier snapshot, a table of that Orçamento's items that are the *selected* item for their Pedido-de-Compra row, unit price, line total, grand total) and streams it back as `application/pdf`. No PDF is stored — generated on demand, same pattern as the existing photo/document download endpoints in `StorageService` for non-generated files, but this one is computed rather than fetched from storage.
+
+**Alternative considered**: generate the PDF client-side (e.g., a JS PDF lib in `pantheon-web`). Rejected — the source data (selections, snapshots) is already fully resolved server-side for the comparison endpoint, so generating there avoids duplicating that resolution logic in the frontend and keeps the PDF's numbers guaranteed consistent with what the API considers "selected."
+
+### 9. Frontend: cards stay the list idiom, but gain pagination, a split header, and an expand-to-detail affordance
+Both list panels keep the existing card-grid idiom (already established, just under-featured) rather than switching to a data table, since the requirement explicitly asks for a "list view de card." Each list gains: a header row with a "Filtrar" button (opens a filter popover: status/date for Pedido de Compra, date/supplier/originating-Pedido for Orçamento) visually separated from the "Novo pedido"/"Novo orçamento" creation action, and pagination controls below the grid. Clicking a card still navigates to the existing dedicated detail route (`/purchase-requests/:id`, `/orcamentos/:id`) rather than expanding inline — an inline expand would duplicate most of the detail view's content (items, linked Orçamentos, comparison table) for little benefit, and the existing routing/deep-linking behavior is worth preserving.
+
+## Risks / Trade-offs
+
+- **Breaking API/UI change**: every existing `Orcamento` submit/approve/reject/conclude caller and the `SiteOrcamentoApprovalLevelsPanel` config screen move wholesale to `PurchaseRequest`-scoped equivalents. No production callers exist yet (pre-launch), and both frontend screens are being reworked in this same change, so there's no transitional/dual-write period to manage.
+- **Selection validation depends on `sourcePurchaseRequestItemId` being set consistently**: a manually-added `OrcamentoLineItem` with no traceable source can still be force-selected against any Pedido-de-Compra item of the same header (Decision 3's edge case) even though it won't appear pre-populated in that item's comparison row. Accepted as a deliberate escape hatch — the alternative (refusing selection entirely for untraced line items) would make ad hoc quote lines useless for mixed purchasing.
+- **Dev data reset**: the migration clears existing `orcamento`/`orcamento_approval`/`site_orcamento_approval_level`/`material` rows and their `purchase_request_item` references before applying new `NOT NULL`/status columns, same precedent as both prior changes in this domain (no real customer data exists to preserve).
+- **PDF layout is intentionally minimal**: a plain header-plus-table document, not a branded/templated one. Acceptable for a first cut; revisit if a specific print layout is requested later.

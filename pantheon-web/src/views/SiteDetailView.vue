@@ -251,7 +251,11 @@ onMounted(load)
           :can-manage="myPermissions?.DOCUMENT_PROJECTS === 'MANAGE'"
         />
         <EquipmentPanel v-if="activeTab === 'equipment' && isTabVisible('equipment')" :site-id="siteId" />
-        <PurchaseRequestPanel v-if="activeTab === 'purchaseRequests' && isTabVisible('purchaseRequests')" :site-id="siteId" />
+        <PurchaseRequestPanel
+          v-if="activeTab === 'purchaseRequests' && isTabVisible('purchaseRequests')"
+          :site-id="siteId"
+          :can-manage="myPermissions?.PURCHASE_REQUEST === 'MANAGE'"
+        />
         <OrcamentoListPanel v-if="activeTab === 'orcamentos' && isTabVisible('orcamentos')" :site-id="siteId" />
         <TasksBoardPanel
           v-if="activeTab === 'tasks' && isTabVisible('tasks')"

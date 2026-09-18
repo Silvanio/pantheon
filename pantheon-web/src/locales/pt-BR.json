@@ -215,6 +215,7 @@
     "accessLevel": {
       "VIEW": "Apenas ver",
       "MANAGE": "Gerenciar",
+      "VIEW_AND_APPROVE": "Apenas ver e aprovar",
       "HIDDEN": "Ocultar menu"
     }
   },

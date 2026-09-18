@@ -1,5 +1,6 @@
 package com.pantheon.service.repository;
 
+import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.PurchaseRequestApproval;
 import com.pantheon.service.entity.PurchaseRequestApprovalStatus;
 import java.util.List;
@@ -16,4 +17,8 @@ public interface PurchaseRequestApprovalRepository extends JpaRepository<Purchas
 
     Optional<PurchaseRequestApproval> findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
             UUID purchaseRequestId, int cycleNumber, PurchaseRequestApprovalStatus status);
+
+    /** Whether {@code function} already decided (approved or rejected) a step of this cycle — i.e. their turn already happened. */
+    boolean existsByPurchaseRequestIdAndCycleNumberAndApproverFunctionAndStatusNot(
+            UUID purchaseRequestId, int cycleNumber, ConstructionFunction approverFunction, PurchaseRequestApprovalStatus status);
 }

@@ -112,30 +112,37 @@ router.beforeEach(async (to) => {
 
   if (!current.hasCompany) {
     // A user with only site membership(s) — e.g. a client or an outside architect/engineer —
-    // has no company of their own and shouldn't be forced through company onboarding.
+    // has no company of their own and shouldn't be forced through company onboarding. With
+    // exactly one obra, send them straight into it; with more than one (possibly spanning
+    // different companies), send them to the dashboard's site-only view instead of an
+    // arbitrary first obra. `siteIds` is a reliable "how many obras can this user reach" count
+    // ONLY for this branch — it comes from their own SiteMembership rows, which is exactly how
+    // a site-only member's access works.
     if (current.siteIds.length === 0) {
       return to.name === 'company-new' ? true : { name: 'company-new' }
     }
-  } else {
-    const pending = pendingCompany(current)
-    if (pending) {
-      const targetName = pending.onboardingStatus === 'PLAN_PENDING' ? 'company-plan' : 'company-profile'
-      if (to.name === targetName && to.params.companyId === pending.companyId) {
-        return true
-      }
-      return { name: targetName, params: { companyId: pending.companyId } }
+    if (to.name === 'dashboard' && current.siteIds.length === 1) {
+      return { name: 'site-detail', params: { siteId: current.siteIds[0] } }
     }
-
-    if (onboardingRouteNames.has(to.name as string)) {
-      return { name: 'dashboard' }
-    }
+    return true
   }
 
-  // Any user — company owner or site-only member — who belongs to exactly one obra has no use
-  // for the multi-site dashboard; send them straight into it. They can still reach the profile
-  // menu (and log out) from the obra's own header via ProfileMenu.
-  if (to.name === 'dashboard' && current.siteIds.length === 1) {
-    return { name: 'site-detail', params: { siteId: current.siteIds[0] } }
+  // A company-staff user (admin or member) always lands on the dashboard, regardless of how
+  // many obras the company has. Unlike a site-only member, their access isn't defined by
+  // SiteMembership rows — company staff can reach every obra of their company whether or not
+  // they hold an explicit SiteMembership on each one — so `siteIds.length` does not represent
+  // "how many obras this user has" for them, and must never drive an auto-redirect here.
+  const pending = pendingCompany(current)
+  if (pending) {
+    const targetName = pending.onboardingStatus === 'PLAN_PENDING' ? 'company-plan' : 'company-profile'
+    if (to.name === targetName && to.params.companyId === pending.companyId) {
+      return true
+    }
+    return { name: targetName, params: { companyId: pending.companyId } }
+  }
+
+  if (onboardingRouteNames.has(to.name as string)) {
+    return { name: 'dashboard' }
   }
 
   return true

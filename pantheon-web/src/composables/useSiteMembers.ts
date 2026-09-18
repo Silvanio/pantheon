@@ -86,5 +86,11 @@ export function useSiteMembers() {
     return authFetch(`/api/sites/${siteId}/people/email-check?email=${encodeURIComponent(email)}`)
   }
 
-  return { listMembers, addMember, removeMember, searchPeople, checkEmailConflicts }
+  /** The caller's own function on this site — `null` for company staff with no `SiteMembership` there. */
+  async function getMyFunction(siteId: string): Promise<ConstructionFunction | null> {
+    const result = await authFetch<{ function: ConstructionFunction | null }>(`/api/sites/${siteId}/members/mine`)
+    return result.function
+  }
+
+  return { listMembers, addMember, removeMember, searchPeople, checkEmailConflicts, getMyFunction }
 }

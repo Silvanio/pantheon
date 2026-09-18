@@ -2,6 +2,7 @@ package com.pantheon.service.service;
 
 import com.pantheon.service.dto.PurchaseRequestComparisonResponse;
 import com.pantheon.service.dto.PurchaseRequestItemCreationRequest;
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.Orcamento;
@@ -52,6 +53,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -166,14 +168,71 @@ public class PurchaseRequestService {
         }
 
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
-        return purchaseRequestRepository.findAll(spec, sorted);
+        Page<PurchaseRequest> page = purchaseRequestRepository.findAll(spec, sorted);
+
+        if (permissionService.resolve(siteId, access, PermissionCapability.PURCHASE_REQUEST) == AccessLevel.VIEW_AND_APPROVE) {
+            SiteMembership membership = resolveSiteMembership(siteId, actingUserId, access);
+            List<PurchaseRequest> visible = membership == null
+                    ? List.of()
+                    : page.getContent().stream().filter(pr -> isVisibleToViewAndApprove(pr, membership)).toList();
+            return new PageImpl<>(visible, pageable, visible.size());
+        }
+        return page;
     }
 
     public PurchaseRequest get(UUID purchaseRequestId, UUID actingUserId) {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
         var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
         permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        requireViewAndApproveVisibility(purchaseRequest, actingUserId, access);
         return purchaseRequest;
+    }
+
+    /** {@code access.siteMembership()} whenever present, else a direct lookup — needed because {@link SiteAccessContext} never populates a membership for company staff, even when one exists. */
+    private SiteMembership resolveSiteMembership(UUID siteId, UUID userId, SiteAccessContext access) {
+        if (access.siteMembership() != null) {
+            return access.siteMembership();
+        }
+        return siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, userId)
+                .filter(SiteMembership::isActive)
+                .orElse(null);
+    }
+
+    /**
+     * {@code VIEW_AND_APPROVE} only sees a Pedido de Compra once it's concluded, once their
+     * function already decided a step in the current cycle, or once their function is the
+     * currently actionable (lowest-order {@code PENDING}) step. Every level's step is created
+     * {@code PENDING} up front at submission time (see {@code submitForApproval}), so a plain
+     * "does a step for my function exist" check would leak visibility to every approver from the
+     * moment of submission — it must check the specific step that's actionable right now instead.
+     */
+    private boolean isVisibleToViewAndApprove(PurchaseRequest purchaseRequest, SiteMembership membership) {
+        if (purchaseRequest.getStatus() == PurchaseRequestStatus.CONCLUIDO) {
+            return true;
+        }
+        boolean alreadyDecided = approvalRepository.existsByPurchaseRequestIdAndCycleNumberAndApproverFunctionAndStatusNot(
+                purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), membership.getFunction(),
+                PurchaseRequestApprovalStatus.PENDING);
+        if (alreadyDecided) {
+            return true;
+        }
+        return approvalRepository
+                .findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                        purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING)
+                .map(step -> step.getApproverFunction() == membership.getFunction())
+                .orElse(false);
+    }
+
+    /** No-op unless the resolved access is {@code VIEW_AND_APPROVE}, in which case an irrelevant Pedido de Compra behaves as if it doesn't exist. */
+    private void requireViewAndApproveVisibility(PurchaseRequest purchaseRequest, UUID actingUserId, SiteAccessContext access) {
+        UUID siteId = purchaseRequest.getConstructionSiteId();
+        if (permissionService.resolve(siteId, access, PermissionCapability.PURCHASE_REQUEST) != AccessLevel.VIEW_AND_APPROVE) {
+            return;
+        }
+        SiteMembership membership = resolveSiteMembership(siteId, actingUserId, access);
+        if (membership == null || !isVisibleToViewAndApprove(purchaseRequest, membership)) {
+            throw new PurchaseRequestNotFoundException(purchaseRequest.getId());
+        }
     }
 
     /** Every Orcamento converted from this header — used to populate the response's linked-Orcamento summaries. */
@@ -226,7 +285,7 @@ public class PurchaseRequestService {
         PurchaseRequestApproval step = requirePendingStep(purchaseRequest);
         var access = requireStepAuthority(purchaseRequest.getConstructionSiteId(), actingUserId, step);
 
-        UUID decidedBy = access.companyStaff() ? null : access.siteMembership().getId();
+        UUID decidedBy = access.siteMembership() != null ? access.siteMembership().getId() : null;
         step.approve(decidedBy, comment, Instant.now());
         approvalRepository.save(step);
 
@@ -251,7 +310,7 @@ public class PurchaseRequestService {
         PurchaseRequestApproval step = requirePendingStep(purchaseRequest);
         var access = requireStepAuthority(purchaseRequest.getConstructionSiteId(), actingUserId, step);
 
-        UUID decidedBy = access.companyStaff() ? null : access.siteMembership().getId();
+        UUID decidedBy = access.siteMembership() != null ? access.siteMembership().getId() : null;
         step.reject(decidedBy, reason, Instant.now());
         approvalRepository.save(step);
 
@@ -261,10 +320,13 @@ public class PurchaseRequestService {
         return purchaseRequest;
     }
 
+    /** Anyone who can act on an approval step — {@code MANAGE} or {@code VIEW_AND_APPROVE} — may conclude, not just full managers. */
     @Transactional
     public PurchaseRequest conclude(UUID purchaseRequestId, UUID actingUserId) {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
-        requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
+        UUID siteId = purchaseRequest.getConstructionSiteId();
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireApprove(siteId, access, PermissionCapability.PURCHASE_REQUEST);
         if (purchaseRequest.getStatus() != PurchaseRequestStatus.CONFERIDO) {
             throw new PurchaseRequestNotConferidoException(purchaseRequestId);
         }
@@ -332,6 +394,7 @@ public class PurchaseRequestService {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
         var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
         permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        requireViewAndApproveVisibility(purchaseRequest, actingUserId, access);
         return invoiceRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
     }
 
@@ -340,6 +403,7 @@ public class PurchaseRequestService {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(invoice.getPurchaseRequestId());
         var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
         permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        requireViewAndApproveVisibility(purchaseRequest, actingUserId, access);
         return new FileContent(storageService.getObject(invoice.getStorageKey()), invoice.getContentType(), invoice.getOriginalName());
     }
 
@@ -381,6 +445,7 @@ public class PurchaseRequestService {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
         var access = siteAccessService.requireAccess(purchaseRequest.getConstructionSiteId(), actingUserId);
         permissionService.requireVisible(purchaseRequest.getConstructionSiteId(), access, PermissionCapability.PURCHASE_REQUEST);
+        requireViewAndApproveVisibility(purchaseRequest, actingUserId, access);
 
         List<PurchaseRequestItem> items = itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
         List<Orcamento> orcamentos = orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
@@ -414,9 +479,26 @@ public class PurchaseRequestService {
                 .orElseThrow(() -> new NoPendingApprovalStepException(purchaseRequest.getId()));
     }
 
+    /**
+     * A user with an active {@link SiteMembership} on this site — company staff or not — must have
+     * a function matching {@code step}'s, with no exception, and a {@code PURCHASE_REQUEST} access
+     * level of {@code MANAGE} or {@code VIEW_AND_APPROVE}. Only a user with no {@link SiteMembership}
+     * at all on this site falls back to the unrestricted company-staff bypass.
+     */
     private SiteAccessContext requireStepAuthority(UUID siteId, UUID userId, PurchaseRequestApproval step) {
         SiteAccessContext access = siteAccessService.requireAccess(siteId, userId);
-        if (access.companyStaff() || access.function() == step.getApproverFunction()) {
+        SiteMembership membership = resolveSiteMembership(siteId, userId, access);
+
+        if (membership != null) {
+            boolean authorized = membership.getFunction() == step.getApproverFunction()
+                    && permissionService.canApprove(siteId, access, PermissionCapability.PURCHASE_REQUEST);
+            if (!authorized) {
+                throw new NotCurrentApprovalStepException(step.getPurchaseRequestId());
+            }
+            return new SiteAccessContext(access.companyStaff(), membership);
+        }
+
+        if (access.companyStaff()) {
             return access;
         }
         throw new NotCurrentApprovalStepException(step.getPurchaseRequestId());

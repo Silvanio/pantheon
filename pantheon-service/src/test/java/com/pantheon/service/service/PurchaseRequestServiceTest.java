@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.PurchaseRequestComparisonResponse;
 import com.pantheon.service.dto.PurchaseRequestItemCreationRequest;
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
@@ -33,6 +34,7 @@ import com.pantheon.service.exception.InvalidFileException;
 import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
+import com.pantheon.service.exception.PurchaseRequestNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
 import com.pantheon.service.exception.PurchaseRequestSelectionIncompleteException;
 import com.pantheon.service.messaging.EventPublisher;
@@ -212,6 +214,134 @@ class PurchaseRequestServiceTest {
     }
 
     @Test
+    void listFiltersToPurchaseRequestsVisibleToViewAndApproveMember() {
+        // Regression: submitForApproval creates every level's step PENDING up front (see below),
+        // so visibility must key off the currently-actionable (lowest-order PENDING) step, not
+        // merely "does a step for my function exist" — a client whose step is second-in-line
+        // must not see the header while the engineer's first step is still outstanding.
+        PurchaseRequest notYetRelevant = purchaseRequest();
+        notYetRelevant.markOrcado();
+        notYetRelevant.submitForApproval(Instant.now());
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                notYetRelevant.getId(), notYetRelevant.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING))
+                .thenReturn(Optional.of(new PurchaseRequestApproval(
+                        UUID.randomUUID(), notYetRelevant.getId(), notYetRelevant.getCurrentApprovalCycle(), 1,
+                        ConstructionFunction.ENGINEER, Instant.now())));
+
+        PurchaseRequest pendingForMe = purchaseRequest();
+        pendingForMe.markOrcado();
+        pendingForMe.submitForApproval(Instant.now());
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                pendingForMe.getId(), pendingForMe.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING))
+                .thenReturn(Optional.of(new PurchaseRequestApproval(
+                        UUID.randomUUID(), pendingForMe.getId(), pendingForMe.getCurrentApprovalCycle(), 2,
+                        ConstructionFunction.CLIENT, Instant.now())));
+
+        PurchaseRequest concluded = purchaseRequest();
+        concluded.markOrcado();
+        concluded.submitForApproval(Instant.now());
+        concluded.approve(Instant.now());
+        concluded.complete(Instant.now());
+        Page<PurchaseRequest> page = new PageImpl<>(List.of(notYetRelevant, pendingForMe, concluded));
+        when(purchaseRequestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        UUID clientUserId = UUID.randomUUID();
+        SiteMembership clientMembership = activeMember(clientUserId, ConstructionFunction.CLIENT);
+        when(siteAccessService.requireAccess(siteId, clientUserId)).thenReturn(new SiteAccessContext(false, clientMembership));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+
+        Page<PurchaseRequest> result = service.list(siteId, clientUserId, null, null, PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(pendingForMe, concluded);
+    }
+
+    @Test
+    void getRejectsViewAndApproveMemberBeforeTheirTurn() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        // Both steps already exist (created up front), but the ENGINEER's is still the one actionable.
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING))
+                .thenReturn(Optional.of(new PurchaseRequestApproval(
+                        UUID.randomUUID(), purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), 1,
+                        ConstructionFunction.ENGINEER, Instant.now())));
+
+        UUID clientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, clientUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(clientUserId, ConstructionFunction.CLIENT)));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+
+        assertThatThrownBy(() -> service.get(purchaseRequest.getId(), clientUserId))
+                .isInstanceOf(PurchaseRequestNotFoundException.class);
+    }
+
+    @Test
+    void getAllowsViewAndApproveMemberOnceItsTheirTurn() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING))
+                .thenReturn(Optional.of(new PurchaseRequestApproval(
+                        UUID.randomUUID(), purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), 2,
+                        ConstructionFunction.CLIENT, Instant.now())));
+
+        UUID clientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, clientUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(clientUserId, ConstructionFunction.CLIENT)));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+
+        assertThat(service.get(purchaseRequest.getId(), clientUserId)).isSameAs(purchaseRequest);
+    }
+
+    @Test
+    void getAllowsViewAndApproveMemberAfterTheyAlreadyDecided() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        when(approvalRepository.existsByPurchaseRequestIdAndCycleNumberAndApproverFunctionAndStatusNot(
+                purchaseRequest.getId(), purchaseRequest.getCurrentApprovalCycle(), ConstructionFunction.CLIENT,
+                PurchaseRequestApprovalStatus.PENDING))
+                .thenReturn(true);
+
+        UUID clientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, clientUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(clientUserId, ConstructionFunction.CLIENT)));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+
+        assertThat(service.get(purchaseRequest.getId(), clientUserId)).isSameAs(purchaseRequest);
+    }
+
+    @Test
+    void getAlwaysAllowsViewAndApproveMemberOnceConcluded() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        purchaseRequest.approve(Instant.now());
+        purchaseRequest.complete(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        UUID clientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, clientUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(clientUserId, ConstructionFunction.CLIENT)));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+
+        assertThat(service.get(purchaseRequest.getId(), clientUserId)).isSameAs(purchaseRequest);
+    }
+
+    @Test
     void submitForApprovalRejectsWhenNotOrcado() {
         PurchaseRequest purchaseRequest = purchaseRequest();
         when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
@@ -277,6 +407,8 @@ class PurchaseRequestServiceTest {
         UUID engineerUserId = UUID.randomUUID();
         when(siteAccessService.requireAccess(siteId, engineerUserId))
                 .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(true);
         when(siteMembershipRepository.findByConstructionSiteIdAndFunction(siteId, ConstructionFunction.CLIENT))
                 .thenReturn(List.of());
 
@@ -303,6 +435,8 @@ class PurchaseRequestServiceTest {
         UUID engineerUserId = UUID.randomUUID();
         when(siteAccessService.requireAccess(siteId, engineerUserId))
                 .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(true);
 
         PurchaseRequest result = service.approveStep(purchaseRequest.getId(), engineerUserId, null);
 
@@ -331,7 +465,7 @@ class PurchaseRequestServiceTest {
     }
 
     @Test
-    void companyStaffCanAlwaysActOnApprovalStep() {
+    void companyStaffWithNoSiteMembershipCanAlwaysActOnApprovalStep() {
         PurchaseRequest purchaseRequest = purchaseRequest();
         purchaseRequest.markOrcado();
         purchaseRequest.submitForApproval(Instant.now());
@@ -345,11 +479,85 @@ class PurchaseRequestServiceTest {
 
         UUID staffUserId = UUID.randomUUID();
         when(siteAccessService.requireAccess(siteId, staffUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, staffUserId)).thenReturn(Optional.empty());
 
         PurchaseRequest result = service.approveStep(purchaseRequest.getId(), staffUserId, "ok");
 
         assertThat(result.getStatus()).isEqualTo(PurchaseRequestStatus.CONFERIDO);
         assertThat(step.getDecidedBySiteMembershipId()).isNull();
+    }
+
+    @Test
+    void companyStaffWithNonMatchingSiteMembershipIsBlockedDespiteBeingStaff() {
+        // Regression: a company owner registered as CLIENT on one of their own sites used to bypass
+        // the ENGINEER-only step just by being company staff. Holding an active SiteMembership there
+        // now always requires the function match, with no staff exception.
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        PurchaseRequestApproval step = new PurchaseRequestApproval(
+                UUID.randomUUID(), purchaseRequest.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                purchaseRequest.getId(), 1, PurchaseRequestApprovalStatus.PENDING)).thenReturn(Optional.of(step));
+
+        UUID staffClientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, staffClientUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, staffClientUserId))
+                .thenReturn(Optional.of(activeMember(staffClientUserId, ConstructionFunction.CLIENT)));
+
+        assertThatThrownBy(() -> service.approveStep(purchaseRequest.getId(), staffClientUserId, "ok"))
+                .isInstanceOf(NotCurrentApprovalStepException.class);
+    }
+
+    @Test
+    void companyStaffWithMatchingSiteMembershipApprovesAsThatMembership() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        PurchaseRequestApproval step = new PurchaseRequestApproval(
+                UUID.randomUUID(), purchaseRequest.getId(), 1, 1, ConstructionFunction.CLIENT, Instant.now());
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                purchaseRequest.getId(), 1, PurchaseRequestApprovalStatus.PENDING))
+                .thenReturn(Optional.of(step), Optional.empty());
+
+        UUID staffClientUserId = UUID.randomUUID();
+        SiteMembership clientMembership = activeMember(staffClientUserId, ConstructionFunction.CLIENT);
+        when(siteAccessService.requireAccess(siteId, staffClientUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, staffClientUserId))
+                .thenReturn(Optional.of(clientMembership));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(true);
+
+        PurchaseRequest result = service.approveStep(purchaseRequest.getId(), staffClientUserId, "ok");
+
+        assertThat(result.getStatus()).isEqualTo(PurchaseRequestStatus.CONFERIDO);
+        assertThat(step.getDecidedBySiteMembershipId()).isEqualTo(clientMembership.getId());
+    }
+
+    @Test
+    void viewOnlyAccessBlocksApprovalEvenOnFunctionMatch() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        PurchaseRequestApproval step = new PurchaseRequestApproval(
+                UUID.randomUUID(), purchaseRequest.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                purchaseRequest.getId(), 1, PurchaseRequestApprovalStatus.PENDING)).thenReturn(Optional.of(step));
+
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.approveStep(purchaseRequest.getId(), engineerUserId, null))
+                .isInstanceOf(NotCurrentApprovalStepException.class);
     }
 
     @Test
@@ -373,6 +581,8 @@ class PurchaseRequestServiceTest {
         UUID engineerUserId = UUID.randomUUID();
         when(siteAccessService.requireAccess(siteId, engineerUserId))
                 .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST)))
+                .thenReturn(true);
 
         PurchaseRequest result = service.rejectStep(purchaseRequest.getId(), engineerUserId, "Preço muito alto");
 
@@ -389,6 +599,40 @@ class PurchaseRequestServiceTest {
 
         assertThatThrownBy(() -> service.conclude(purchaseRequest.getId(), UUID.randomUUID()))
                 .isInstanceOf(PurchaseRequestNotConferidoException.class);
+    }
+
+    @Test
+    void concludeRejectsMemberWithoutApproveAccess() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.conclude(purchaseRequest.getId(), UUID.randomUUID()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void concludeChecksApproveAccessNotStrictManage() {
+        // conclude() must gate on "can approve" (MANAGE or VIEW_AND_APPROVE), not requireManage's
+        // strict MANAGE-only check — otherwise a VIEW_AND_APPROVE client could approve every step
+        // but still be unable to conclude the header they just finished approving.
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        purchaseRequest.approve(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(List.of());
+
+        UUID clientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, clientUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(clientUserId, ConstructionFunction.CLIENT)));
+
+        PurchaseRequest result = service.conclude(purchaseRequest.getId(), clientUserId);
+
+        assertThat(result.getStatus()).isEqualTo(PurchaseRequestStatus.CONCLUIDO);
+        verify(permissionService).requireApprove(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+        verify(permissionService, never()).requireManage(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
     }
 
     @Test

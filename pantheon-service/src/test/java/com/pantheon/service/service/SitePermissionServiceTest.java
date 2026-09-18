@@ -93,6 +93,31 @@ class SitePermissionServiceTest {
 
     @Test
     void requireManageThrowsWhenResolvedAccessIsViewOnly() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.DAILY_REPORT))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.DAILY_REPORT))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requireManage(siteId, clientAccess, PermissionCapability.DAILY_REPORT))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void clientDefaultsToViewAndApproveOnPurchaseRequest() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.PURCHASE_REQUEST))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.PURCHASE_REQUEST))
+                .thenReturn(Optional.empty());
+
+        AccessLevel level = service.resolve(siteId, clientAccess, PermissionCapability.PURCHASE_REQUEST);
+
+        assertThat(level).isEqualTo(AccessLevel.VIEW_AND_APPROVE);
+    }
+
+    @Test
+    void requireManageThrowsWhenResolvedAccessIsViewAndApprove() {
         when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.PURCHASE_REQUEST))
                 .thenReturn(Optional.empty());
         when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
@@ -101,6 +126,18 @@ class SitePermissionServiceTest {
 
         assertThatThrownBy(() -> service.requireManage(siteId, clientAccess, PermissionCapability.PURCHASE_REQUEST))
                 .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void viewAndApproveOverrideRoundTripsThroughResolve() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.PURCHASE_REQUEST))
+                .thenReturn(Optional.of(SitePermissionOverride.forMember(
+                        UUID.randomUUID(), siteId, clientMembership.getId(), PermissionCapability.PURCHASE_REQUEST,
+                        AccessLevel.VIEW_AND_APPROVE)));
+
+        AccessLevel level = service.resolve(siteId, clientAccess, PermissionCapability.PURCHASE_REQUEST);
+
+        assertThat(level).isEqualTo(AccessLevel.VIEW_AND_APPROVE);
     }
 
     @Test
@@ -116,6 +153,29 @@ class SitePermissionServiceTest {
                 .thenReturn(Optional.empty());
 
         service.requireManage(siteId, engineerAccess, PermissionCapability.ORCAMENTO_MANAGE);
+    }
+
+    @Test
+    void requireApprovePassesForViewAndApprove() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.PURCHASE_REQUEST))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.PURCHASE_REQUEST))
+                .thenReturn(Optional.empty());
+
+        service.requireApprove(siteId, clientAccess, PermissionCapability.PURCHASE_REQUEST);
+    }
+
+    @Test
+    void requireApproveThrowsForViewOnly() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.DAILY_REPORT))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.DAILY_REPORT))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requireApprove(siteId, clientAccess, PermissionCapability.DAILY_REPORT))
+                .isInstanceOf(ForbiddenCapabilityException.class);
     }
 
     @Test

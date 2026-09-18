@@ -16,10 +16,12 @@ import org.springframework.stereotype.Service;
  * Resolves a site member's effective {@link AccessLevel} for a {@link PermissionCapability}:
  * a member-specific override wins, then a function-level override, then the hardcoded default
  * below (matching the pre-permission-configuration role rules, so a freshly created obra needs
- * no configuration to behave correctly). {@code PURCHASE_REQUEST}/{@code ORCAMENTO_MANAGE}
- * have no real "view" mode - {@link AccessLevel#MANAGE} means granted, {@link AccessLevel#VIEW}
- * means denied. Pedido de Compra approval-step authority is resolved separately, from that
- * site's {@code SitePurchaseRequestApprovalLevel} configuration, not from a capability here.
+ * no configuration to behave correctly). {@code ORCAMENTO_MANAGE} only distinguishes
+ * {@link AccessLevel#VIEW} (unrestricted read) from {@link AccessLevel#MANAGE} (create/edit).
+ * {@code PURCHASE_REQUEST} additionally supports {@link AccessLevel#VIEW_AND_APPROVE}: unlike
+ * plain {@code VIEW}, it only sees a Pedido de Compra relevant to the member's approval role and
+ * can act on a matching approval step — see {@code PurchaseRequestService} for both the
+ * visibility filtering and the (function + access-level) check on approval-step authority.
  */
 @Service
 public class SitePermissionService {
@@ -56,7 +58,7 @@ public class SitePermissionService {
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
                 PermissionCapability.DAILY_REPORT, AccessLevel.VIEW,
                 PermissionCapability.EQUIPMENT, AccessLevel.VIEW,
-                PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW,
+                PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW_AND_APPROVE,
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW,
                 PermissionCapability.TASKS, AccessLevel.VIEW,
                 PermissionCapability.TEAM_MANAGE, AccessLevel.VIEW));
@@ -103,6 +105,18 @@ public class SitePermissionService {
 
     public void requireManage(UUID constructionSiteId, SiteAccessContext access, PermissionCapability capability) {
         if (!canManage(constructionSiteId, access, capability)) {
+            throw new ForbiddenCapabilityException(constructionSiteId, capability);
+        }
+    }
+
+    /** Whether {@code capability}'s resolved access allows approving — {@code MANAGE} or {@code VIEW_AND_APPROVE}. Meaningful only for {@code PURCHASE_REQUEST}. */
+    public boolean canApprove(UUID constructionSiteId, SiteAccessContext access, PermissionCapability capability) {
+        AccessLevel level = resolve(constructionSiteId, access, capability);
+        return level == AccessLevel.MANAGE || level == AccessLevel.VIEW_AND_APPROVE;
+    }
+
+    public void requireApprove(UUID constructionSiteId, SiteAccessContext access, PermissionCapability capability) {
+        if (!canApprove(constructionSiteId, access, capability)) {
             throw new ForbiddenCapabilityException(constructionSiteId, capability);
         }
     }

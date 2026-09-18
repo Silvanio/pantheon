@@ -10,6 +10,8 @@ import {
   type PurchaseRequestStatus,
 } from '../composables/usePurchaseRequests'
 import { useMaterialDeliveries, type Material } from '../composables/useMaterialDeliveries'
+import { useSitePermissions, type AccessLevel } from '../composables/useSitePermissions'
+import { useSiteMembers, type ConstructionFunction } from '../composables/useSiteMembers'
 import type { FornecedorInput } from '../composables/useFornecedores'
 import FornecedorPicker from '../components/FornecedorPicker.vue'
 import AppHeader from '../components/AppHeader.vue'
@@ -37,6 +39,8 @@ const {
   getInvoiceContentBlob,
 } = usePurchaseRequests()
 const { listMaterials, markDelivered, markChecked } = useMaterialDeliveries()
+const { getMyPermissions } = useSitePermissions()
+const { getMyFunction } = useSiteMembers()
 
 const purchaseRequestId = route.params.id as string
 const detail = ref<PurchaseRequestDetail | null>(null)
@@ -45,6 +49,8 @@ const materials = ref<Material[]>([])
 const invoices = ref<PurchaseRequestInvoice[]>([])
 const loading = ref(false)
 const loadError = ref('')
+const myAccessLevel = ref<AccessLevel | null>(null)
+const myFunction = ref<ConstructionFunction | null>(null)
 
 const STEPS: PurchaseRequestStatus[] = ['INICIADO', 'ORCADO', 'CONFERIDO', 'CONCLUIDO']
 
@@ -113,13 +119,29 @@ const approvalsByCycle = computed(() => {
 
 const canSubmit = computed(() => {
   if (!detail.value) return false
+  if (myAccessLevel.value !== 'MANAGE') return false
   if (detail.value.purchaseRequest.status !== 'ORCADO') return false
   if (detail.value.items.length === 0) return false
   return detail.value.items.every((item) => !!item.selectedOrcamentoLineItemId)
 })
 
+// Whether this viewer's access level allows approving at all (MANAGE or VIEW_AND_APPROVE) —
+// mirrors SitePermissionService.canApprove on the backend.
+const canApprove = computed(() => myAccessLevel.value === 'MANAGE' || myAccessLevel.value === 'VIEW_AND_APPROVE')
+
+// Mirrors the backend's requireStepAuthority: a member holding a SiteMembership on this site
+// (even one who is also company staff) may act only when their function matches the current
+// pending step; a company-staff user with NO SiteMembership here at all keeps the admin bypass.
+const canActOnApproval = computed(() => {
+  if (!currentPendingApproval.value) return false
+  if (myFunction.value !== null) {
+    return myFunction.value === currentPendingApproval.value.approverFunction && canApprove.value
+  }
+  return myAccessLevel.value === 'MANAGE'
+})
+
 const canDelete = computed(() => detail.value?.purchaseRequest.status === 'INICIADO')
-const canConclude = computed(() => detail.value?.purchaseRequest.status === 'CONFERIDO')
+const canConclude = computed(() => detail.value?.purchaseRequest.status === 'CONFERIDO' && canApprove.value)
 const isConcluded = computed(() => detail.value?.purchaseRequest.status === 'CONCLUIDO')
 const selectionEditable = computed(() => detail.value?.purchaseRequest.status === 'ORCADO')
 
@@ -138,6 +160,10 @@ const selectionByItemId = computed(() => {
 
 async function loadDetail() {
   detail.value = await getPurchaseRequest(purchaseRequestId)
+  const siteId = detail.value.purchaseRequest.constructionSiteId
+  const [permissions, fn] = await Promise.all([getMyPermissions(siteId), getMyFunction(siteId)])
+  myAccessLevel.value = permissions.PURCHASE_REQUEST
+  myFunction.value = fn
 }
 
 async function loadComparison() {
@@ -614,15 +640,17 @@ onMounted(load)
           <p class="mb-2 text-sm font-medium text-steel-800 dark:text-steel-50">
             {{ t('purchaseRequests.stepLabel') }} {{ currentPendingApproval.stepOrder }} — {{ t(`purchaseRequests.approverFunction.${currentPendingApproval.approverFunction}`) }}
           </p>
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" class="btn-primary px-3 py-1.5" @click="onApproveStep">{{ t('purchaseRequests.approveStepButton') }}</button>
-            <button type="button" class="btn-danger px-3 py-1.5" @click="showRejectForm = !showRejectForm">{{ t('purchaseRequests.rejectStepButton') }}</button>
-          </div>
-          <form v-if="showRejectForm" class="mt-3 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
-            <input v-model="rejectReason" type="text" required :placeholder="t('purchaseRequests.rejectReasonPlaceholder')" class="field-input flex-1" />
-            <button type="submit" class="btn-danger px-3 py-1.5">{{ t('purchaseRequests.confirmReject') }}</button>
-          </form>
-          <p v-if="approvalActionError" class="mt-2 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
+          <template v-if="canActOnApproval">
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" class="btn-primary px-3 py-1.5" @click="onApproveStep">{{ t('purchaseRequests.approveStepButton') }}</button>
+              <button type="button" class="btn-danger px-3 py-1.5" @click="showRejectForm = !showRejectForm">{{ t('purchaseRequests.rejectStepButton') }}</button>
+            </div>
+            <form v-if="showRejectForm" class="mt-3 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
+              <input v-model="rejectReason" type="text" required :placeholder="t('purchaseRequests.rejectReasonPlaceholder')" class="field-input flex-1" />
+              <button type="submit" class="btn-danger px-3 py-1.5">{{ t('purchaseRequests.confirmReject') }}</button>
+            </form>
+            <p v-if="approvalActionError" class="mt-2 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
+          </template>
         </div>
 
         <div v-for="cycle in approvalsByCycle" :key="cycle.cycleNumber" class="mb-4 last:mb-0">

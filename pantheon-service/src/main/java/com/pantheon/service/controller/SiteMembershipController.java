@@ -2,6 +2,7 @@ package com.pantheon.service.controller;
 
 import com.pantheon.service.dto.AddSiteMemberRequest;
 import com.pantheon.service.dto.MemberInvitationResponse;
+import com.pantheon.service.dto.SiteMemberFunctionResponse;
 import com.pantheon.service.dto.SiteMemberResponse;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionFunction;
@@ -60,6 +61,14 @@ public class SiteMembershipController {
     @GetMapping
     public ResponseEntity<List<SiteMemberResponse>> list(@AuthenticationPrincipal AppUser user, @PathVariable UUID siteId) {
         return ResponseEntity.ok(siteMembershipService.listMembers(siteId, user.getId()));
+    }
+
+    // Any active member (not gated by TEAM_MANAGE, unlike list() above) may learn their own
+    // function — pantheon-web uses this to decide whether it's this viewer's turn on a Pedido de
+    // Compra approval step, independent of whether they're also company staff.
+    @GetMapping("/mine")
+    public ResponseEntity<SiteMemberFunctionResponse> mine(@AuthenticationPrincipal AppUser user, @PathVariable UUID siteId) {
+        return ResponseEntity.ok(new SiteMemberFunctionResponse(siteMembershipService.findMyFunction(siteId, user.getId())));
     }
 
     @DeleteMapping("/{membershipId}")

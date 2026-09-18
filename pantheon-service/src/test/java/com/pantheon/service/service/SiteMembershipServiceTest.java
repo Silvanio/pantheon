@@ -273,6 +273,41 @@ class SiteMembershipServiceTest {
     }
 
     @Test
+    void findMyFunctionReturnsTheCallersOwnFunction() {
+        UUID clientUserId = UUID.randomUUID();
+        SiteMembership clientMembership = SiteMembership.invited(
+                UUID.randomUUID(), siteId, clientUserId, ConstructionFunction.CLIENT, null, null, Instant.now());
+        clientMembership.accept();
+        when(siteAccessService.requireAccess(siteId, clientUserId)).thenReturn(new SiteAccessContext(false, clientMembership));
+        when(membershipRepository.findByConstructionSiteIdAndUserId(siteId, clientUserId))
+                .thenReturn(Optional.of(clientMembership));
+
+        assertThat(service.findMyFunction(siteId, clientUserId)).isEqualTo(ConstructionFunction.CLIENT);
+    }
+
+    @Test
+    void findMyFunctionReturnsTheCallersFunctionEvenWhenTheyAreAlsoCompanyStaff() {
+        // SiteAccessContext.function() would be null here (company staff resolves with no
+        // SiteMembership attached) — findMyFunction must look past that to the real membership.
+        UUID staffClientUserId = UUID.randomUUID();
+        SiteMembership clientMembership = SiteMembership.invited(
+                UUID.randomUUID(), siteId, staffClientUserId, ConstructionFunction.CLIENT, null, null, Instant.now());
+        clientMembership.accept();
+        when(siteAccessService.requireAccess(siteId, staffClientUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(membershipRepository.findByConstructionSiteIdAndUserId(siteId, staffClientUserId))
+                .thenReturn(Optional.of(clientMembership));
+
+        assertThat(service.findMyFunction(siteId, staffClientUserId)).isEqualTo(ConstructionFunction.CLIENT);
+    }
+
+    @Test
+    void findMyFunctionReturnsNullForStaffWithNoSiteMembership() {
+        when(membershipRepository.findByConstructionSiteIdAndUserId(siteId, staffUserId)).thenReturn(Optional.empty());
+
+        assertThat(service.findMyFunction(siteId, staffUserId)).isNull();
+    }
+
+    @Test
     void removeMemberDeletesMembershipAndDependents() {
         SiteMembership membership = SiteMembership.admin(UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now());
         when(membershipRepository.findById(membership.getId())).thenReturn(Optional.of(membership));

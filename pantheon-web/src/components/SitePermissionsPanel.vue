@@ -91,6 +91,9 @@ onMounted(load)
                 <option value="" disabled>{{ t('sitePermissions.default') }}</option>
                 <option value="VIEW">{{ t('sitePermissions.accessLevel.VIEW') }}</option>
                 <option value="MANAGE">{{ t('sitePermissions.accessLevel.MANAGE') }}</option>
+                <option v-if="capability === 'PURCHASE_REQUEST'" value="VIEW_AND_APPROVE">
+                  {{ t('sitePermissions.accessLevel.VIEW_AND_APPROVE') }}
+                </option>
                 <option value="HIDDEN">{{ t('sitePermissions.accessLevel.HIDDEN') }}</option>
               </select>
             </td>

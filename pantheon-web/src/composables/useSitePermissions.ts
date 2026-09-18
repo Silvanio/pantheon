@@ -10,7 +10,7 @@ export type PermissionCapability =
   | 'ORCAMENTO_MANAGE'
   | 'TASKS'
   | 'TEAM_MANAGE'
-export type AccessLevel = 'VIEW' | 'MANAGE' | 'HIDDEN'
+export type AccessLevel = 'VIEW' | 'MANAGE' | 'VIEW_AND_APPROVE' | 'HIDDEN'
 
 export interface SitePermissionOverride {
   id: string

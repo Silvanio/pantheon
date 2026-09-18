@@ -168,6 +168,20 @@ public class SiteMembershipService {
                 .toList();
     }
 
+    /**
+     * The acting user's own function on this site, independent of company-staff status — {@code
+     * null} if they hold no active {@code SiteMembership} here (including a pure company-staff
+     * user with no site-specific role). Unlike {@link SiteAccessContext#function()}, this never
+     * comes back {@code null} just because the user also happens to be company staff.
+     */
+    public ConstructionFunction findMyFunction(UUID constructionSiteId, UUID actingUserId) {
+        siteAccessService.requireAccess(constructionSiteId, actingUserId);
+        return membershipRepository.findByConstructionSiteIdAndUserId(constructionSiteId, actingUserId)
+                .filter(SiteMembership::isActive)
+                .map(SiteMembership::getFunction)
+                .orElse(null);
+    }
+
     @Transactional
     public void removeMember(UUID constructionSiteId, UUID actingUserId, UUID membershipId) {
         SiteAccessContext access = siteAccessService.requireAccess(constructionSiteId, actingUserId);

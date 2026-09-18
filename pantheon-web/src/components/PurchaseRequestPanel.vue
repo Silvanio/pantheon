@@ -10,7 +10,7 @@ import {
 import { vDatePicker } from '../lib/datePicker'
 import StatusBadge from './StatusBadge.vue'
 
-const props = defineProps<{ siteId: string }>()
+const props = defineProps<{ siteId: string; canManage: boolean }>()
 
 const { t } = useI18n()
 const { listPurchaseRequests, createPurchaseRequest } = usePurchaseRequests()
@@ -144,13 +144,13 @@ onMounted(load)
             </div>
           </div>
         </div>
-        <button type="button" class="btn-primary" @click="showForm = !showForm">
+        <button v-if="canManage" type="button" class="btn-primary" @click="showForm = !showForm">
           {{ t('purchaseRequests.newButton') }}
         </button>
       </div>
     </div>
 
-    <form v-if="showForm" class="mb-5 space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmitForm">
+    <form v-if="canManage && showForm" class="mb-5 space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmitForm">
       <div v-for="(row, index) in rows" :key="index" class="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:items-end">
         <div class="sm:col-span-2">
           <label class="field-label">{{ t('purchaseRequests.form.name') }}</label>

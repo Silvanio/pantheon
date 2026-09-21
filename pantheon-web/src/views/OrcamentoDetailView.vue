@@ -206,7 +206,7 @@ onMounted(load)
       </template>
     </AppHeader>
 
-    <main v-if="detail" class="app-container max-w-5xl! space-y-6 py-8">
+    <main v-if="detail" class="app-container space-y-6 py-8">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold text-steel-800 dark:text-steel-50">
@@ -371,7 +371,7 @@ onMounted(load)
       </section>
     </main>
 
-    <p v-else-if="loadError" class="app-container max-w-5xl! py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
+    <p v-else-if="loadError" class="app-container py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
     </div>
   </div>
 </template>

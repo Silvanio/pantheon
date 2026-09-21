@@ -19,7 +19,20 @@ class _Authority {
   final String? myFunction;
   final String? accessLevel;
 
+  /// Mirrors `pantheon-web`'s `canApprove` computed / the backend's `SitePermissionService.canApprove`.
   bool get canApprove => accessLevel == 'MANAGE' || accessLevel == 'VIEW_AND_APPROVE';
+
+  bool get canManage => accessLevel == 'MANAGE';
+
+  /// Mirrors `pantheon-web`'s `canActOnApproval` / the backend's `requireStepAuthority`: a member
+  /// holding a `SiteMembership` on this site (even one who is also company staff) may act only
+  /// when their function matches the pending step; a company-staff user with NO `SiteMembership`
+  /// here keeps the admin bypass, but that bypass requires `MANAGE` specifically — `VIEW_AND_APPROVE`
+  /// alone is not enough without a matching function, since there's no function to match.
+  bool canActOn(String approverFunction) {
+    if (myFunction != null) return myFunction == approverFunction && canApprove;
+    return canManage;
+  }
 }
 
 final _authorityProvider = FutureProvider.family((ref, String siteId) async {
@@ -64,6 +77,14 @@ class _PurchaseRequestDetailScreenState extends ConsumerState<PurchaseRequestDet
     }
   }
 
+  Future<void> _submit() async {
+    await _act(() => ref.read(purchaseRequestRepositoryProvider).submitForApproval(widget.id));
+  }
+
+  Future<void> _conclude() async {
+    await _act(() => ref.read(purchaseRequestRepositoryProvider).conclude(widget.id));
+  }
+
   Future<void> _showRejectDialog() async {
     final controller = TextEditingController();
     final reason = await showDialog<String>(
@@ -96,8 +117,15 @@ class _PurchaseRequestDetailScreenState extends ConsumerState<PurchaseRequestDet
         value: detail,
         data: (d) {
           final authority = ref.watch(_authorityProvider(d.purchaseRequest.constructionSiteId));
-          final pendingApproval = d.approvals.where((a) => a.status == 'PENDING').toList();
-          final currentPending = pendingApproval.isEmpty ? null : pendingApproval.last;
+
+          // Mirrors pantheon-web's `currentCycle`/`currentPendingApproval` computeds: all of a
+          // cycle's steps are created PENDING up front on submit, so more than one can be PENDING
+          // at once (e.g. steps 2 and 3 while step 1 hasn't been decided yet) — the actionable one
+          // is the *lowest step order* within the *current* (highest) cycle, not just "any pending".
+          final currentCycle = d.approvals.isEmpty ? 0 : d.approvals.map((a) => a.cycleNumber).reduce((a, b) => a > b ? a : b);
+          final currentCyclePending = d.approvals.where((a) => a.cycleNumber == currentCycle && a.status == 'PENDING').toList()
+            ..sort((a, b) => a.stepOrder.compareTo(b.stepOrder));
+          final currentPending = currentCyclePending.isEmpty ? null : currentCyclePending.first;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -109,6 +137,35 @@ class _PurchaseRequestDetailScreenState extends ConsumerState<PurchaseRequestDet
                   ),
                   StatusBadge(kind: StatusBadgeKind.purchaseRequest, status: d.purchaseRequest.status),
                 ],
+              ),
+              authority.when(
+                data: (auth) {
+                  // Mirrors pantheon-web's `canSubmit`: MANAGE only, status ORCADO, at least one
+                  // item, and every item has a selected Orçamento line item.
+                  final canSubmit = auth.canManage &&
+                      d.purchaseRequest.status == 'ORCADO' &&
+                      d.items.isNotEmpty &&
+                      d.items.every((item) => item.selectedOrcamentoLineItemId != null);
+                  // Mirrors pantheon-web's `canConclude`: any approve-capable member, regardless
+                  // of function — status CONFERIDO only.
+                  final canConclude = d.purchaseRequest.status == 'CONFERIDO' && auth.canApprove;
+                  if (!canSubmit && !canConclude) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: canSubmit
+                          ? ElevatedButton.icon(
+                              onPressed: _acting ? null : _submit,
+                              icon: const Icon(Icons.send_outlined, size: 18),
+                              label: const Text('Enviar para aprovação'),
+                            )
+                          : SuccessButton(label: 'Concluir', loading: _acting, onPressed: _conclude, icon: Icons.task_alt),
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 20),
               const Text('Etapas de aprovação', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -127,8 +184,7 @@ class _PurchaseRequestDetailScreenState extends ConsumerState<PurchaseRequestDet
               if (currentPending != null)
                 authority.when(
                   data: (auth) {
-                    final canAct = auth.canApprove && (auth.myFunction == null || auth.myFunction == currentPending.approverFunction);
-                    if (!canAct) return const SizedBox.shrink();
+                    if (!auth.canActOn(currentPending.approverFunction)) return const SizedBox.shrink();
                     return Padding(
                       padding: const EdgeInsets.only(top: 8, bottom: 8),
                       child: Row(

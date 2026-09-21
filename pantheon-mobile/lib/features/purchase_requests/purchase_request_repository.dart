@@ -15,6 +15,14 @@ class PurchaseRequestRepository {
     return PageResponse.fromJson(json, PurchaseRequest.fromJson);
   }
 
+  Future<PurchaseRequest> create(String siteId, List<Map<String, String?>> items) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/api/construction-sites/$siteId/purchase-requests',
+      body: {'items': items},
+    );
+    return PurchaseRequest.fromJson(json);
+  }
+
   Future<PurchaseRequestDetail> getDetail(String id) async {
     final json = await _client.get<Map<String, dynamic>>('/api/purchase-requests/$id');
     return PurchaseRequestDetail.fromJson(json);

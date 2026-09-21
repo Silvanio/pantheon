@@ -53,6 +53,7 @@ class PurchaseRequestItem {
     required this.quantity,
     required this.unit,
     required this.status,
+    required this.selectedOrcamentoLineItemId,
   });
 
   factory PurchaseRequestItem.fromJson(Map<String, dynamic> json) => PurchaseRequestItem(
@@ -62,6 +63,7 @@ class PurchaseRequestItem {
         quantity: asDecimalString(json['quantity']),
         unit: json['unit'] as String?,
         status: json['status'] as String,
+        selectedOrcamentoLineItemId: json['selectedOrcamentoLineItemId'] as String?,
       );
 
   final String id;
@@ -70,6 +72,7 @@ class PurchaseRequestItem {
   final String quantity;
   final String? unit;
   final String status;
+  final String? selectedOrcamentoLineItemId;
 }
 
 class PurchaseRequestApproval {

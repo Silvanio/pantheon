@@ -12,23 +12,30 @@ final _siteProvider = FutureProvider.family((ref, String siteId) => ref.watch(da
 final _myPermissionsProvider =
     FutureProvider.family((ref, String siteId) => ref.watch(siteRepositoryProvider).getMyPermissions(siteId));
 
+/// Mirrors `pantheon-web`'s `SiteDetailView.vue` `listMyCompanies()` call, used the same way
+/// there: to compute `isCompanyAdmin` and gate the Permissões tab, which — unlike every other
+/// tab — is gated by company-admin role, not a `PermissionCapability`.
+final _myCompanyMembershipsProvider =
+    FutureProvider((ref) => ref.watch(dashboardRepositoryProvider).getOnboardingStatus().then((s) => s.companies));
+
 class _Entry {
-  const _Entry(this.label, this.icon, this.route, this.capability);
+  const _Entry(this.label, this.icon, this.route, {this.capability, this.adminOnly = false});
   final String label;
   final IconData icon;
   final String Function(String siteId) route;
   final String? capability;
+  final bool adminOnly;
 }
 
 const _entries = [
-  _Entry('Equipe', Icons.groups_outlined, _teamRoute, 'TEAM_MANAGE'),
-  _Entry('Diário de Obra', Icons.article_outlined, _dailyReportsRoute, 'DAILY_REPORT'),
-  _Entry('Pedido de Compra', Icons.shopping_cart_outlined, _purchaseRequestsRoute, 'PURCHASE_REQUEST'),
-  _Entry('Orçamentos', Icons.attach_money, _orcamentosRoute, 'ORCAMENTO_MANAGE'),
-  _Entry('Tasks', Icons.view_kanban_outlined, _tasksRoute, 'TASKS'),
-  _Entry('Equipamentos', Icons.construction_outlined, _equipmentRoute, 'EQUIPMENT'),
-  _Entry('Projetos', Icons.folder_outlined, _projectsRoute, 'DOCUMENT_PROJECTS'),
-  _Entry('Permissões', Icons.lock_outline, _permissionsRoute, null),
+  _Entry('Equipe', Icons.groups_outlined, _teamRoute, capability: 'TEAM_MANAGE'),
+  _Entry('Diário de Obra', Icons.article_outlined, _dailyReportsRoute, capability: 'DAILY_REPORT'),
+  _Entry('Pedido de Compra', Icons.shopping_cart_outlined, _purchaseRequestsRoute, capability: 'PURCHASE_REQUEST'),
+  _Entry('Orçamentos', Icons.attach_money, _orcamentosRoute, capability: 'ORCAMENTO_MANAGE'),
+  _Entry('Tasks', Icons.view_kanban_outlined, _tasksRoute, capability: 'TASKS'),
+  _Entry('Equipamentos', Icons.construction_outlined, _equipmentRoute, capability: 'EQUIPMENT'),
+  _Entry('Projetos', Icons.folder_outlined, _projectsRoute, capability: 'DOCUMENT_PROJECTS'),
+  _Entry('Permissões', Icons.lock_outline, _permissionsRoute, adminOnly: true),
 ];
 
 String _teamRoute(String id) => '/sites/$id/team';
@@ -76,7 +83,16 @@ class SiteHomeScreen extends ConsumerWidget {
               Expanded(
                 child: permissions.when(
                   data: (perms) {
-                    final visible = _entries.where((e) => e.capability == null || perms[e.capability] != 'HIDDEN').toList();
+                    final memberships = ref.watch(_myCompanyMembershipsProvider);
+                    final isCompanyAdmin = memberships.maybeWhen(
+                      data: (list) => list.any((m) => m.companyId == s.companyId && m.role == 'ADMIN'),
+                      // Don't hide anything before this loads — mirrors the web app's
+                      // isTabVisible comment ("avoids a flash of a tab disappearing").
+                      orElse: () => true,
+                    );
+                    final visible = _entries
+                        .where((e) => e.adminOnly ? isCompanyAdmin : perms[e.capability] != 'HIDDEN')
+                        .toList();
                     return GridView.builder(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,

@@ -2,9 +2,7 @@
 
 ## Purpose
 Defines the approval workflow for a Pedido de Compra: configurable per-site multi-step approval levels, submission gated on every item having a selected Orçamento line item, acting on approval steps (which locks or unlocks the Pedido de Compra's linked Orçamentos), and concluding an approved Pedido de Compra into delivery-tracking materials.
-
 ## Requirements
-
 ### Requirement: Per-site Pedido de Compra approval levels
 `pantheon-service` SHALL allow a company staff member with `MANAGE` access to a construction site's permissions to configure an ordered list of Pedido de Compra approval levels for that site, each specifying a step order and a required construction-site function. A site with no configured levels SHALL default to a single implicit level requiring the `ENGINEER` function.
 
@@ -130,3 +128,15 @@ Defines the approval workflow for a Pedido de Compra: configurable per-site mult
 #### Scenario: List excludes irrelevant purchase requests
 - **WHEN** a `VIEW_AND_APPROVE` member lists a site's Pedidos de Compra
 - **THEN** `pantheon-service` excludes every Pedido de Compra that is neither `CONCLUIDO`, nor already decided by that member's function in the current cycle, nor currently actionable by that member's function
+
+### Requirement: Approval-step transitions trigger a push notification
+In addition to their existing effects, submitting a Pedido de Compra for approval, approving a step, rejecting a step, and concluding a Pedido de Compra SHALL each trigger a best-effort push notification (via the `push-notifications` capability) to the affected user(s): the site members whose function matches the newly-pending step's approver function on submit/approve, and the request's creator on reject/conclude. A failure or absence of push configuration SHALL NOT affect the underlying state transition.
+
+#### Scenario: Submitting for approval notifies the first approver
+- **WHEN** a Pedido de Compra is submitted for approval and its first step's approver function is ENGINEER
+- **THEN** the site's members with an active ENGINEER `SiteMembership` and a registered device token receive a push notification, and the submission itself succeeds regardless of push delivery outcome
+
+#### Scenario: Rejecting a step notifies the creator
+- **WHEN** an approver rejects the pending step of a Pedido de Compra
+- **THEN** the request's creator receives a push notification if they have a registered device token, and the rejection itself succeeds regardless of push delivery outcome
+

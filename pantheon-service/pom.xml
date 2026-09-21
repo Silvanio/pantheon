@@ -53,6 +53,12 @@
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>s3</artifactId>
 		</dependency>
+		<!-- Push notifications to the mobile app (purchase-request approval events) -->
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>9.4.3</version>
+		</dependency>
 		<!-- Server-side HTML-to-PDF rendering for daily report and purchase-request exports -->
 		<dependency>
 			<groupId>com.openhtmltopdf</groupId>

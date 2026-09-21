@@ -49,6 +49,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -89,6 +90,7 @@ public class PurchaseRequestService {
     private final MaterialService materialService;
     private final EventPublisher eventPublisher;
     private final StorageService storageService;
+    private final PushNotificationService pushNotificationService;
 
     public PurchaseRequestService(
             PurchaseRequestRepository purchaseRequestRepository,
@@ -106,7 +108,8 @@ public class PurchaseRequestService {
             OrcamentoService orcamentoService,
             MaterialService materialService,
             EventPublisher eventPublisher,
-            StorageService storageService) {
+            StorageService storageService,
+            PushNotificationService pushNotificationService) {
         this.purchaseRequestRepository = purchaseRequestRepository;
         this.itemRepository = itemRepository;
         this.approvalRepository = approvalRepository;
@@ -123,6 +126,7 @@ public class PurchaseRequestService {
         this.materialService = materialService;
         this.eventPublisher = eventPublisher;
         this.storageService = storageService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     @Transactional
@@ -317,6 +321,11 @@ public class PurchaseRequestService {
         purchaseRequest.returnToOrcadoAfterRejection(reason);
         purchaseRequestRepository.save(purchaseRequest);
         orcamentoService.unlockAllForPurchaseRequest(purchaseRequestId);
+        pushNotificationService.sendToUser(
+                purchaseRequest.getCreatedBy(),
+                "Pedido de compra rejeitado",
+                purchaseRequest.getName() + " foi rejeitado: " + reason,
+                Map.of("purchaseRequestId", purchaseRequest.getId().toString()));
         return purchaseRequest;
     }
 
@@ -340,6 +349,11 @@ public class PurchaseRequestService {
         purchaseRequestRepository.save(purchaseRequest);
 
         materialService.createFromPurchaseRequestSelections(purchaseRequest, selectedLineItems);
+        pushNotificationService.sendToUser(
+                purchaseRequest.getCreatedBy(),
+                "Pedido de compra concluído",
+                purchaseRequest.getName() + " foi concluído.",
+                Map.of("purchaseRequestId", purchaseRequest.getId().toString()));
         return purchaseRequest;
     }
 
@@ -518,6 +532,11 @@ public class PurchaseRequestService {
             userRepository.findById(approver.getUserId()).map(AppUser::getEmail).ifPresent(email ->
                     eventPublisher.publish(PurchaseRequestApprovalStepPendingEvent.TYPE, new PurchaseRequestApprovalStepPendingEvent(
                             purchaseRequest.getId(), siteId, site.getName(), step.getApproverFunction().name(), email)));
+            pushNotificationService.sendToUser(
+                    approver.getUserId(),
+                    "Pedido de compra aguardando aprovação",
+                    purchaseRequest.getName() + " (" + site.getName() + ") está aguardando sua aprovação.",
+                    Map.of("purchaseRequestId", purchaseRequest.getId().toString()));
         }
     }
 

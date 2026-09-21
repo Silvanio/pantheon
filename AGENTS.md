@@ -35,6 +35,7 @@ approved change's tasks (`openspec-apply-change`). Don't hand-edit
 pantheon-service/   Core REST API (Java 17, Spring Boot) — com.pantheon.service
 pantheon-message/   Messaging/notification worker (Java 17, Spring Boot) — com.pantheon.message
 pantheon-web/       Frontend (Vue 3, TypeScript, Vite)
+pantheon-mobile/    Mobile app (Flutter, Android + iOS) — see pantheon-mobile/README.md
 infra/              docker-compose.yml, Kubernetes manifests (infra/k8s), shared Maven parent
 openspec/           Specs and change proposals (see above)
 ```

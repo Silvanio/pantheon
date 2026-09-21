@@ -1,0 +1,65 @@
+name: pantheon_mobile
+description: "Pantheon mobile app — construction-management on the go."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Routing
+  go_router: ^14.8.1
+
+  # Networking
+  dio: ^5.9.0
+
+  # Secure token storage (platform keychain/keystore)
+  flutter_secure_storage: ^9.2.4
+
+  # Camera / gallery photo capture for Diário de Obra
+  image_picker: ^1.1.2
+
+  # Push notifications
+  firebase_core: ^3.10.1
+  firebase_messaging: ^15.2.1
+  flutter_local_notifications: ^18.0.1
+
+  # Formatting (dates, numbers)
+  intl: ^0.20.2
+
+  # Pull-to-refresh / pagination niceties
+  cached_network_image: ^3.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/Manrope-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/Manrope-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/Manrope-Variable.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope-Variable.ttf
+          weight: 800

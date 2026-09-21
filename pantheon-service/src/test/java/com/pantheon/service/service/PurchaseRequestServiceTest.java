@@ -118,6 +118,9 @@ class PurchaseRequestServiceTest {
     @Mock
     private StorageService storageService;
 
+    @Mock
+    private PushNotificationService pushNotificationService;
+
     private PurchaseRequestService service;
 
     private UUID siteId;
@@ -128,7 +131,7 @@ class PurchaseRequestServiceTest {
                 purchaseRequestRepository, itemRepository, approvalRepository, invoiceRepository, siteRepository,
                 siteMembershipRepository, userRepository, orcamentoRepository, orcamentoLineItemRepository,
                 siteAccessService, permissionService, approvalLevelService, orcamentoService, materialService,
-                eventPublisher, storageService);
+                eventPublisher, storageService, pushNotificationService);
 
         siteId = UUID.randomUUID();
         lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));

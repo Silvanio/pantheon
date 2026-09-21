@@ -55,6 +55,12 @@ pantheon:
     google:
       client-id: ${GOOGLE_CLIENT_ID:}
       client-secret: ${GOOGLE_CLIENT_SECRET:}
+  # Push notifications to the mobile app (see push-notifications capability). Optional —
+  # PushNotificationService no-ops (logs only) when this path is unset, so environments
+  # without a Firebase project (dev, CI) are unaffected. Set it to a Firebase service-account
+  # JSON key file's path once a Firebase project exists (see pantheon-mobile/README.md).
+  push:
+    firebase-credentials-path: ${PANTHEON_FIREBASE_CREDENTIALS_PATH:}
   storage:
     endpoint: ${PANTHEON_STORAGE_ENDPOINT:http://localhost:9000}
     region: ${PANTHEON_STORAGE_REGION:us-east-1}

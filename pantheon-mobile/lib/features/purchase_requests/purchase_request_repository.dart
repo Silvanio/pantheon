@@ -15,13 +15,15 @@ class PurchaseRequestRepository {
     return PageResponse.fromJson(json, PurchaseRequest.fromJson);
   }
 
-  Future<PurchaseRequest> create(String siteId, List<Map<String, String?>> items) async {
-    final json = await _client.post<Map<String, dynamic>>(
-      '/api/construction-sites/$siteId/purchase-requests',
-      body: {'items': items},
-    );
-    return PurchaseRequest.fromJson(json);
-  }
+  /// Returns `true` if sent live, `false` if queued for later (offline) — see
+  /// `ApiClient.mutateQueueable`. The caller doesn't need the created record back (the list just
+  /// refreshes), which is what makes this safe to queue.
+  Future<bool> create(String siteId, List<Map<String, String?>> items) => _client.mutateQueueable(
+        method: 'POST',
+        path: '/api/construction-sites/$siteId/purchase-requests',
+        body: {'items': items},
+        entityLabel: 'Novo pedido de compra',
+      );
 
   Future<PurchaseRequestDetail> getDetail(String id) async {
     final json = await _client.get<Map<String, dynamic>>('/api/purchase-requests/$id');
@@ -33,6 +35,10 @@ class PurchaseRequestRepository {
     return PurchaseRequestComparison.fromJson(json);
   }
 
+  // Submit/approve/reject/conclude are the approval workflow itself, which requires being
+  // online (design.md's offline-support scoping) — never queued. The screen calls
+  // `requireOnline` before invoking these, so a failure here should be rare (a race where
+  // connectivity dropped in between), and just surfaces as a normal error.
   Future<void> submitForApproval(String id) async {
     await _client.post<dynamic>('/api/purchase-requests/$id/submit');
   }

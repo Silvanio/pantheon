@@ -26,8 +26,10 @@ class SiteRepository {
   }
 
   /// Read-only in this app — editing overrides stays web-only for this pass (design.md).
+  /// Permissions configuration must not work offline (design.md's offline-support scoping) —
+  /// never cached.
   Future<List<Map<String, dynamic>>> listPermissionOverrides(String siteId) async {
-    final json = await _client.get<List<dynamic>>('/api/sites/$siteId/permissions');
+    final json = await _client.get<List<dynamic>>('/api/sites/$siteId/permissions', offlineCapable: false);
     return json.cast<Map<String, dynamic>>();
   }
 }

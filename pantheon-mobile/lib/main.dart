@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/auth/auth_provider.dart';
 import 'core/router/app_router.dart';
+import 'core/widgets/sync_status_badge.dart';
 import 'features/notifications/push_notification_service.dart';
 import 'theme/app_theme.dart';
 
@@ -40,6 +41,7 @@ class _PantheonAppState extends ConsumerState<PantheonApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
+    final isAuthenticated = ref.watch(authControllerProvider.select((s) => s.status == AuthStatus.authenticated));
     return MaterialApp.router(
       title: 'Pantheon',
       debugShowCheckedModeBanner: false,
@@ -47,6 +49,14 @@ class _PantheonAppState extends ConsumerState<PantheonApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       routerConfig: router,
+      // The offline/pending-sync indicator floats above every authenticated screen — see
+      // SyncStatusBadge's doc comment.
+      builder: (context, child) => Stack(
+        children: [
+          ?child,
+          if (isAuthenticated) const SyncStatusBadge(),
+        ],
+      ),
     );
   }
 }

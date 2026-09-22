@@ -7,7 +7,8 @@ class TaskRepository {
   final ApiClient _client;
 
   Future<TaskBoard> getBoard(String siteId) async {
-    final json = await _client.get<Map<String, dynamic>>('/api/construction-sites/$siteId/task-board');
+    // Tasks must not work offline (see design.md's offline-support scoping) — never cached.
+    final json = await _client.get<Map<String, dynamic>>('/api/construction-sites/$siteId/task-board', offlineCapable: false);
     return TaskBoard.fromJson(json);
   }
 

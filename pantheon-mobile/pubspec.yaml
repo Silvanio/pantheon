@@ -39,6 +39,13 @@ dependencies:
   # Pull-to-refresh / pagination niceties
   cached_network_image: ^3.4.1
 
+  # Offline support: local cache of last-known API responses + a pending-actions
+  # outbox synced when connectivity returns (see lib/core/offline/).
+  sqflite: ^2.4.2
+  path: ^1.9.1
+  connectivity_plus: ^6.1.3
+  uuid: ^4.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

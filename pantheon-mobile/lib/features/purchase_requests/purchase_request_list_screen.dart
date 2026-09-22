@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/offline_dialogs.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import '../site/site_repository.dart';
@@ -36,13 +37,17 @@ class PurchaseRequestListScreen extends ConsumerWidget {
   final String siteId;
 
   Future<void> _openCreateSheet(BuildContext context, WidgetRef ref) async {
-    final created = await showModalBottomSheet<bool>(
+    // null = the sheet was dismissed without creating anything; true/false (created, either sent
+    // live or queued offline — see ApiClient.mutateQueueable) both mean the list should refresh.
+    final sentLive = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _CreatePurchaseRequestSheet(siteId: siteId),
     );
-    if (created == true) {
-      ref.invalidate(_purchaseRequestListProvider(siteId));
+    if (sentLive == null) return;
+    ref.invalidate(_purchaseRequestListProvider(siteId));
+    if (!sentLive && context.mounted) {
+      await showOfflineSavedDialog(context);
     }
   }
 
@@ -142,13 +147,14 @@ class _CreatePurchaseRequestSheetState extends ConsumerState<_CreatePurchaseRequ
       setState(() => _error = 'Informe ao menos um item com nome e quantidade.');
       return;
     }
+    if (!await confirmProceedOffline(context, ref)) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
-      await ref.read(purchaseRequestRepositoryProvider).create(widget.siteId, items);
-      if (mounted) Navigator.pop(context, true);
+      final sentLive = await ref.read(purchaseRequestRepositoryProvider).create(widget.siteId, items);
+      if (mounted) Navigator.pop(context, sentLive);
     } catch (_) {
       setState(() => _error = 'Não foi possível criar o pedido. Verifique os dados.');
     } finally {

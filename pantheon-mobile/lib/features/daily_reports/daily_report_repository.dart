@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import 'daily_report_models.dart';
@@ -12,13 +11,15 @@ class DailyReportRepository {
     return json.map((e) => DailyReport.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<DailyReport> create(String siteId, String reportDate) async {
-    final json = await _client.post<Map<String, dynamic>>(
-      '/api/construction-sites/$siteId/daily-reports',
-      body: {'reportDate': reportDate},
-    );
-    return DailyReport.fromJson(json);
-  }
+  /// Returns `true` if sent live, `false` if queued for later (offline) — see
+  /// `ApiClient.mutateQueueable`. The caller doesn't need the created record back (the list just
+  /// refreshes), which is what makes this safe to queue.
+  Future<bool> create(String siteId, String reportDate) => _client.mutateQueueable(
+        method: 'POST',
+        path: '/api/construction-sites/$siteId/daily-reports',
+        body: {'reportDate': reportDate},
+        entityLabel: 'Novo relatório diário',
+      );
 
   Future<DailyReportDetail> getDetail(String reportId) async {
     final json = await _client.get<Map<String, dynamic>>('/api/daily-reports/$reportId');
@@ -46,25 +47,29 @@ class DailyReportRepository {
     return DailyReport.fromJson(json);
   }
 
-  Future<DailyReport> submit(String reportId) async {
-    final json = await _client.post<Map<String, dynamic>>('/api/daily-reports/$reportId/submit');
-    return DailyReport.fromJson(json);
-  }
+  Future<bool> submit(String reportId) => _client.mutateQueueable(
+        method: 'POST',
+        path: '/api/daily-reports/$reportId/submit',
+        entityLabel: 'Enviar relatório diário',
+      );
 
   Future<List<ReportMedia>> listMedia(String reportId) async {
     final json = await _client.get<List<dynamic>>('/api/daily-reports/$reportId/media');
     return json.map((e) => ReportMedia.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<ReportMedia> uploadPhoto(String reportId, String filePath, {String? caption}) async {
-    final formData = FormData.fromMap({'file': await MultipartFile.fromFile(filePath)});
+  /// Returns `true` if sent live, `false` if queued for later (offline). The local file path is
+  /// what gets queued, so it must still exist on disk when connectivity returns — see
+  /// `OutboxController.syncNow`'s "file not found" handling for the (rare) case it doesn't.
+  Future<bool> uploadPhoto(String reportId, String filePath, {String? caption}) {
     final query = StringBuffer('?type=PHOTO');
     if (caption != null && caption.isNotEmpty) query.write('&caption=${Uri.encodeComponent(caption)}');
-    final json = await _client.uploadMultipart<Map<String, dynamic>>(
-      '/api/daily-reports/$reportId/media$query',
-      formData,
+    return _client.uploadQueueable(
+      path: '/api/daily-reports/$reportId/media$query',
+      fileFieldName: 'file',
+      localFilePath: filePath,
+      entityLabel: 'Foto do diário de obra',
     );
-    return ReportMedia.fromJson(json);
   }
 }
 

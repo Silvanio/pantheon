@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/buttons.dart';
+import '../../core/widgets/offline_dialogs.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import '../site/site_repository.dart';
@@ -63,7 +64,11 @@ class PurchaseRequestDetailScreen extends ConsumerStatefulWidget {
 class _PurchaseRequestDetailScreenState extends ConsumerState<PurchaseRequestDetailScreen> {
   bool _acting = false;
 
+  /// The approval workflow (submit/approve/reject/conclude) requires being online — see
+  /// `PurchaseRequestRepository`'s doc comment — so this blocks with an explanatory dialog
+  /// instead of attempting anything while offline.
   Future<void> _act(Future<void> Function() action) async {
+    if (!await requireOnline(context, ref)) return;
     setState(() => _acting = true);
     try {
       await action();

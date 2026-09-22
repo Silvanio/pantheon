@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/offline_dialogs.dart';
 import '../../theme/app_colors.dart';
 import 'daily_report_repository.dart';
 
@@ -22,10 +23,14 @@ class DailyReportListScreen extends ConsumerWidget {
       lastDate: DateTime(2100),
     );
     if (date == null) return;
+    if (!context.mounted || !await confirmProceedOffline(context, ref)) return;
     final iso = date.toIso8601String().split('T').first;
     try {
-      await ref.read(dailyReportRepositoryProvider).create(siteId, iso);
+      final sentLive = await ref.read(dailyReportRepositoryProvider).create(siteId, iso);
       ref.invalidate(_listProvider(siteId));
+      if (!sentLive && context.mounted) {
+        await showOfflineSavedDialog(context);
+      }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

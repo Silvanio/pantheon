@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/offline_dialogs.dart';
 import '../../theme/app_colors.dart';
 import 'task_models.dart';
 import 'task_repository.dart';
@@ -46,6 +47,7 @@ class _TaskBoardScreenState extends ConsumerState<TaskBoardScreen> {
       ),
     );
     if (target == null || target.id == card.columnId) return;
+    if (!mounted || !await requireOnline(context, ref)) return;
     final newSortOrder = board.cardsFor(target.id).length;
     try {
       await ref.read(taskRepositoryProvider).moveCard(card.id, target.id, newSortOrder);
@@ -71,6 +73,7 @@ class _TaskBoardScreenState extends ConsumerState<TaskBoardScreen> {
       ),
     );
     if (title != null && title.trim().isNotEmpty) {
+      if (!mounted || !await requireOnline(context, ref)) return;
       try {
         await ref.read(taskRepositoryProvider).createCard(widget.siteId, columnId, title.trim(), null);
         ref.invalidate(_boardProvider(widget.siteId));

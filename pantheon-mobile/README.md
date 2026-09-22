@@ -40,18 +40,44 @@ flutter run --dart-define=PANTHEON_SERVICE_URL=https://your-host:8081
 
 Auth (email/password only — see "Known gaps" below), Dashboard, obra navigation gated by the
 caller's resolved permissions (`/api/sites/{id}/permissions/mine`), Pedido de Compra
-(list/detail/approve/reject/comparison), Orçamentos (list/detail), Diário de Obra
+(list/create/detail/approve/reject/comparison), Orçamentos (list/detail), Diário de Obra
 (list/detail/photo capture via camera or gallery), Tasks board (per-column pages, touch-friendly
 "mover para coluna" instead of the web's drag-and-drop), and simplified read-only screens for
 Equipamentos, Projetos and Permissões (creating/uploading/editing those stays web-only for now).
+Offline support for the modules that need it — see below.
+
+## Offline support
+
+Diário de Obra, Orçamentos, and viewing/creating Pedido de Compra work offline, transparently:
+
+- **Reads fall back to the last-known value.** Every GET response is cached locally (SQLite);
+  if a request fails for connectivity reasons, the app serves the cached value instead of an
+  error, so a screen you've already opened keeps showing its last-known data offline.
+- **Queueable writes are saved and sent automatically.** Creating a Pedido de Compra, creating/
+  submitting a Diário de Obra report, and uploading a report photo, when offline, are saved to
+  a local outbox instead of failing — a modal explains this and asks for confirmation before
+  proceeding, and another acknowledges it if connectivity drops mid-request. The outbox drains
+  automatically the moment connectivity returns (or on demand from the sync screen).
+- **A floating badge** (bottom-right, on every authenticated screen) shows offline status and/or
+  a pending-sync count; tapping it opens `/sync` — a screen listing what's pending, a manual
+  "Sincronizar agora" button, and a way to discard a stuck item.
+
+**Deliberately excluded from all of this** (never cached, never queued — these require an active
+connection and fail normally otherwise): Projetos, the Permissões configuration screen, and the
+whole Tasks board (viewing and moving/creating cards) and the Pedido de Compra approval workflow
+itself (submit for approval / approve / reject / conclude) — these show a "you're offline, this
+requires a connection" dialog instead of proceeding, since a decision made on stale data (or
+silently queued) is worse than not being able to make it at all until you're back online.
+
+See `lib/core/offline/` (`OutboxController`, `ApiClient.get`'s `offlineCapable` flag) and
+`lib/core/widgets/offline_dialogs.dart` (`confirmProceedOffline`, `requireOnline`,
+`showOfflineSavedDialog`).
 
 ## Known gaps (by design, this pass)
 
 - **No Google OAuth login on mobile.** The web's `/oauth2/authorization/google` redirect flow
   doesn't translate directly to a mobile custom-tab/deep-link flow without extra backend
   redirect-URI work — email/password only for now.
-- **No offline support.** Data is fetched fresh per screen (Riverpod `FutureProvider`s); there's
-  no local cache/sync.
 - **Not published to any store.** This app builds and runs locally (Android emulator/device, iOS
   Simulator) but publishing to the Play Store or App Store requires your own Play Console /
   Apple Developer accounts and is out of scope here.

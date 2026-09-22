@@ -18,6 +18,7 @@ import '../../features/purchase_requests/purchase_request_list_screen.dart';
 import '../../features/site/permissions_screen.dart';
 import '../../features/site/site_home_screen.dart';
 import '../../features/site/team_screen.dart';
+import '../../features/sync/sync_screen.dart';
 import '../../features/tasks/task_board_screen.dart';
 import '../auth/auth_provider.dart';
 
@@ -41,6 +42,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+      GoRoute(path: '/sync', builder: (context, state) => const SyncScreen()),
       GoRoute(
         path: '/sites/:id',
         builder: (context, state) => SiteHomeScreen(siteId: state.pathParameters['id']!),

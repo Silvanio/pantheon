@@ -39,7 +39,8 @@ class ProjectRepository {
 
   Future<FolderContents> listContents(String siteId, String? parentId) async {
     final query = parentId != null ? '?parentId=$parentId' : '';
-    final json = await _client.get<Map<String, dynamic>>('/api/sites/$siteId/projects/contents$query');
+    // Projetos must not work offline (see design.md's offline-support scoping) — never cached.
+    final json = await _client.get<Map<String, dynamic>>('/api/sites/$siteId/projects/contents$query', offlineCapable: false);
     return FolderContents.fromJson(json);
   }
 }

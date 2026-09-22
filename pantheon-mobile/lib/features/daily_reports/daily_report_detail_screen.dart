@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/buttons.dart';
+import '../../core/widgets/offline_dialogs.dart';
 import '../../theme/app_colors.dart';
 import 'daily_report_models.dart';
 import 'daily_report_repository.dart';
@@ -27,10 +28,14 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
     final picker = ImagePicker();
     final photo = await picker.pickImage(source: source, imageQuality: 85);
     if (photo == null) return;
+    if (!mounted || !await confirmProceedOffline(context, ref)) return;
     setState(() => _uploading = true);
     try {
-      await ref.read(dailyReportRepositoryProvider).uploadPhoto(widget.id, photo.path);
+      final sentLive = await ref.read(dailyReportRepositoryProvider).uploadPhoto(widget.id, photo.path);
       ref.invalidate(_mediaProvider(widget.id));
+      if (!sentLive && mounted) {
+        await showOfflineSavedDialog(context);
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível enviar a foto.')));
@@ -70,10 +75,14 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
   }
 
   Future<void> _submitReport() async {
+    if (!await confirmProceedOffline(context, ref)) return;
     setState(() => _submitting = true);
     try {
-      await ref.read(dailyReportRepositoryProvider).submit(widget.id);
+      final sentLive = await ref.read(dailyReportRepositoryProvider).submit(widget.id);
       ref.invalidate(_detailProvider(widget.id));
+      if (!sentLive && mounted) {
+        await showOfflineSavedDialog(context);
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível enviar o relatório.')));

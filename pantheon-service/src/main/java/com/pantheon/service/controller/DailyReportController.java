@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -75,6 +76,12 @@ public class DailyReportController {
     public ResponseEntity<DailyReportResponse> submit(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
         DailyReport report = dailyReportService.submit(id, user.getId());
         return ResponseEntity.ok(DailyReportResponse.from(report));
+    }
+
+    @DeleteMapping("/api/daily-reports/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        dailyReportService.delete(id, user.getId());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/api/daily-reports/{id}/workforce-entries")

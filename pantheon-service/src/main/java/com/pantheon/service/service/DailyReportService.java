@@ -11,24 +11,30 @@ import com.pantheon.service.dto.WorkforceEntryRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportActivity;
+import com.pantheon.service.entity.DailyReportAttachment;
 import com.pantheon.service.entity.DailyReportEquipmentUsage;
 import com.pantheon.service.entity.DailyReportMaterialReceived;
+import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.entity.DailyReportOccurrence;
 import com.pantheon.service.entity.DailyReportWorkforceEntry;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.DailyReportNotDeletableException;
 import com.pantheon.service.exception.DailyReportNotEditableException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
 import com.pantheon.service.exception.DuplicateDailyReportException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
+import com.pantheon.service.repository.DailyReportAttachmentRepository;
 import com.pantheon.service.repository.DailyReportEquipmentUsageRepository;
 import com.pantheon.service.repository.DailyReportMaterialReceivedRepository;
+import com.pantheon.service.repository.DailyReportMediaRepository;
 import com.pantheon.service.repository.DailyReportOccurrenceRepository;
 import com.pantheon.service.repository.DailyReportRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
+import com.pantheon.service.storage.StorageService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -45,10 +51,13 @@ public class DailyReportService {
     private final DailyReportActivityRepository activityRepository;
     private final DailyReportOccurrenceRepository occurrenceRepository;
     private final DailyReportMaterialReceivedRepository materialReceivedRepository;
+    private final DailyReportMediaRepository mediaRepository;
+    private final DailyReportAttachmentRepository attachmentRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteMembershipRepository siteMembershipRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final StorageService storageService;
 
     public DailyReportService(
             DailyReportRepository dailyReportRepository,
@@ -57,20 +66,26 @@ public class DailyReportService {
             DailyReportActivityRepository activityRepository,
             DailyReportOccurrenceRepository occurrenceRepository,
             DailyReportMaterialReceivedRepository materialReceivedRepository,
+            DailyReportMediaRepository mediaRepository,
+            DailyReportAttachmentRepository attachmentRepository,
             ConstructionSiteRepository siteRepository,
             SiteMembershipRepository siteMembershipRepository,
             SiteAccessService siteAccessService,
-            SitePermissionService permissionService) {
+            SitePermissionService permissionService,
+            StorageService storageService) {
         this.dailyReportRepository = dailyReportRepository;
         this.workforceEntryRepository = workforceEntryRepository;
         this.equipmentUsageRepository = equipmentUsageRepository;
         this.activityRepository = activityRepository;
         this.occurrenceRepository = occurrenceRepository;
         this.materialReceivedRepository = materialReceivedRepository;
+        this.mediaRepository = mediaRepository;
+        this.attachmentRepository = attachmentRepository;
         this.siteRepository = siteRepository;
         this.siteMembershipRepository = siteMembershipRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.storageService = storageService;
     }
 
     @Transactional
@@ -184,6 +199,36 @@ public class DailyReportService {
     public List<DailyReportMaterialReceived> listMaterialsReceived(UUID reportId, UUID actingUserId) {
         requireReport(reportId, actingUserId);
         return materialReceivedRepository.findByDailyReportId(reportId);
+    }
+
+    /** Only while still DRAFT — a submitted report is part of the site's record and signatures may depend on it. */
+    @Transactional
+    public void delete(UUID reportId, UUID actingUserId) {
+        DailyReport report = requireReport(reportId, actingUserId);
+        requireManage(report.getConstructionSiteId(), actingUserId);
+        if (!report.isEditable()) {
+            throw new DailyReportNotDeletableException(reportId);
+        }
+
+        List<DailyReportMedia> media = mediaRepository.findByDailyReportIdOrderByCreatedAtAsc(reportId);
+        for (DailyReportMedia item : media) {
+            storageService.deleteObject(item.getStorageKey());
+        }
+        mediaRepository.deleteAll(media);
+
+        List<DailyReportAttachment> attachments = attachmentRepository.findByDailyReportIdOrderByCreatedAtAsc(reportId);
+        for (DailyReportAttachment attachment : attachments) {
+            storageService.deleteObject(attachment.getStorageKey());
+        }
+        attachmentRepository.deleteAll(attachments);
+
+        workforceEntryRepository.deleteAll(workforceEntryRepository.findByDailyReportId(reportId));
+        equipmentUsageRepository.deleteAll(equipmentUsageRepository.findByDailyReportId(reportId));
+        activityRepository.deleteAll(activityRepository.findByDailyReportId(reportId));
+        occurrenceRepository.deleteAll(occurrenceRepository.findByDailyReportId(reportId));
+        materialReceivedRepository.deleteAll(materialReceivedRepository.findByDailyReportId(reportId));
+
+        dailyReportRepository.delete(report);
     }
 
     public List<DailyReport> list(UUID siteId, UUID actingUserId) {

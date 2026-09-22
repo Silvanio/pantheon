@@ -13,9 +13,12 @@ public record ConstructionSiteResponse(
         SiteStatus status,
         LocalDate startDate,
         LocalDate expectedEndDate,
-        String photoObjectKey) {
+        String photoObjectKey,
+        Integer schedulePercentComplete) {
 
-    public static ConstructionSiteResponse from(ConstructionSite site) {
+    /** {@code schedulePercentComplete} is {@code null} when the site has no schedule tasks yet — see
+     * {@code ScheduleService#computeProgress} and the construction-schedule spec's progress requirement. */
+    public static ConstructionSiteResponse from(ConstructionSite site, Integer schedulePercentComplete) {
         return new ConstructionSiteResponse(
                 site.getId(),
                 site.getCompanyId(),
@@ -24,6 +27,7 @@ public record ConstructionSiteResponse(
                 site.getStatus(),
                 site.getStartDate(),
                 site.getExpectedEndDate(),
-                site.getPhotoObjectKey());
+                site.getPhotoObjectKey(),
+                schedulePercentComplete);
     }
 }

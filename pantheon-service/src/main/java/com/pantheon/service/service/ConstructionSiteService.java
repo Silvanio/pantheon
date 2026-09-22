@@ -33,6 +33,7 @@ public class ConstructionSiteService {
     private final CompanyRepository companyRepository;
     private final PlanService planService;
     private final SiteAccessService siteAccessService;
+    private final ScheduleService scheduleService;
 
     public ConstructionSiteService(
             ConstructionSiteRepository siteRepository,
@@ -40,13 +41,15 @@ public class ConstructionSiteService {
             SiteMembershipRepository siteMembershipRepository,
             CompanyRepository companyRepository,
             PlanService planService,
-            SiteAccessService siteAccessService) {
+            SiteAccessService siteAccessService,
+            ScheduleService scheduleService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
         this.siteMembershipRepository = siteMembershipRepository;
         this.companyRepository = companyRepository;
         this.planService = planService;
         this.siteAccessService = siteAccessService;
+        this.scheduleService = scheduleService;
     }
 
     @Transactional
@@ -122,7 +125,8 @@ public class ConstructionSiteService {
                 .collect(Collectors.toMap(Company::getId, Company::getName));
 
         return sites.stream()
-                .map(site -> MySiteResponse.from(site, companyNamesById.get(site.getCompanyId())))
+                .map(site -> MySiteResponse.from(
+                        site, companyNamesById.get(site.getCompanyId()), scheduleService.computeProgress(site.getId())))
                 .toList();
     }
 

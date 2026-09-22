@@ -6,6 +6,7 @@ import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/offline_dialogs.dart';
 import '../../theme/app_colors.dart';
+import 'daily_report_list_screen.dart' show dailyReportListProvider;
 import 'daily_report_models.dart';
 import 'daily_report_repository.dart';
 
@@ -23,6 +24,7 @@ class DailyReportDetailScreen extends ConsumerStatefulWidget {
 class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScreen> {
   bool _uploading = false;
   bool _submitting = false;
+  bool _deleting = false;
 
   Future<void> _addPhoto(ImageSource source) async {
     final picker = ImagePicker();
@@ -89,6 +91,35 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _deleteReport() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir relatório'),
+        content: const Text('Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Excluir')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted || !await requireOnline(context, ref)) return;
+    final siteId = ref.read(_detailProvider(widget.id)).valueOrNull?.report.constructionSiteId;
+    setState(() => _deleting = true);
+    try {
+      await ref.read(dailyReportRepositoryProvider).delete(widget.id);
+      if (siteId != null) ref.invalidate(dailyReportListProvider(siteId));
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível excluir o relatório.')));
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -195,6 +226,8 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
               if (isDraft) ...[
                 const SizedBox(height: 24),
                 SuccessButton(label: 'Enviar relatório', loading: _submitting, onPressed: _submitReport, icon: Icons.send_outlined),
+                const SizedBox(height: 10),
+                DangerButton(label: 'Excluir relatório', loading: _deleting, onPressed: _deleteReport, icon: Icons.delete_outline),
               ],
             ],
           );

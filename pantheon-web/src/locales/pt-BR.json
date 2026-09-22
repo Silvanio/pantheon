@@ -138,7 +138,6 @@
       "orcamentos": "Orçamentos",
       "tasks": "Tasks",
       "schedule": "Cronograma",
-      "scheduleDisabled": "Em breve",
       "permissions": "Permissões"
     }
   },
@@ -273,6 +272,46 @@
     },
     "attachmentsIndicator": "{count} anexo(s)"
   },
+  "schedule": {
+    "title": "Cronograma",
+    "subtitle": "Etapas e tarefas da obra, com datas e responsáveis.",
+    "loadError": "Não foi possível carregar o cronograma.",
+    "empty": "Nenhuma etapa cadastrada ainda.",
+    "form": {
+      "cancel": "Cancelar"
+    },
+    "stage": {
+      "newButton": "Nova etapa",
+      "name": "Nome da etapa",
+      "color": "Cor",
+      "startDate": "Início",
+      "endDate": "Fim",
+      "save": "Salvar",
+      "error": "Não foi possível salvar a etapa.",
+      "editTitle": "Editar etapa",
+      "deleteButton": "Excluir etapa",
+      "deleteConfirm": "Tem certeza que deseja excluir esta etapa? Todas as suas tarefas também serão excluídas. Esta ação não pode ser desfeita.",
+      "deleteError": "Não foi possível excluir a etapa."
+    },
+    "task": {
+      "newTitle": "Nova tarefa",
+      "title": "Título da tarefa",
+      "responsible": "Responsável",
+      "unassigned": "Sem responsável",
+      "percentComplete": "Progresso",
+      "error": "Não foi possível salvar a tarefa.",
+      "editTitle": "Editar tarefa",
+      "deleteButton": "Excluir tarefa",
+      "deleteConfirm": "Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.",
+      "deleteError": "Não foi possível excluir a tarefa.",
+      "dependsOn": "Depende de",
+      "dependsOnHint": "Apenas indica a ordem entre tarefas — as datas não são reagendadas automaticamente.",
+      "selectDependency": "Selecione uma tarefa",
+      "addDependency": "Vincular",
+      "removeDependency": "Remover",
+      "dependencyError": "Não foi possível atualizar a dependência."
+    }
+  },
   "globalTasksBoard": {
     "back": "Voltar ao painel",
     "title": "Quadro global de Tasks",
@@ -347,7 +386,10 @@
         "submit": "Criar relatório",
         "cancel": "Cancelar",
         "error": "Não foi possível criar o relatório. Verifique se já não existe um para esta data."
-      }
+      },
+      "deleteButton": "Excluir",
+      "deleteConfirm": "Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.",
+      "deleteError": "Não foi possível excluir o relatório."
     },
     "status": {
       "DRAFT": "Rascunho",
@@ -358,7 +400,11 @@
       "submitConfirm": "Depois de enviado, o relatório não pode mais ser editado. Confirmar envio?",
       "submitError": "Não foi possível enviar o relatório.",
       "submittedNotice": "Este relatório foi enviado e não pode mais ser editado.",
-      "loadError": "Não foi possível carregar o relatório."
+      "loadError": "Não foi possível carregar o relatório.",
+      "deleteButton": "Excluir",
+      "deleteConfirm": "Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.",
+      "deleteCancel": "Cancelar",
+      "deleteError": "Não foi possível excluir o relatório."
     },
     "core": {
       "title": "Clima, horário e comentários",

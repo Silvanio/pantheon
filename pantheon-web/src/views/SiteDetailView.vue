@@ -17,6 +17,7 @@ import PurchaseRequestPanel from '../components/PurchaseRequestPanel.vue'
 import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
 import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import TasksBoardPanel from '../components/TasksBoardPanel.vue'
+import SchedulePanel from '../components/SchedulePanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
@@ -39,8 +40,8 @@ const isCompanyAdmin = ref(false)
 type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('team')
 
-// Tabs backed by a PermissionCapability can be hidden per member; 'schedule' (an unimplemented
-// placeholder) and 'permissions' (gated by company-admin status, not a capability) are exempt.
+// Tabs backed by a PermissionCapability can be hidden per member; 'permissions' (gated by
+// company-admin status, not a capability) is exempt.
 const TAB_CAPABILITY: Partial<Record<Tab, PermissionCapability>> = {
   team: 'TEAM_MANAGE',
   dailyReport: 'DAILY_REPORT',
@@ -49,8 +50,9 @@ const TAB_CAPABILITY: Partial<Record<Tab, PermissionCapability>> = {
   purchaseRequests: 'PURCHASE_REQUEST',
   orcamentos: 'ORCAMENTO_MANAGE',
   tasks: 'TASKS',
+  schedule: 'SCHEDULE',
 }
-const TAB_ORDER: Tab[] = ['team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'tasks']
+const TAB_ORDER: Tab[] = ['team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'tasks', 'schedule']
 
 const myPermissions = ref<Record<PermissionCapability, AccessLevel> | null>(null)
 const pendingPurchaseRequestCount = ref(0)
@@ -199,10 +201,11 @@ onMounted(load)
           {{ t('siteDetail.tabs.tasks') }}
         </button>
         <button
+          v-if="isTabVisible('schedule')"
           type="button"
-          disabled
-          class="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-steel-300 dark:text-steel-600"
-          :title="t('siteDetail.tabs.scheduleDisabled')"
+          class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition"
+          :class="activeTab === 'schedule' ? 'bg-blueprint-50 text-blueprint-700 dark:bg-blueprint-900/40 dark:text-blueprint-300' : 'text-steel-500 hover:bg-steel-100 dark:text-steel-400 dark:hover:bg-steel-800'"
+          @click="activeTab = 'schedule'"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
           {{ t('siteDetail.tabs.schedule') }}
@@ -359,10 +362,11 @@ onMounted(load)
             {{ t('siteDetail.tabs.tasks') }}
           </button>
           <button
+            v-if="isTabVisible('schedule')"
             type="button"
-            disabled
-            class="cursor-not-allowed rounded-lg px-3.5 py-2 text-sm font-medium text-steel-400 dark:text-steel-600"
-            :title="t('siteDetail.tabs.scheduleDisabled')"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'schedule' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'schedule'"
           >
             {{ t('siteDetail.tabs.schedule') }}
           </button>
@@ -396,6 +400,11 @@ onMounted(load)
           :site-id="siteId"
           :can-manage-tasks="myPermissions?.TASKS === 'MANAGE'"
           :can-view-projects="myPermissions?.DOCUMENT_PROJECTS !== 'HIDDEN'"
+        />
+        <SchedulePanel
+          v-if="activeTab === 'schedule' && isTabVisible('schedule')"
+          :site-id="siteId"
+          :can-manage="myPermissions?.SCHEDULE === 'MANAGE'"
         />
         <template v-if="activeTab === 'permissions' && isCompanyAdmin">
           <SitePermissionsPanel :site-id="siteId" />

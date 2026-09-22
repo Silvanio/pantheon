@@ -7,7 +7,8 @@ import '../../core/widgets/offline_dialogs.dart';
 import '../../theme/app_colors.dart';
 import 'daily_report_repository.dart';
 
-final _listProvider = FutureProvider.family((ref, String siteId) => ref.watch(dailyReportRepositoryProvider).list(siteId));
+final dailyReportListProvider =
+    FutureProvider.family((ref, String siteId) => ref.watch(dailyReportRepositoryProvider).list(siteId));
 
 const _statusLabels = {'DRAFT': 'Rascunho', 'SUBMITTED': 'Enviado'};
 
@@ -27,7 +28,7 @@ class DailyReportListScreen extends ConsumerWidget {
     final iso = date.toIso8601String().split('T').first;
     try {
       final sentLive = await ref.read(dailyReportRepositoryProvider).create(siteId, iso);
-      ref.invalidate(_listProvider(siteId));
+      ref.invalidate(dailyReportListProvider(siteId));
       if (!sentLive && context.mounted) {
         await showOfflineSavedDialog(context);
       }
@@ -42,14 +43,14 @@ class DailyReportListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reports = ref.watch(_listProvider(siteId));
+    final reports = ref.watch(dailyReportListProvider(siteId));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Diário de Obra'),
         actions: [IconButton(icon: const Icon(Icons.add), onPressed: () => _createReport(context, ref))],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(_listProvider(siteId).future),
+        onRefresh: () => ref.refresh(dailyReportListProvider(siteId).future),
         child: AsyncValueView(
           value: reports,
           data: (list) {

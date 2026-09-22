@@ -8,5 +8,6 @@ public enum PermissionCapability {
     PURCHASE_REQUEST,
     ORCAMENTO_MANAGE,
     TASKS,
+    SCHEDULE,
     TEAM_MANAGE
 }

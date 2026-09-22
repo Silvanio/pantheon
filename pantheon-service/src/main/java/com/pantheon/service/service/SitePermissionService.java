@@ -37,6 +37,7 @@ public class SitePermissionService {
                 PermissionCapability.PURCHASE_REQUEST, AccessLevel.MANAGE,
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.MANAGE,
                 PermissionCapability.TASKS, AccessLevel.MANAGE,
+                PermissionCapability.SCHEDULE, AccessLevel.MANAGE,
                 PermissionCapability.TEAM_MANAGE, AccessLevel.MANAGE));
         DEFAULTS.put(ConstructionFunction.ARCHITECT, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.MANAGE,
@@ -45,6 +46,7 @@ public class SitePermissionService {
                 PermissionCapability.PURCHASE_REQUEST, AccessLevel.MANAGE,
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.MANAGE,
                 PermissionCapability.TASKS, AccessLevel.MANAGE,
+                PermissionCapability.SCHEDULE, AccessLevel.MANAGE,
                 PermissionCapability.TEAM_MANAGE, AccessLevel.MANAGE));
         DEFAULTS.put(ConstructionFunction.SITE_FOREMAN, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
@@ -53,6 +55,7 @@ public class SitePermissionService {
                 PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW,
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW,
                 PermissionCapability.TASKS, AccessLevel.MANAGE,
+                PermissionCapability.SCHEDULE, AccessLevel.MANAGE,
                 PermissionCapability.TEAM_MANAGE, AccessLevel.VIEW));
         DEFAULTS.put(ConstructionFunction.CLIENT, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
@@ -61,6 +64,7 @@ public class SitePermissionService {
                 PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW_AND_APPROVE,
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW,
                 PermissionCapability.TASKS, AccessLevel.VIEW,
+                PermissionCapability.SCHEDULE, AccessLevel.VIEW,
                 PermissionCapability.TEAM_MANAGE, AccessLevel.VIEW));
         DEFAULTS.put(ConstructionFunction.SERVICE_PROVIDER, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.VIEW,
@@ -69,6 +73,7 @@ public class SitePermissionService {
                 PermissionCapability.PURCHASE_REQUEST, AccessLevel.VIEW,
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.VIEW,
                 PermissionCapability.TASKS, AccessLevel.VIEW,
+                PermissionCapability.SCHEDULE, AccessLevel.VIEW,
                 PermissionCapability.TEAM_MANAGE, AccessLevel.VIEW));
     }
 

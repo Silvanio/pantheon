@@ -12,6 +12,7 @@ export interface ConstructionSite {
   startDate: string
   expectedEndDate: string | null
   photoObjectKey: string | null
+  schedulePercentComplete: number | null
 }
 
 export interface ConstructionSiteRegistrationData {

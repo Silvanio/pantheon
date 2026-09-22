@@ -28,6 +28,11 @@ public class DailyReportExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
+    @ExceptionHandler(DailyReportNotDeletableException.class)
+    public ResponseEntity<String> handleDailyReportNotDeletable(DailyReportNotDeletableException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
     @ExceptionHandler(InvalidFileException.class)
     public ResponseEntity<String> handleInvalidFile(InvalidFileException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());

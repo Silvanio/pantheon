@@ -156,6 +156,10 @@ export function useDailyReports() {
     return authFetch(`/api/daily-reports/${reportId}/submit`, { method: 'POST' })
   }
 
+  function deleteReport(reportId: string): Promise<void> {
+    return authFetch(`/api/daily-reports/${reportId}`, { method: 'DELETE' })
+  }
+
   function addWorkforceEntry(
     reportId: string,
     data: { membershipId: string | null; roleDescription: string | null; headcount: number },
@@ -253,6 +257,7 @@ export function useDailyReports() {
     getDetail,
     updateCore,
     submitReport,
+    deleteReport,
     addWorkforceEntry,
     addEquipmentUsage,
     addActivity,

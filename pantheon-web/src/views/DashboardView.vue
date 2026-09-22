@@ -67,15 +67,18 @@ const membersBySite = ref<Record<string, SiteMember[]>>({})
 // Per-site pending purchase-request/orçamento counts, for the badges at the bottom of each card.
 const statsBySite = ref<Record<string, { pendingPr: number; pendingOrc: number }>>({})
 
-// Every construction site currently uses status PLANNING/IN_PROGRESS/PAUSED/COMPLETED only — there's
-// no real "% concluído" tracked yet. This is a deliberate, static, status-derived approximation
-// (not real data) kept only so the card layout matches the approved design; replace once a real
-// progress-tracking feature exists.
+// Status-derived approximation used only until an obra has a real Cronograma (see the
+// construction-schedule capability) — once it has schedule tasks, `schedulePercentComplete`
+// (computed from them) takes over and this placeholder is never consulted for that obra again.
 const PLACEHOLDER_PROGRESS: Record<ConstructionSite['status'], number> = {
   PLANNING: 10,
   IN_PROGRESS: 55,
   PAUSED: 40,
   COMPLETED: 100,
+}
+
+function progressFor(site: ConstructionSite): number {
+  return site.schedulePercentComplete ?? PLACEHOLDER_PROGRESS[site.status]
 }
 
 // A site-only member (no CompanyMembership at all) has no single company to scope the board
@@ -261,12 +264,15 @@ watch(companyId, loadSites)
           v-for="site in filteredSites"
           :key="site.id"
           type="button"
-          class="rounded-2xl border border-steel-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          class="flex flex-col rounded-2xl border border-steel-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           @click="openSite(site)"
         >
-          <div class="relative h-28 w-full overflow-hidden rounded-t-2xl bg-gradient-to-br from-blueprint-600 to-ink-900">
+          <div class="relative h-28 w-full shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-br from-blueprint-600 to-ink-900">
             <SitePhoto :site-id="site.id" :has-photo="!!site.photoObjectKey" />
-            <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"></div>
+            <div
+              v-if="site.photoObjectKey"
+              class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"
+            ></div>
             <SiteCompanyBadge
               v-if="site.companyName"
               :site-id="site.id"
@@ -286,10 +292,10 @@ watch(companyId, loadSites)
 
             <div class="mt-3.5 flex items-center justify-between">
               <span class="text-[11px] font-bold text-steel-500">{{ t('dashboard.card.progress') }}</span>
-              <span class="text-xs font-extrabold text-emerald-600">{{ PLACEHOLDER_PROGRESS[site.status] }}%</span>
+              <span class="text-xs font-extrabold text-emerald-600">{{ progressFor(site) }}%</span>
             </div>
             <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-steel-100">
-              <div class="h-full rounded-full bg-emerald-500" :style="{ width: PLACEHOLDER_PROGRESS[site.status] + '%' }"></div>
+              <div class="h-full rounded-full bg-emerald-500" :style="{ width: progressFor(site) + '%' }"></div>
             </div>
 
             <div v-if="statsFor(site.id).pendingPr > 0 || statsFor(site.id).pendingOrc > 0" class="mt-3.5 flex flex-wrap items-center gap-1.5">

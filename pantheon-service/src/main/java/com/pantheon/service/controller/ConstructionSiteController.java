@@ -7,6 +7,7 @@ import com.pantheon.service.dto.MySiteResponse;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.service.ConstructionSiteService;
+import com.pantheon.service.service.ScheduleService;
 import com.pantheon.service.storage.StorageKeys;
 import com.pantheon.service.storage.StorageService;
 import jakarta.validation.Valid;
@@ -34,10 +35,13 @@ public class ConstructionSiteController {
 
     private final ConstructionSiteService constructionSiteService;
     private final StorageService storageService;
+    private final ScheduleService scheduleService;
 
-    public ConstructionSiteController(ConstructionSiteService constructionSiteService, StorageService storageService) {
+    public ConstructionSiteController(
+            ConstructionSiteService constructionSiteService, StorageService storageService, ScheduleService scheduleService) {
         this.constructionSiteService = constructionSiteService;
         this.storageService = storageService;
+        this.scheduleService = scheduleService;
     }
 
     @PostMapping("/api/companies/{companyId}/construction-sites")
@@ -46,14 +50,14 @@ public class ConstructionSiteController {
             @PathVariable UUID companyId,
             @Valid @RequestBody ConstructionSiteRegistrationRequest request) {
         ConstructionSite site = constructionSiteService.create(companyId, user.getId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ConstructionSiteResponse.from(site));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(site));
     }
 
     @GetMapping("/api/companies/{companyId}/construction-sites")
     public ResponseEntity<List<ConstructionSiteResponse>> list(
             @AuthenticationPrincipal AppUser user, @PathVariable UUID companyId) {
         List<ConstructionSiteResponse> sites = constructionSiteService.list(companyId, user.getId()).stream()
-                .map(ConstructionSiteResponse::from)
+                .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(sites);
     }
@@ -66,7 +70,7 @@ public class ConstructionSiteController {
 
     @GetMapping("/api/construction-sites/{id}")
     public ResponseEntity<ConstructionSiteResponse> get(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
-        return ResponseEntity.ok(ConstructionSiteResponse.from(constructionSiteService.get(id, user.getId())));
+        return ResponseEntity.ok(toResponse(constructionSiteService.get(id, user.getId())));
     }
 
     @GetMapping("/api/construction-sites/{id}/photo/content")
@@ -91,7 +95,7 @@ public class ConstructionSiteController {
             @PathVariable UUID id,
             @Valid @RequestBody ConstructionSiteStatusUpdateRequest request) {
         ConstructionSite site = constructionSiteService.updateStatus(id, user.getId(), request.status());
-        return ResponseEntity.ok(ConstructionSiteResponse.from(site));
+        return ResponseEntity.ok(toResponse(site));
     }
 
     @PutMapping(value = "/api/construction-sites/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -102,7 +106,11 @@ public class ConstructionSiteController {
         storageService.putObject(key, readBytes(photo), photo.getContentType());
 
         ConstructionSite site = constructionSiteService.updatePhoto(id, user.getId(), key);
-        return ResponseEntity.ok(ConstructionSiteResponse.from(site));
+        return ResponseEntity.ok(toResponse(site));
+    }
+
+    private ConstructionSiteResponse toResponse(ConstructionSite site) {
+        return ConstructionSiteResponse.from(site, scheduleService.computeProgress(site.getId()));
     }
 
     private byte[] readBytes(MultipartFile file) {

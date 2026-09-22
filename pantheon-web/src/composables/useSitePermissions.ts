@@ -9,6 +9,7 @@ export type PermissionCapability =
   | 'PURCHASE_REQUEST'
   | 'ORCAMENTO_MANAGE'
   | 'TASKS'
+  | 'SCHEDULE'
   | 'TEAM_MANAGE'
 export type AccessLevel = 'VIEW' | 'MANAGE' | 'VIEW_AND_APPROVE' | 'HIDDEN'
 

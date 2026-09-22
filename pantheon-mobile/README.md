@@ -41,8 +41,9 @@ flutter run --dart-define=PANTHEON_SERVICE_URL=https://your-host:8081
 Auth (email/password only — see "Known gaps" below), Dashboard, obra navigation gated by the
 caller's resolved permissions (`/api/sites/{id}/permissions/mine`), Pedido de Compra
 (list/create/detail/approve/reject/comparison), Orçamentos (list/detail), Diário de Obra
-(list/detail/photo capture via camera or gallery), Tasks board (per-column pages, touch-friendly
-"mover para coluna" instead of the web's drag-and-drop), and simplified read-only screens for
+(list/detail/photo capture via camera or gallery/delete while still a draft), Tasks board
+(per-column pages, touch-friendly "mover para coluna" instead of the web's drag-and-drop), and
+simplified read-only screens for
 Equipamentos, Projetos and Permissões (creating/uploading/editing those stays web-only for now).
 Offline support for the modules that need it — see below.
 

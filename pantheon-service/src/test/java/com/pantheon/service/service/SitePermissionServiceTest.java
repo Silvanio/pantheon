@@ -207,6 +207,34 @@ class SitePermissionServiceTest {
     }
 
     @Test
+    void siteForemanCanManageScheduleByDefault() {
+        SiteMembership foreman = SiteMembership.invited(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.SITE_FOREMAN, null, null, Instant.now());
+        foreman.accept();
+        SiteAccessContext foremanAccess = new SiteAccessContext(false, foreman);
+        when(overrideRepository.findBySiteMembershipIdAndCapability(foreman.getId(), PermissionCapability.SCHEDULE))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.SITE_FOREMAN, PermissionCapability.SCHEDULE))
+                .thenReturn(Optional.empty());
+
+        service.requireManage(siteId, foremanAccess, PermissionCapability.SCHEDULE);
+    }
+
+    @Test
+    void clientDefaultsToViewOnSchedule() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.SCHEDULE))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.SCHEDULE))
+                .thenReturn(Optional.empty());
+
+        AccessLevel level = service.resolve(siteId, clientAccess, PermissionCapability.SCHEDULE);
+
+        assertThat(level).isEqualTo(AccessLevel.VIEW);
+    }
+
+    @Test
     void resolveAllReturnsEveryCapability() {
         SiteAccessContext staffAccess = new SiteAccessContext(true, null);
 

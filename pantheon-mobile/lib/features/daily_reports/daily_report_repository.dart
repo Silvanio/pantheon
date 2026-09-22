@@ -53,6 +53,10 @@ class DailyReportRepository {
         entityLabel: 'Enviar relatório diário',
       );
 
+  /// Deleting is a destructive, irreversible action — like the purchase-request approval
+  /// workflow, it's never queued offline. The screen calls `requireOnline` before invoking this.
+  Future<void> delete(String reportId) => _client.delete<dynamic>('/api/daily-reports/$reportId');
+
   Future<List<ReportMedia>> listMedia(String reportId) async {
     final json = await _client.get<List<dynamic>>('/api/daily-reports/$reportId/media');
     return json.map((e) => ReportMedia.fromJson(e as Map<String, dynamic>)).toList();

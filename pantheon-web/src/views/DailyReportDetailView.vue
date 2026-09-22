@@ -23,6 +23,7 @@ const {
   getDetail,
   updateCore,
   submitReport,
+  deleteReport,
   addWorkforceEntry,
   addEquipmentUsage,
   addActivity,
@@ -88,6 +89,10 @@ const materialQuantity = ref('')
 
 const submitError = ref('')
 const submitting = ref(false)
+
+const confirmingDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
 
 // media
 const media = ref<ReportMedia[]>([])
@@ -334,6 +339,19 @@ async function onSubmitReport() {
   }
 }
 
+async function onDelete() {
+  deleteError.value = ''
+  deleting.value = true
+  try {
+    await deleteReport(reportId)
+    router.back()
+  } catch {
+    deleteError.value = t('dailyReports.detail.deleteError')
+    deleting.value = false
+    confirmingDelete.value = false
+  }
+}
+
 function equipmentName(equipmentId: string): string {
   return equipmentCatalog.value.find((e) => e.id === equipmentId)?.name ?? equipmentId
 }
@@ -382,12 +400,25 @@ onMounted(load)
           >
             {{ t('dailyReports.detail.submitButton') }}
           </button>
+          <div v-if="isDraft" class="relative">
+            <button type="button" :disabled="deleting" class="btn-danger" @click="confirmingDelete = !confirmingDelete">
+              {{ t('dailyReports.detail.deleteButton') }}
+            </button>
+            <div v-if="confirmingDelete" class="modal-panel absolute right-0 top-full z-10 mt-2 w-72 p-3 shadow-lg" @click.stop>
+              <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('dailyReports.detail.deleteConfirm') }}</p>
+              <div class="flex justify-end gap-2">
+                <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDelete = false">{{ t('dailyReports.detail.deleteCancel') }}</button>
+                <button type="button" :disabled="deleting" class="btn-danger py-1 text-xs" @click="onDelete">{{ t('dailyReports.detail.deleteButton') }}</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <p v-if="!isDraft" class="rounded-md bg-blueprint-50 px-4 py-2 text-sm text-blueprint-700 dark:bg-blueprint-900/40 dark:text-blueprint-300">
         {{ t('dailyReports.detail.submittedNotice') }}
       </p>
       <p v-if="submitError" class="text-sm text-safety-600 dark:text-safety-500">{{ submitError }}</p>
+      <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
       <p v-if="pdfError" class="text-sm text-safety-600 dark:text-safety-500">{{ pdfError }}</p>
 
       <!-- Core: weather, hours, comments -->

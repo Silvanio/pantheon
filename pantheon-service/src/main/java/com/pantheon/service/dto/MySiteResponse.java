@@ -8,11 +8,11 @@ import java.util.UUID;
 /** A construction site a site-only member has access to, with its owning company's name inlined. */
 public record MySiteResponse(
         UUID id, UUID companyId, String companyName, String name, String address, SiteStatus status,
-        LocalDate startDate, LocalDate expectedEndDate, String photoObjectKey) {
+        LocalDate startDate, LocalDate expectedEndDate, String photoObjectKey, Integer schedulePercentComplete) {
 
-    public static MySiteResponse from(ConstructionSite site, String companyName) {
+    public static MySiteResponse from(ConstructionSite site, String companyName, Integer schedulePercentComplete) {
         return new MySiteResponse(
                 site.getId(), site.getCompanyId(), companyName, site.getName(), site.getAddress(), site.getStatus(),
-                site.getStartDate(), site.getExpectedEndDate(), site.getPhotoObjectKey());
+                site.getStartDate(), site.getExpectedEndDate(), site.getPhotoObjectKey(), schedulePercentComplete);
     }
 }

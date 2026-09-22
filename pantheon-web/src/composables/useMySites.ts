@@ -12,6 +12,7 @@ export interface MySite {
   startDate: string
   expectedEndDate: string | null
   photoObjectKey: string | null
+  schedulePercentComplete: number | null
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

@@ -9,7 +9,7 @@ const props = defineProps<{ siteId: string }>()
 
 const { t } = useI18n()
 const router = useRouter()
-const { listReports, createReport } = useDailyReports()
+const { listReports, createReport, deleteReport } = useDailyReports()
 
 const reports = ref<DailyReport[]>([])
 const loading = ref(false)
@@ -17,6 +17,9 @@ const showForm = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const reportDate = ref('')
+
+const deletingId = ref<string | null>(null)
+const deleteError = ref('')
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR')
 function formatDate(value: string): string {
@@ -44,6 +47,20 @@ async function onSubmit() {
     errorMessage.value = t('dailyReports.history.form.error')
   } finally {
     submitting.value = false
+  }
+}
+
+async function onDelete(reportId: string) {
+  if (!window.confirm(t('dailyReports.history.deleteConfirm'))) return
+  deleteError.value = ''
+  deletingId.value = reportId
+  try {
+    await deleteReport(reportId)
+    await load()
+  } catch {
+    deleteError.value = t('dailyReports.history.deleteError')
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -88,7 +105,8 @@ onMounted(load)
             <th class="pb-3 pl-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('dailyReports.history.table.report') }}</th>
             <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('dailyReports.history.table.status') }}</th>
             <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('dailyReports.history.table.weather') }}</th>
-            <th class="pb-3 pr-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('dailyReports.history.table.date') }}</th>
+            <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('dailyReports.history.table.date') }}</th>
+            <th class="pb-3 pr-5 pt-4"></th>
           </tr>
         </thead>
         <tbody>
@@ -101,10 +119,25 @@ onMounted(load)
             <td class="py-3.5 pl-5 text-[13.5px] font-bold text-steel-800 dark:text-steel-50">{{ t('dailyReports.history.reportLabel') }} #{{ report.sequenceNo }}</td>
             <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ t(`dailyReports.status.${report.status}`) }}</td>
             <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ report.weatherCondition ?? '—' }}</td>
-            <td class="py-3.5 pr-5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(report.reportDate) }}</td>
+            <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(report.reportDate) }}</td>
+            <td class="py-3.5 pr-5 text-right" @click.stop>
+              <button
+                v-if="report.status === 'DRAFT'"
+                type="button"
+                :disabled="deletingId === report.id"
+                :title="t('dailyReports.history.deleteButton')"
+                class="inline-flex h-7 w-7 items-center justify-center rounded-md text-safety-600 transition hover:bg-safety-50 dark:text-safety-500 dark:hover:bg-safety-900/30"
+                @click="onDelete(report.id)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16zM10 11v6M14 11v6" />
+                </svg>
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
+    <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
   </section>
 </template>

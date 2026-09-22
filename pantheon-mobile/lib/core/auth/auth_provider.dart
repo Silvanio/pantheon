@@ -71,17 +71,6 @@ class AuthController extends StateNotifier<AuthState> {
     state = AuthState(status: AuthStatus.authenticated, email: _decodeEmail(token));
   }
 
-  Future<void> register(String email, String password, String displayName) async {
-    final dio = Dio(BaseOptions(baseUrl: ApiConfig.baseUrl));
-    final response = await dio.post<Map<String, dynamic>>(
-      '/api/auth/register',
-      data: {'email': email, 'password': password, 'displayName': displayName},
-    );
-    final token = response.data!['token'] as String;
-    await _tokenStorage.write(token);
-    state = AuthState(status: AuthStatus.authenticated, email: _decodeEmail(token));
-  }
-
   Future<void> logout() async {
     try {
       await _ref.read(deviceTokenUnregisterProvider)();

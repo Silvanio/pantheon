@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/login_screen.dart';
-import '../../features/auth/register_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/daily_reports/daily_report_detail_screen.dart';
@@ -28,7 +27,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: _AuthRefreshNotifier(ref),
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
-      final loggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/register';
+      final loggingIn = state.matchedLocation == '/login';
       // Never mount an authenticated screen (and its network calls) before the secure-storage
       // session restore resolves — show the splash route instead of guessing.
       if (auth.status == AuthStatus.unknown) return state.matchedLocation == '/splash' ? null : '/splash';
@@ -39,7 +38,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
       GoRoute(path: '/sync', builder: (context, state) => const SyncScreen()),

@@ -22,6 +22,7 @@ import com.pantheon.service.exception.NoPendingApprovalStepException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
 import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
+import com.pantheon.service.exception.PurchaseRequestNotIniciadoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
@@ -144,12 +145,31 @@ public class PurchaseRequestService {
         PurchaseRequest purchaseRequest =
                 purchaseRequestRepository.save(new PurchaseRequest(UUID.randomUUID(), siteId, name, actingUserId, now));
 
-        for (PurchaseRequestItemCreationRequest item : items) {
+        for (PurchaseRequestItemCreationRequest item : items == null ? List.<PurchaseRequestItemCreationRequest>of() : items) {
             itemRepository.save(new PurchaseRequestItem(
                     UUID.randomUUID(), siteId, purchaseRequest.getId(), item.name(), item.type(), item.quantity(),
                     item.unit(), actingUserId, now));
         }
         return purchaseRequest;
+    }
+
+    @Transactional
+    public List<PurchaseRequestItem> addItems(
+            UUID purchaseRequestId, UUID actingUserId, List<PurchaseRequestItemCreationRequest> items) {
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
+        requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
+        if (purchaseRequest.getStatus() != PurchaseRequestStatus.INICIADO) {
+            throw new PurchaseRequestNotIniciadoException(purchaseRequestId);
+        }
+
+        Instant now = Instant.now();
+        List<PurchaseRequestItem> added = new ArrayList<>();
+        for (PurchaseRequestItemCreationRequest item : items) {
+            added.add(itemRepository.save(new PurchaseRequestItem(
+                    UUID.randomUUID(), purchaseRequest.getConstructionSiteId(), purchaseRequest.getId(), item.name(),
+                    item.type(), item.quantity(), item.unit(), actingUserId, now)));
+        }
+        return added;
     }
 
     public Page<PurchaseRequest> list(

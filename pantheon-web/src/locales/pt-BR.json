@@ -619,6 +619,9 @@
     "detailTitle": "Itens do pedido",
     "itemsTitle": "Produtos",
     "noItems": "Nenhum produto neste pedido.",
+    "addItemsButton": "Adicionar produtos",
+    "addItemsSubmit": "Adicionar produtos",
+    "addItemsError": "Não foi possível adicionar os produtos. Verifique os dados informados.",
     "convertButton": "Criar orçamento",
     "convertError": "Não foi possível criar o orçamento a partir dos itens selecionados.",
     "table": {

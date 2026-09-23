@@ -94,21 +94,24 @@ onMounted(load)
       </button>
     </div>
 
-    <form v-if="showForm" class="space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmit">
-      <div>
-        <label class="field-label">{{ t('dailyReports.history.form.date') }}</label>
-        <input v-model="reportDate" v-date-picker type="date" required class="field-input" />
-      </div>
-      <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
-      <div class="flex gap-2">
-        <button type="submit" :disabled="submitting" class="btn-primary">
-          {{ t('dailyReports.history.form.submit') }}
-        </button>
-        <button type="button" class="btn-secondary" @click="showForm = false">
-          {{ t('dailyReports.history.form.cancel') }}
-        </button>
-      </div>
-    </form>
+    <div v-if="showForm" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showForm = false">
+      <form class="modal-panel card-pad w-full max-w-md space-y-3" @submit.prevent="onSubmit">
+        <h3 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.history.newButton') }}</h3>
+        <div>
+          <label class="field-label">{{ t('dailyReports.history.form.date') }}</label>
+          <input v-model="reportDate" v-date-picker type="date" required class="field-input" />
+        </div>
+        <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
+        <div class="flex gap-2">
+          <button type="submit" :disabled="submitting" class="btn-primary">
+            {{ t('dailyReports.history.form.submit') }}
+          </button>
+          <button type="button" class="btn-secondary" @click="showForm = false">
+            {{ t('dailyReports.history.form.cancel') }}
+          </button>
+        </div>
+      </form>
+    </div>
 
     <p v-if="!loading && reports.length === 0" class="text-sm text-steel-500 dark:text-steel-400">
       {{ t('dailyReports.history.empty') }}

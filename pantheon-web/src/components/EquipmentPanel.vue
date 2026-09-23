@@ -85,18 +85,21 @@ onMounted(load)
       </button>
     </div>
 
-    <form v-if="showForm" class="mb-4 space-y-2 rounded-lg border border-steel-200 p-3 dark:border-steel-700" @submit.prevent="onSubmit">
-      <input v-model="name" type="text" required :placeholder="t('equipment.form.name')" class="field-input" />
-      <input v-model="type" type="text" :placeholder="t('equipment.form.type')" class="field-input" />
-      <select v-model="status" class="field-input">
-        <option v-for="s in statuses" :key="s" :value="s">{{ t(`equipment.status.${s}`) }}</option>
-      </select>
-      <p v-if="errorMessage" class="text-xs text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
-      <div class="flex gap-2">
-        <button type="submit" :disabled="submitting" class="btn-primary px-3 py-1.5 text-xs">{{ t('equipment.form.submit') }}</button>
-        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="showForm = false">{{ t('equipment.form.cancel') }}</button>
-      </div>
-    </form>
+    <div v-if="showForm" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showForm = false">
+      <form class="modal-panel card-pad w-full max-w-md space-y-2" @submit.prevent="onSubmit">
+        <h3 class="mb-1 font-semibold text-steel-800 dark:text-steel-50">{{ t('equipment.newButton') }}</h3>
+        <input v-model="name" type="text" required :placeholder="t('equipment.form.name')" class="field-input" />
+        <input v-model="type" type="text" :placeholder="t('equipment.form.type')" class="field-input" />
+        <select v-model="status" class="field-input">
+          <option v-for="s in statuses" :key="s" :value="s">{{ t(`equipment.status.${s}`) }}</option>
+        </select>
+        <p v-if="errorMessage" class="text-xs text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
+        <div class="flex gap-2">
+          <button type="submit" :disabled="submitting" class="btn-primary px-3 py-1.5 text-xs">{{ t('equipment.form.submit') }}</button>
+          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="showForm = false">{{ t('equipment.form.cancel') }}</button>
+        </div>
+      </form>
+    </div>
 
     <p v-if="!loading && items.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('equipment.empty') }}</p>
     <ul v-else class="space-y-1.5">

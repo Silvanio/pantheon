@@ -69,6 +69,15 @@ public class PurchaseRequestController {
         return ResponseEntity.status(HttpStatus.CREATED).body(PurchaseRequestResponse.from(purchaseRequest));
     }
 
+    @PostMapping("/api/purchase-requests/{id}/items")
+    public ResponseEntity<List<PurchaseRequestItemResponse>> addItems(
+            @AuthenticationPrincipal AppUser user,
+            @PathVariable UUID id,
+            @Valid @RequestBody PurchaseRequestCreationRequest request) {
+        var items = purchaseRequestService.addItems(id, user.getId(), request.items());
+        return ResponseEntity.status(HttpStatus.CREATED).body(items.stream().map(PurchaseRequestItemResponse::from).toList());
+    }
+
     @GetMapping("/api/construction-sites/{siteId}/purchase-requests")
     public ResponseEntity<Page<PurchaseRequestResponse>> list(
             @AuthenticationPrincipal AppUser user,

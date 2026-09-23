@@ -35,6 +35,7 @@ import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
+import com.pantheon.service.exception.PurchaseRequestNotIniciadoException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
 import com.pantheon.service.exception.PurchaseRequestSelectionIncompleteException;
 import com.pantheon.service.messaging.EventPublisher;
@@ -194,6 +195,53 @@ class PurchaseRequestServiceTest {
 
         verify(itemRepository).save(argThat(
                 item -> item.getPurchaseRequestId().equals(result.getId()) && item.getName().equals("Cimento")));
+    }
+
+    @Test
+    void createWithNoItemsPersistsEmptyHeaderInIniciado() {
+        when(purchaseRequestRepository.countByConstructionSiteIdAndCreatedAtBetween(eq(siteId), any(), any())).thenReturn(0L);
+
+        PurchaseRequest result = service.create(siteId, UUID.randomUUID(), List.of());
+
+        assertThat(result.getStatus()).isEqualTo(PurchaseRequestStatus.INICIADO);
+        verify(itemRepository, never()).save(any());
+    }
+
+    @Test
+    void addItemsToIniciadoHeaderPersistsThemAndReturnsThem() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        List<PurchaseRequestItem> added = service.addItems(purchaseRequest.getId(), UUID.randomUUID(), oneItem());
+
+        assertThat(added).hasSize(1);
+        assertThat(added.get(0).getPurchaseRequestId()).isEqualTo(purchaseRequest.getId());
+        assertThat(added.get(0).getName()).isEqualTo("Cimento");
+        verify(itemRepository).save(argThat(item -> item.getPurchaseRequestId().equals(purchaseRequest.getId())));
+        verify(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+    }
+
+    @Test
+    void addItemsRejectsWhenHeaderIsNotIniciado() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        assertThatThrownBy(() -> service.addItems(purchaseRequest.getId(), UUID.randomUUID(), oneItem()))
+                .isInstanceOf(PurchaseRequestNotIniciadoException.class);
+        verify(itemRepository, never()).save(any());
+    }
+
+    @Test
+    void addItemsRejectsMemberWithoutManageAccess() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.addItems(purchaseRequest.getId(), UUID.randomUUID(), oneItem()))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+        verify(itemRepository, never()).save(any());
     }
 
     @Test

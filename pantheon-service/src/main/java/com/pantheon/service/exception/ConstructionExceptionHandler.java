@@ -143,6 +143,11 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
+    @ExceptionHandler(PurchaseRequestNotIniciadoException.class)
+    public ResponseEntity<String> handlePurchaseRequestNotIniciado(PurchaseRequestNotIniciadoException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
     @ExceptionHandler(PurchaseRequestSelectionIncompleteException.class)
     public ResponseEntity<String> handlePurchaseRequestSelectionIncomplete(PurchaseRequestSelectionIncompleteException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());

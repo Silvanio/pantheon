@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n'
 import {
   usePurchaseRequests,
   type PurchaseRequest,
-  type PurchaseRequestItemCreationData,
   type PurchaseRequestStatus,
 } from '../composables/usePurchaseRequests'
 import { useSiteMembers } from '../composables/useSiteMembers'
@@ -33,10 +32,8 @@ const dateFilter = ref('')
 const statusFilter = ref<PurchaseRequestStatus | ''>('')
 const hasActiveFilter = ref(false)
 
-const showForm = ref(false)
-const submitting = ref(false)
-const formError = ref('')
-const rows = ref<PurchaseRequestItemCreationData[]>([{ name: '', type: null, quantity: '', unit: null }])
+const creating = ref(false)
+const createError = ref('')
 
 const memberNames = ref<Record<string, string>>({})
 
@@ -111,35 +108,16 @@ function goToPage(target: number) {
   load()
 }
 
-function addRow() {
-  rows.value.push({ name: '', type: null, quantity: '', unit: null })
-}
-
-function removeRow(index: number) {
-  rows.value.splice(index, 1)
-}
-
-async function onSubmitForm() {
-  formError.value = ''
-  submitting.value = true
+async function onCreate() {
+  createError.value = ''
+  creating.value = true
   try {
-    const items = rows.value
-      .filter((r) => r.name.trim() && r.quantity)
-      .map((r) => ({ name: r.name.trim(), type: r.type || null, quantity: r.quantity, unit: r.unit || null }))
-    if (items.length === 0) {
-      formError.value = t('purchaseRequests.form.error')
-      return
-    }
-    await createPurchaseRequest(props.siteId, items)
-    rows.value = [{ name: '', type: null, quantity: '', unit: null }]
-    showForm.value = false
-    page.value = 0
-    await load()
-    await loadStats()
+    const created = await createPurchaseRequest(props.siteId, [])
+    router.push(`/purchase-requests/${created.id}`)
   } catch {
-    formError.value = t('purchaseRequests.form.error')
+    createError.value = t('purchaseRequests.form.error')
   } finally {
-    submitting.value = false
+    creating.value = false
   }
 }
 
@@ -214,7 +192,7 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <button v-if="canManage" type="button" class="btn-primary" @click="showForm = !showForm">
+        <button v-if="canManage" type="button" :disabled="creating" class="btn-primary" @click="onCreate">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5">
             <path stroke-linecap="round" d="M12 5v14M5 12h14" />
           </svg>
@@ -222,6 +200,8 @@ onMounted(() => {
         </button>
       </div>
     </div>
+
+    <p v-if="createError" class="text-sm text-safety-600 dark:text-safety-500">{{ createError }}</p>
 
     <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
       <div class="rounded-2xl border border-steel-200 bg-white p-4 dark:border-steel-700 dark:bg-steel-800/60">
@@ -241,40 +221,6 @@ onMounted(() => {
         <p class="text-2xl font-extrabold text-steel-700 dark:text-steel-300">{{ stats?.completed ?? '—' }}</p>
       </div>
     </div>
-
-    <form v-if="canManage && showForm" class="space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onSubmitForm">
-      <div v-for="(row, index) in rows" :key="index" class="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:items-end">
-        <div class="sm:col-span-2">
-          <label class="field-label">{{ t('purchaseRequests.form.name') }}</label>
-          <input v-model="row.name" type="text" required class="field-input" />
-        </div>
-        <div>
-          <label class="field-label">{{ t('purchaseRequests.form.type') }}</label>
-          <input v-model="row.type" type="text" class="field-input" />
-        </div>
-        <div>
-          <label class="field-label">{{ t('purchaseRequests.form.quantity') }}</label>
-          <input v-model="row.quantity" type="number" step="0.001" min="0" required class="field-input" />
-        </div>
-        <div class="flex items-end gap-2">
-          <div class="flex-1">
-            <label class="field-label">{{ t('purchaseRequests.form.unit') }}</label>
-            <input v-model="row.unit" type="text" class="field-input" />
-          </div>
-          <button v-if="rows.length > 1" type="button" class="btn-ghost px-2 py-1.5 text-xs" @click="removeRow(index)">
-            {{ t('purchaseRequests.removeRowButton') }}
-          </button>
-        </div>
-      </div>
-      <button type="button" class="text-sm font-medium text-blueprint-600 hover:underline dark:text-blueprint-400" @click="addRow">
-        {{ t('purchaseRequests.addRowButton') }}
-      </button>
-      <p v-if="formError" class="text-sm text-safety-600 dark:text-safety-500">{{ formError }}</p>
-      <div class="flex gap-2">
-        <button type="submit" :disabled="submitting" class="btn-primary">{{ t('purchaseRequests.form.submit') }}</button>
-        <button type="button" class="btn-secondary" @click="showForm = false">{{ t('purchaseRequests.form.cancel') }}</button>
-      </div>
-    </form>
 
     <p v-if="!loading && purchaseRequests.length === 0" class="text-sm text-steel-500 dark:text-steel-400">
       {{ t('purchaseRequests.empty') }}

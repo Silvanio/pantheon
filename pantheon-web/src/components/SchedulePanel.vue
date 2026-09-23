@@ -315,41 +315,44 @@ onMounted(load)
       </button>
     </div>
 
-    <form v-if="showNewStageForm" class="space-y-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700" @submit.prevent="onCreateStage">
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label class="field-label">{{ t('schedule.stage.name') }}</label>
-          <input v-model="newStageName" type="text" required class="field-input" />
-        </div>
-        <div>
-          <label class="field-label">{{ t('schedule.stage.color') }}</label>
-          <div class="flex gap-1.5 pt-1.5">
-            <button
-              v-for="color in STAGE_COLORS"
-              :key="color"
-              type="button"
-              class="h-6 w-6 rounded-full ring-offset-2"
-              :class="{ 'ring-2 ring-blueprint-500': newStageColor === color }"
-              :style="{ backgroundColor: color }"
-              @click="newStageColor = color"
-            ></button>
+    <div v-if="showNewStageForm" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showNewStageForm = false">
+      <form class="modal-panel card-pad w-full max-w-md space-y-3" @submit.prevent="onCreateStage">
+        <h3 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('schedule.stage.newButton') }}</h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="field-label">{{ t('schedule.stage.name') }}</label>
+            <input v-model="newStageName" type="text" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">{{ t('schedule.stage.color') }}</label>
+            <div class="flex gap-1.5 pt-1.5">
+              <button
+                v-for="color in STAGE_COLORS"
+                :key="color"
+                type="button"
+                class="h-6 w-6 rounded-full ring-offset-2"
+                :class="{ 'ring-2 ring-blueprint-500': newStageColor === color }"
+                :style="{ backgroundColor: color }"
+                @click="newStageColor = color"
+              ></button>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">{{ t('schedule.stage.startDate') }}</label>
+            <input v-model="newStageStart" v-date-picker type="date" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">{{ t('schedule.stage.endDate') }}</label>
+            <input v-model="newStageEnd" v-date-picker type="date" required class="field-input" />
           </div>
         </div>
-        <div>
-          <label class="field-label">{{ t('schedule.stage.startDate') }}</label>
-          <input v-model="newStageStart" v-date-picker type="date" required class="field-input" />
+        <p v-if="newStageError" class="text-sm text-safety-600 dark:text-safety-500">{{ newStageError }}</p>
+        <div class="flex gap-2">
+          <button type="submit" :disabled="savingStage" class="btn-primary">{{ t('schedule.stage.save') }}</button>
+          <button type="button" class="btn-secondary" @click="showNewStageForm = false">{{ t('schedule.form.cancel') }}</button>
         </div>
-        <div>
-          <label class="field-label">{{ t('schedule.stage.endDate') }}</label>
-          <input v-model="newStageEnd" v-date-picker type="date" required class="field-input" />
-        </div>
-      </div>
-      <p v-if="newStageError" class="text-sm text-safety-600 dark:text-safety-500">{{ newStageError }}</p>
-      <div class="flex gap-2">
-        <button type="submit" :disabled="savingStage" class="btn-primary">{{ t('schedule.stage.save') }}</button>
-        <button type="button" class="btn-secondary" @click="showNewStageForm = false">{{ t('schedule.form.cancel') }}</button>
-      </div>
-    </form>
+      </form>
+    </div>
 
     <p v-if="loadError" class="text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
 

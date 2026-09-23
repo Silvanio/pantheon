@@ -165,8 +165,10 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="showFornecedorPicker" class="mb-5">
-      <FornecedorPicker :site-id="siteId" @confirm="onCreateConfirmed" @cancel="showFornecedorPicker = false" />
+    <div v-if="showFornecedorPicker" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showFornecedorPicker = false">
+      <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto">
+        <FornecedorPicker :site-id="siteId" @confirm="onCreateConfirmed" @cancel="showFornecedorPicker = false" />
+      </div>
     </div>
 
     <p v-if="errorMessage" class="text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>

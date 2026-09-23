@@ -7,6 +7,7 @@ import {
   type PurchaseRequestDetail,
   type PurchaseRequestComparison,
   type PurchaseRequestInvoice,
+  type PurchaseRequestItemCreationData,
   type PurchaseRequestStatus,
 } from '../composables/usePurchaseRequests'
 import { useMaterialDeliveries, type Material } from '../composables/useMaterialDeliveries'
@@ -25,6 +26,7 @@ const router = useRouter()
 const { t } = useI18n()
 const {
   getPurchaseRequest,
+  addPurchaseRequestItems,
   deletePurchaseRequest,
   convertToOrcamento,
   setItemSelection,
@@ -61,6 +63,11 @@ const selectedIds = ref<Set<string>>(new Set())
 const showFornecedorPicker = ref(false)
 const converting = ref(false)
 const convertError = ref('')
+
+const showAddItemsForm = ref(false)
+const addingItems = ref(false)
+const addItemsError = ref('')
+const newItemRows = ref<PurchaseRequestItemCreationData[]>([{ name: '', type: null, quantity: '', unit: null }])
 
 const selectionError = ref('')
 const printingOrcamentoId = ref<string | null>(null)
@@ -148,6 +155,7 @@ const canActOnApproval = computed(() => {
 })
 
 const canDelete = computed(() => detail.value?.purchaseRequest.status === 'INICIADO')
+const canAddItems = computed(() => detail.value?.purchaseRequest.status === 'INICIADO' && myAccessLevel.value === 'MANAGE')
 const canConclude = computed(() => detail.value?.purchaseRequest.status === 'CONFERIDO' && canApprove.value)
 const isConcluded = computed(() => detail.value?.purchaseRequest.status === 'CONCLUIDO')
 const selectionEditable = computed(() => detail.value?.purchaseRequest.status === 'ORCADO')
@@ -251,6 +259,36 @@ function toggleSelection(itemId: string) {
 
 function toggleSelectAll() {
   selectedIds.value = allSelected.value ? new Set() : new Set(items.value.map((i) => i.id))
+}
+
+function addItemRow() {
+  newItemRows.value.push({ name: '', type: null, quantity: '', unit: null })
+}
+
+function removeItemRow(index: number) {
+  newItemRows.value.splice(index, 1)
+}
+
+async function onAddItems() {
+  addItemsError.value = ''
+  addingItems.value = true
+  try {
+    const newItems = newItemRows.value
+      .filter((r) => r.name.trim() && r.quantity)
+      .map((r) => ({ name: r.name.trim(), type: r.type || null, quantity: r.quantity, unit: r.unit || null }))
+    if (newItems.length === 0) {
+      addItemsError.value = t('purchaseRequests.addItemsError')
+      return
+    }
+    await addPurchaseRequestItems(purchaseRequestId, newItems)
+    newItemRows.value = [{ name: '', type: null, quantity: '', unit: null }]
+    showAddItemsForm.value = false
+    await loadDetail()
+  } catch {
+    addItemsError.value = t('purchaseRequests.addItemsError')
+  } finally {
+    addingItems.value = false
+  }
 }
 
 async function onConvertConfirmed(fornecedor: FornecedorInput) {
@@ -603,14 +641,24 @@ onMounted(load)
           <h2 class="text-sm font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
             {{ t('purchaseRequests.itemsTitle') }}
           </h2>
-          <button
-            type="button"
-            :disabled="selectedIds.size === 0 || converting"
-            class="btn-primary px-3 py-1.5 text-xs"
-            @click="showFornecedorPicker = true"
-          >
-            {{ t('purchaseRequests.convertButton') }} ({{ selectedIds.size }})
-          </button>
+          <div class="flex gap-2">
+            <button
+              v-if="canAddItems"
+              type="button"
+              class="btn-secondary px-3 py-1.5 text-xs"
+              @click="showAddItemsForm = true"
+            >
+              {{ t('purchaseRequests.addItemsButton') }}
+            </button>
+            <button
+              type="button"
+              :disabled="selectedIds.size === 0 || converting"
+              class="btn-primary px-3 py-1.5 text-xs"
+              @click="showFornecedorPicker = true"
+            >
+              {{ t('purchaseRequests.convertButton') }} ({{ selectedIds.size }})
+            </button>
+          </div>
         </div>
 
         <div v-if="showFornecedorPicker" class="mb-5">
@@ -814,6 +862,44 @@ onMounted(load)
       </div>
       </div>
     </main>
+
+    <!-- Add items modal -->
+    <div v-if="showAddItemsForm" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showAddItemsForm = false">
+      <form class="modal-panel card-pad max-h-[85vh] w-full max-w-2xl space-y-3 overflow-y-auto" @submit.prevent="onAddItems">
+        <h3 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.addItemsButton') }}</h3>
+        <div v-for="(row, index) in newItemRows" :key="index" class="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:items-end">
+          <div class="sm:col-span-2">
+            <label class="field-label">{{ t('purchaseRequests.form.name') }}</label>
+            <input v-model="row.name" type="text" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">{{ t('purchaseRequests.form.type') }}</label>
+            <input v-model="row.type" type="text" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">{{ t('purchaseRequests.form.quantity') }}</label>
+            <input v-model="row.quantity" type="number" step="0.001" min="0" required class="field-input" />
+          </div>
+          <div class="flex items-end gap-2">
+            <div class="flex-1">
+              <label class="field-label">{{ t('purchaseRequests.form.unit') }}</label>
+              <input v-model="row.unit" type="text" class="field-input" />
+            </div>
+            <button v-if="newItemRows.length > 1" type="button" class="btn-ghost px-2 py-1.5 text-xs" @click="removeItemRow(index)">
+              {{ t('purchaseRequests.removeRowButton') }}
+            </button>
+          </div>
+        </div>
+        <button type="button" class="text-sm font-medium text-blueprint-600 hover:underline dark:text-blueprint-400" @click="addItemRow">
+          {{ t('purchaseRequests.addRowButton') }}
+        </button>
+        <p v-if="addItemsError" class="text-sm text-safety-600 dark:text-safety-500">{{ addItemsError }}</p>
+        <div class="flex gap-2">
+          <button type="submit" :disabled="addingItems" class="btn-primary">{{ t('purchaseRequests.addItemsSubmit') }}</button>
+          <button type="button" class="btn-secondary" @click="showAddItemsForm = false">{{ t('purchaseRequests.form.cancel') }}</button>
+        </div>
+      </form>
+    </div>
 
     <!-- All suppliers modal -->
     <div v-if="showFornecedoresModal" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" @click.self="showFornecedoresModal = false">

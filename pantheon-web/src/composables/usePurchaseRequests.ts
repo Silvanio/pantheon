@@ -188,6 +188,16 @@ export function usePurchaseRequests() {
     return authFetch(`/api/purchase-requests/${purchaseRequestId}`)
   }
 
+  function addPurchaseRequestItems(
+    purchaseRequestId: string,
+    items: PurchaseRequestItemCreationData[],
+  ): Promise<PurchaseRequestItem[]> {
+    return authFetch(`/api/purchase-requests/${purchaseRequestId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    })
+  }
+
   function deletePurchaseRequest(purchaseRequestId: string): Promise<void> {
     return authFetch(`/api/purchase-requests/${purchaseRequestId}`, { method: 'DELETE' })
   }
@@ -271,6 +281,7 @@ export function usePurchaseRequests() {
     listPurchaseRequests,
     createPurchaseRequest,
     getPurchaseRequest,
+    addPurchaseRequestItems,
     deletePurchaseRequest,
     convertToOrcamento,
     setItemSelection,

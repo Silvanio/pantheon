@@ -187,7 +187,9 @@ onMounted(loadMembers)
       </button>
     </div>
 
-    <form v-if="showForm" class="mb-5 grid grid-cols-1 gap-3 rounded-lg border border-steel-200 p-4 dark:border-steel-700 sm:grid-cols-2" @submit.prevent="onSubmit">
+    <div v-if="showForm" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showForm = false">
+      <form class="modal-panel card-pad grid max-h-[85vh] w-full max-w-lg grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2" @submit.prevent="onSubmit">
+        <h3 class="text-lg font-semibold text-steel-800 dark:text-steel-50 sm:col-span-2">{{ t('siteTeam.newButton') }}</h3>
       <div class="sm:col-span-2">
         <label class="field-label">{{ t('siteTeam.function.label') }}</label>
         <select v-model="memberFunction" class="field-input">
@@ -264,7 +266,8 @@ onMounted(loadMembers)
           {{ t('siteTeam.form.cancel') }}
         </button>
       </div>
-    </form>
+      </form>
+    </div>
 
     <p v-if="noticeMessage" class="mb-4 rounded-lg bg-blueprint-50 px-3 py-2 text-sm text-blueprint-700 dark:bg-blueprint-900/40 dark:text-blueprint-300">
       {{ noticeMessage }}

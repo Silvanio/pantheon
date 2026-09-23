@@ -18,6 +18,7 @@ import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
 import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import TasksBoardPanel from '../components/TasksBoardPanel.vue'
 import SchedulePanel from '../components/SchedulePanel.vue'
+import SiteSummaryPanel from '../components/SiteSummaryPanel.vue'
 import AppHeader from '../components/AppHeader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
@@ -37,11 +38,12 @@ const site = ref<ConstructionSite | null>(null)
 const loading = ref(false)
 const isCompanyAdmin = ref(false)
 
-type Tab = 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
-const activeTab = ref<Tab>('team')
+type Tab = 'summary' | 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
+const activeTab = ref<Tab>('summary')
 
-// Tabs backed by a PermissionCapability can be hidden per member; 'permissions' (gated by
-// company-admin status, not a capability) is exempt.
+// Tabs backed by a PermissionCapability can be hidden per member; 'summary' (aggregates every
+// section rather than belonging to one capability) and 'permissions' (gated by company-admin
+// status, not a capability) are exempt — both always resolve visible via isTabVisible below.
 const TAB_CAPABILITY: Partial<Record<Tab, PermissionCapability>> = {
   team: 'TEAM_MANAGE',
   dailyReport: 'DAILY_REPORT',
@@ -52,7 +54,8 @@ const TAB_CAPABILITY: Partial<Record<Tab, PermissionCapability>> = {
   tasks: 'TASKS',
   schedule: 'SCHEDULE',
 }
-const TAB_ORDER: Tab[] = ['team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'tasks', 'schedule']
+// 'summary' leads so it's always the default landing tab (TAB_ORDER.find(isTabVisible) below).
+const TAB_ORDER: Tab[] = ['summary', 'team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'tasks', 'schedule']
 
 const myPermissions = ref<Record<PermissionCapability, AccessLevel> | null>(null)
 const pendingPurchaseRequestCount = ref(0)
@@ -127,6 +130,15 @@ onMounted(load)
         </div>
       </div>
       <nav class="flex flex-col gap-0.5">
+        <button
+          type="button"
+          class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition"
+          :class="activeTab === 'summary' ? 'bg-blueprint-50 text-blueprint-700 dark:bg-blueprint-900/40 dark:text-blueprint-300' : 'text-steel-500 hover:bg-steel-100 dark:text-steel-400 dark:hover:bg-steel-800'"
+          @click="activeTab = 'summary'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0"><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></svg>
+          {{ t('siteDetail.tabs.summary') }}
+        </button>
         <button
           v-if="isTabVisible('team')"
           type="button"
@@ -299,6 +311,14 @@ onMounted(load)
         <!-- Compact fallback nav for narrow viewports, where the obra sidebar is hidden -->
         <nav class="flex flex-wrap gap-1.5 border-b border-steel-200 pb-3 dark:border-steel-800 md:hidden">
           <button
+            type="button"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'summary' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'summary'"
+          >
+            {{ t('siteDetail.tabs.summary') }}
+          </button>
+          <button
             v-if="isTabVisible('team')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
@@ -381,6 +401,7 @@ onMounted(load)
           </button>
         </nav>
 
+        <SiteSummaryPanel v-if="activeTab === 'summary'" :site-id="siteId" @open-tab="activeTab = $event" />
         <SiteTeamPanel v-if="activeTab === 'team' && isTabVisible('team')" :site-id="siteId" />
         <DailyReportsPanel v-if="activeTab === 'dailyReport' && isTabVisible('dailyReport')" :site-id="siteId" />
         <SiteDocumentProjectsPanel
@@ -405,6 +426,8 @@ onMounted(load)
           v-if="activeTab === 'schedule' && isTabVisible('schedule')"
           :site-id="siteId"
           :can-manage="myPermissions?.SCHEDULE === 'MANAGE'"
+          :can-manage-tasks="myPermissions?.TASKS === 'MANAGE'"
+          @open-tab="activeTab = $event"
         />
         <template v-if="activeTab === 'permissions' && isCompanyAdmin">
           <SitePermissionsPanel :site-id="siteId" />

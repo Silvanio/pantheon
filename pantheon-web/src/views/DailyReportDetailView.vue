@@ -128,7 +128,7 @@ async function load() {
     comments.value = detail.value.report.comments ?? ''
 
     const siteId = detail.value.report.constructionSiteId
-    equipmentCatalog.value = await listEquipment(siteId)
+    equipmentCatalog.value = (await listEquipment(siteId, { size: 200 })).content
     siteMembers.value = await listMembers(siteId)
 
     media.value = await listMedia(reportId)

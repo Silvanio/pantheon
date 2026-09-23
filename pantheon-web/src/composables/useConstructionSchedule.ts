@@ -16,6 +16,8 @@ export interface ScheduleTask {
   percentComplete: number
   sortOrder: number
   dependsOn: ScheduleDependencyRef[]
+  taskCardId: string | null
+  taskCardTitle: string | null
 }
 
 export interface ScheduleStage {
@@ -130,6 +132,10 @@ export function useConstructionSchedule() {
     return authFetch(`/api/schedule-tasks/${successorTaskId}/dependencies/${dependencyId}`, { method: 'DELETE' })
   }
 
+  function createLinkedTaskCard(taskId: string): Promise<ScheduleTask> {
+    return authFetch(`/api/schedule-tasks/${taskId}/task-card`, { method: 'POST' })
+  }
+
   return {
     listStages,
     createStage,
@@ -140,5 +146,6 @@ export function useConstructionSchedule() {
     deleteTask,
     linkDependency,
     unlinkDependency,
+    createLinkedTaskCard,
   }
 }

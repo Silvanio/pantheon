@@ -9,8 +9,11 @@ import com.pantheon.service.exception.EquipmentNotFoundException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.EquipmentRepository;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,11 +57,12 @@ public class EquipmentService {
         return equipmentRepository.save(equipment);
     }
 
-    public List<Equipment> list(UUID siteId, UUID actingUserId) {
+    public Page<Equipment> list(UUID siteId, UUID actingUserId, Pageable pageable) {
         requireSite(siteId);
         var access = siteAccessService.requireAccess(siteId, actingUserId);
         permissionService.requireVisible(siteId, access, PermissionCapability.EQUIPMENT);
-        return equipmentRepository.findByConstructionSiteId(siteId);
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+        return equipmentRepository.findByConstructionSiteId(siteId, sorted);
     }
 
     private void requireSite(UUID siteId) {

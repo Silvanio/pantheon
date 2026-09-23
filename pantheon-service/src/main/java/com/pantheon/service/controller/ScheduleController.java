@@ -85,6 +85,12 @@ public class ScheduleController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/api/schedule-tasks/{id}/task-card")
+    public ResponseEntity<ScheduleTaskResponse> createLinkedTask(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(scheduleService.createLinkedTask(id, user.getId()));
+    }
+
     @PostMapping("/api/schedule-tasks/{id}/dependencies")
     public ResponseEntity<ScheduleTaskDependency> linkDependency(
             @AuthenticationPrincipal AppUser user,

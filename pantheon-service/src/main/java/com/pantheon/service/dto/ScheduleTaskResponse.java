@@ -14,12 +14,16 @@ public record ScheduleTaskResponse(
         UUID responsibleSiteMembershipId,
         int percentComplete,
         int sortOrder,
-        List<ScheduleDependencyRef> dependsOn) {
+        List<ScheduleDependencyRef> dependsOn,
+        UUID taskCardId,
+        String taskCardTitle) {
 
-    public static ScheduleTaskResponse from(ScheduleTask task, List<ScheduleDependencyRef> dependsOn) {
+    /** {@code taskCardTitle} is resolved by the caller (a lookup keyed on {@code task.getTaskCardId()}) —
+     * {@code null} both when there's no link and when the linked card was deleted independently. */
+    public static ScheduleTaskResponse from(ScheduleTask task, List<ScheduleDependencyRef> dependsOn, String taskCardTitle) {
         return new ScheduleTaskResponse(
                 task.getId(), task.getStageId(), task.getTitle(), task.getStartDate(), task.getEndDate(),
                 task.getResponsibleSiteMembershipId(), task.getPercentComplete(), task.getSortOrder(),
-                dependsOn);
+                dependsOn, task.getTaskCardId(), taskCardTitle);
     }
 }

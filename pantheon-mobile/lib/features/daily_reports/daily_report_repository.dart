@@ -1,14 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
+import '../../core/models/page_response.dart';
 import 'daily_report_models.dart';
 
 class DailyReportRepository {
   DailyReportRepository(this._client);
   final ApiClient _client;
 
+  /// The backend paginates this endpoint (see `PageResponse`); mobile has no pagination UI here
+  /// (same precedent as `PurchaseRequestRepository.list`), so it just requests one generously
+  /// sized page and returns its content flat.
   Future<List<DailyReport>> list(String siteId) async {
-    final json = await _client.get<List<dynamic>>('/api/construction-sites/$siteId/daily-reports');
-    return json.map((e) => DailyReport.fromJson(e as Map<String, dynamic>)).toList();
+    final json = await _client.get<Map<String, dynamic>>(
+      '/api/construction-sites/$siteId/daily-reports',
+      query: {'size': 100},
+    );
+    final page = PageResponse.fromJson(json, (e) => DailyReport.fromJson(e));
+    return page.content;
   }
 
   /// Returns `true` if sent live, `false` if queued for later (offline) — see

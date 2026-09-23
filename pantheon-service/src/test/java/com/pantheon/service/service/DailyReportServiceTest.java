@@ -36,8 +36,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @ExtendWith(MockitoExtension.class)
 class DailyReportServiceTest {
@@ -94,6 +100,12 @@ class DailyReportServiceTest {
 
         siteId = UUID.randomUUID();
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
+        lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));
+    }
+
+    private com.pantheon.service.entity.ConstructionSite site(UUID id) {
+        return new com.pantheon.service.entity.ConstructionSite(
+                id, UUID.randomUUID(), "Obra", "Endereco", LocalDate.now(), null, UUID.randomUUID(), Instant.now());
     }
 
     private DailyReport draftReport() {
@@ -154,5 +166,29 @@ class DailyReportServiceTest {
         verify(storageService).deleteObject("attachment/key.pdf");
         verify(mediaRepository).deleteAll(List.of(media));
         verify(attachmentRepository).deleteAll(List.of(attachment));
+    }
+
+    @Test
+    void listReturnsPagedResultsSortedByCreatedAtDescending() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findByConstructionSiteId(eq(siteId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(report), PageRequest.of(0, 20), 1));
+
+        Page<DailyReport> result = service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(report);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(dailyReportRepository).findByConstructionSiteId(eq(siteId), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    @Test
+    void listRejectsMemberWithHiddenAccess() {
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.DAILY_REPORT))
+                .when(permissionService)
+                .requireVisible(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT));
+
+        assertThatThrownBy(() -> service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20)))
+                .isInstanceOf(ForbiddenCapabilityException.class);
     }
 }

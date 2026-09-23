@@ -10,7 +10,8 @@ import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
 import { vDatePicker } from '../lib/datePicker'
 import ScheduleGantt from './schedule/ScheduleGantt.vue'
 
-const props = defineProps<{ siteId: string; canManage: boolean }>()
+const props = defineProps<{ siteId: string; canManage: boolean; canManageTasks: boolean }>()
+const emit = defineEmits<{ (e: 'open-tab', tab: 'tasks'): void }>()
 
 const { t } = useI18n()
 const {
@@ -23,6 +24,7 @@ const {
   deleteTask,
   linkDependency,
   unlinkDependency,
+  createLinkedTaskCard,
 } = useConstructionSchedule()
 const { listMembers } = useSiteMembers()
 
@@ -236,6 +238,24 @@ async function onDeleteTask() {
     await load()
   } catch {
     editTaskError.value = t('schedule.task.deleteError')
+  }
+}
+
+const creatingTaskCard = ref(false)
+
+async function onCreateLinkedTask() {
+  if (!editingTask.value) return
+  editTaskError.value = ''
+  creatingTaskCard.value = true
+  try {
+    const taskId = editingTask.value.id
+    await createLinkedTaskCard(taskId)
+    await load()
+    openEditTask(taskId)
+  } catch {
+    editTaskError.value = t('schedule.task.linkError')
+  } finally {
+    creatingTaskCard.value = false
   }
 }
 
@@ -489,6 +509,29 @@ onMounted(load)
               </select>
               <button type="button" class="btn-secondary py-1.5 text-xs" @click="onAddDependency">{{ t('schedule.task.addDependency') }}</button>
             </div>
+          </div>
+
+          <div class="border-t border-steel-100 pt-3 dark:border-steel-800">
+            <p class="field-label mb-1.5">{{ t('schedule.task.tasksBoardLabel') }}</p>
+            <button
+              v-if="editingTask.taskCardId"
+              type="button"
+              class="flex items-center gap-1.5 text-xs font-medium text-blueprint-600 hover:underline dark:text-blueprint-400"
+              @click="emit('open-tab', 'tasks')"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M3 9h6" /></svg>
+              {{ editingTask.taskCardTitle ?? t('schedule.task.linkedTaskFallbackLabel') }}
+            </button>
+            <button
+              v-else-if="canManageTasks"
+              type="button"
+              :disabled="creatingTaskCard"
+              class="btn-secondary py-1.5 text-xs"
+              @click="onCreateLinkedTask"
+            >
+              {{ creatingTaskCard ? t('schedule.task.creatingLinkedTask') : t('schedule.task.createLinkedTask') }}
+            </button>
+            <p v-else class="text-xs text-steel-400 dark:text-steel-500">{{ t('schedule.task.noLinkedTask') }}</p>
           </div>
 
           <p v-if="editTaskError" class="text-sm text-safety-600 dark:text-safety-500">{{ editTaskError }}</p>

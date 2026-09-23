@@ -27,4 +27,14 @@ public class ScheduleExceptionHandler {
     public ResponseEntity<String> handleDuplicateDependency(DuplicateDependencyException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
+
+    @ExceptionHandler(ScheduleTaskAlreadyLinkedException.class)
+    public ResponseEntity<String> handleScheduleTaskAlreadyLinked(ScheduleTaskAlreadyLinkedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(NoTaskColumnsAvailableException.class)
+    public ResponseEntity<String> handleNoTaskColumnsAvailable(NoTaskColumnsAvailableException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
 }

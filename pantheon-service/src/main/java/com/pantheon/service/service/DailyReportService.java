@@ -39,6 +39,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -231,11 +235,12 @@ public class DailyReportService {
         dailyReportRepository.delete(report);
     }
 
-    public List<DailyReport> list(UUID siteId, UUID actingUserId) {
+    public Page<DailyReport> list(UUID siteId, UUID actingUserId, Pageable pageable) {
         requireSite(siteId);
         var access = siteAccessService.requireAccess(siteId, actingUserId);
         permissionService.requireVisible(siteId, access, PermissionCapability.DAILY_REPORT);
-        return dailyReportRepository.findByConstructionSiteIdOrderByReportDateDesc(siteId);
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+        return dailyReportRepository.findByConstructionSiteId(siteId, sorted);
     }
 
     public DailyReportDetailResponse getDetail(UUID reportId, UUID actingUserId) {

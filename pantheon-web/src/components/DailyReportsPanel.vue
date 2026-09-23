@@ -11,7 +11,12 @@ const { t } = useI18n()
 const router = useRouter()
 const { listReports, createReport, deleteReport } = useDailyReports()
 
+const PAGE_SIZE = 20
+
 const reports = ref<DailyReport[]>([])
+const totalPages = ref(0)
+const totalElements = ref(0)
+const page = ref(0)
 const loading = ref(false)
 const showForm = ref(false)
 const submitting = ref(false)
@@ -29,10 +34,19 @@ function formatDate(value: string): string {
 async function load() {
   loading.value = true
   try {
-    reports.value = await listReports(props.siteId)
+    const result = await listReports(props.siteId, { page: page.value, size: PAGE_SIZE })
+    reports.value = result.content
+    totalPages.value = result.totalPages
+    totalElements.value = result.totalElements
   } finally {
     loading.value = false
   }
+}
+
+function goToPage(target: number) {
+  if (target < 0 || target >= totalPages.value) return
+  page.value = target
+  load()
 }
 
 async function onSubmit() {
@@ -42,6 +56,7 @@ async function onSubmit() {
     await createReport(props.siteId, reportDate.value)
     reportDate.value = ''
     showForm.value = false
+    page.value = 0
     await load()
   } catch {
     errorMessage.value = t('dailyReports.history.form.error')
@@ -138,6 +153,21 @@ onMounted(load)
         </tbody>
       </table>
     </div>
+
+    <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
+      <p class="text-xs text-steel-500 dark:text-steel-400">
+        {{ t('dailyReports.history.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
+      </p>
+      <div class="flex gap-2">
+        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
+          {{ t('dailyReports.history.pagination.previous') }}
+        </button>
+        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
+          {{ t('dailyReports.history.pagination.next') }}
+        </button>
+      </div>
+    </div>
+
     <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
   </section>
 </template>

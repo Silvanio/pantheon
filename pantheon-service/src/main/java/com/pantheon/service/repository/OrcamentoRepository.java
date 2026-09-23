@@ -1,6 +1,7 @@
 package com.pantheon.service.repository;
 
 import com.pantheon.service.entity.Orcamento;
+import com.pantheon.service.entity.OrcamentoStatus;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,4 +11,6 @@ public interface OrcamentoRepository extends JpaRepository<Orcamento, UUID>, Jpa
 
     /** Every Orcamento converted from a given Pedido de Compra — used to lock/unlock them together. */
     List<Orcamento> findBySourcePurchaseRequestId(UUID sourcePurchaseRequestId);
+
+    long countByConstructionSiteIdAndStatus(UUID constructionSiteId, OrcamentoStatus status);
 }

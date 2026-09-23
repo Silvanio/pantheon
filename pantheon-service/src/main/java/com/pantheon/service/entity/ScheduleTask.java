@@ -36,6 +36,9 @@ public class ScheduleTask {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    @Column(name = "task_card_id")
+    private UUID taskCardId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -87,6 +90,14 @@ public class ScheduleTask {
         this.updatedAt = now;
     }
 
+    /** Links this task to a newly created Tasks-board card — one-directional, never cascaded,
+     * mirroring {@code SiteDocumentProject.linkTask}. The service layer guards against overwriting
+     * an existing link; this method itself doesn't. */
+    public void linkTask(UUID taskCardId, Instant now) {
+        this.taskCardId = taskCardId;
+        this.updatedAt = now;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -117,6 +128,10 @@ public class ScheduleTask {
 
     public int getSortOrder() {
         return sortOrder;
+    }
+
+    public UUID getTaskCardId() {
+        return taskCardId;
     }
 
     public Instant getCreatedAt() {

@@ -8,20 +8,27 @@ import com.pantheon.service.dto.ScheduleStageUpdateRequest;
 import com.pantheon.service.dto.ScheduleTaskCreationRequest;
 import com.pantheon.service.dto.ScheduleTaskResponse;
 import com.pantheon.service.dto.ScheduleTaskUpdateRequest;
+import com.pantheon.service.dto.TaskCardCreationRequest;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.ScheduleStage;
 import com.pantheon.service.entity.ScheduleTask;
 import com.pantheon.service.entity.ScheduleTaskDependency;
+import com.pantheon.service.entity.TaskCard;
+import com.pantheon.service.entity.TaskColumn;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DuplicateDependencyException;
+import com.pantheon.service.exception.NoTaskColumnsAvailableException;
 import com.pantheon.service.exception.ScheduleStageNotFoundException;
+import com.pantheon.service.exception.ScheduleTaskAlreadyLinkedException;
 import com.pantheon.service.exception.ScheduleTaskNotFoundException;
 import com.pantheon.service.exception.SelfDependencyException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.ScheduleStageRepository;
 import com.pantheon.service.repository.ScheduleTaskDependencyRepository;
 import com.pantheon.service.repository.ScheduleTaskRepository;
+import com.pantheon.service.repository.TaskCardRepository;
+import com.pantheon.service.repository.TaskColumnRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +46,9 @@ public class ScheduleService {
     private final ConstructionSiteRepository siteRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final TaskCardRepository taskCardRepository;
+    private final TaskColumnRepository taskColumnRepository;
+    private final TaskCardService taskCardService;
 
     public ScheduleService(
             ScheduleStageRepository stageRepository,
@@ -46,13 +56,19 @@ public class ScheduleService {
             ScheduleTaskDependencyRepository dependencyRepository,
             ConstructionSiteRepository siteRepository,
             SiteAccessService siteAccessService,
-            SitePermissionService permissionService) {
+            SitePermissionService permissionService,
+            TaskCardRepository taskCardRepository,
+            TaskColumnRepository taskColumnRepository,
+            TaskCardService taskCardService) {
         this.stageRepository = stageRepository;
         this.taskRepository = taskRepository;
         this.dependencyRepository = dependencyRepository;
         this.siteRepository = siteRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.taskCardRepository = taskCardRepository;
+        this.taskColumnRepository = taskColumnRepository;
+        this.taskCardService = taskCardService;
     }
 
     public List<ScheduleStageResponse> listStages(UUID siteId, UUID actingUserId) {
@@ -64,12 +80,14 @@ public class ScheduleService {
         List<UUID> stageIds = stages.stream().map(ScheduleStage::getId).toList();
         Map<UUID, List<ScheduleTask>> tasksByStage = taskRepository.findByStageIdIn(stageIds).stream()
                 .collect(Collectors.groupingBy(ScheduleTask::getStageId));
-        List<UUID> taskIds = tasksByStage.values().stream().flatMap(List::stream).map(ScheduleTask::getId).toList();
+        List<ScheduleTask> allTasks = tasksByStage.values().stream().flatMap(List::stream).toList();
+        List<UUID> taskIds = allTasks.stream().map(ScheduleTask::getId).toList();
         Map<UUID, List<ScheduleDependencyRef>> dependsOnByTask = dependencyRepository
                 .findByPredecessorTaskIdInOrSuccessorTaskIdIn(taskIds, taskIds).stream()
                 .collect(Collectors.groupingBy(
                         ScheduleTaskDependency::getSuccessorTaskId,
                         Collectors.mapping(ScheduleDependencyRef::from, Collectors.toList())));
+        Map<UUID, String> taskCardTitles = taskCardTitles(allTasks);
 
         return stages.stream()
                 .map(stage -> {
@@ -78,11 +96,22 @@ public class ScheduleService {
                             .stream()
                             .sorted((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()))
                             .map(task -> ScheduleTaskResponse.from(
-                                    task, dependsOnByTask.getOrDefault(task.getId(), List.of())))
+                                    task, dependsOnByTask.getOrDefault(task.getId(), List.of()),
+                                    taskCardTitles.get(task.getTaskCardId())))
                             .toList();
                     return ScheduleStageResponse.from(stage, taskResponses);
                 })
                 .toList();
+    }
+
+    /** Batch-resolves linked Tasks-board card titles for a set of schedule tasks — a task with no
+     * link, or whose linked card was deleted independently, simply gets no entry (map lookup miss). */
+    private Map<UUID, String> taskCardTitles(List<ScheduleTask> tasks) {
+        // A plain (mutable) map, never `Map.of()` — this gets looked up with `task.getTaskCardId()`,
+        // which is null for the (common) unlinked case, and Map.of()'s null-hostile `get` would throw.
+        List<UUID> taskCardIds = tasks.stream().map(ScheduleTask::getTaskCardId).filter(id -> id != null).toList();
+        return taskCardRepository.findAllById(taskCardIds).stream()
+                .collect(Collectors.toMap(TaskCard::getId, TaskCard::getTitle));
     }
 
     @Transactional
@@ -130,7 +159,7 @@ public class ScheduleService {
         ScheduleTask task = taskRepository.save(new ScheduleTask(
                 UUID.randomUUID(), stageId, request.title(), request.startDate(), request.endDate(),
                 request.responsibleSiteMembershipId(), 0, (int) nextSortOrder, Instant.now()));
-        return ScheduleTaskResponse.from(task, List.of());
+        return ScheduleTaskResponse.from(task, List.of(), null);
     }
 
     @Transactional
@@ -140,7 +169,8 @@ public class ScheduleService {
         requireManage(stage.getConstructionSiteId(), actingUserId);
         task.update(
                 request.title(), request.startDate(), request.endDate(), request.responsibleSiteMembershipId(),
-                request.percentComplete(), request.sortOrder(), request.clearResponsible(), Instant.now());
+                request.percentComplete(), request.sortOrder(), Boolean.TRUE.equals(request.clearResponsible()),
+                Instant.now());
         taskRepository.save(task);
         return toTaskResponse(task);
     }
@@ -154,6 +184,41 @@ public class ScheduleService {
         dependencyRepository.deleteAll(
                 dependencyRepository.findByPredecessorTaskIdOrSuccessorTaskId(taskId, taskId));
         taskRepository.delete(task);
+    }
+
+    /** Creates a new Tasks-board card from this schedule task (title + due date carried over,
+     * placed in the site's company's first task column), assigns the schedule task's responsible
+     * site membership to the new card if one is set, and links the two — see design.md's
+     * "reuse TaskCardService.createCard" decision. Requires MANAGE on both SCHEDULE (checked here)
+     * and TASKS (checked inside TaskCardService.createCard/assign themselves). */
+    @Transactional
+    public ScheduleTaskResponse createLinkedTask(UUID scheduleTaskId, UUID actingUserId) {
+        ScheduleTask task = requireTask(scheduleTaskId);
+        ScheduleStage stage = requireStage(task.getStageId());
+        UUID siteId = stage.getConstructionSiteId();
+        requireManage(siteId, actingUserId);
+
+        if (task.getTaskCardId() != null) {
+            throw new ScheduleTaskAlreadyLinkedException(scheduleTaskId);
+        }
+
+        ConstructionSite site = requireSite(siteId);
+        List<TaskColumn> columns = taskColumnRepository.findByCompanyIdOrderBySortOrderAsc(site.getCompanyId());
+        if (columns.isEmpty()) {
+            throw new NoTaskColumnsAvailableException(site.getCompanyId());
+        }
+
+        TaskCard card = taskCardService.createCard(
+                siteId, actingUserId,
+                new TaskCardCreationRequest(columns.get(0).getId(), task.getTitle(), null, task.getEndDate()));
+
+        if (task.getResponsibleSiteMembershipId() != null) {
+            taskCardService.assign(card.getId(), actingUserId, task.getResponsibleSiteMembershipId());
+        }
+
+        task.linkTask(card.getId(), Instant.now());
+        taskRepository.save(task);
+        return toTaskResponse(task, card.getTitle());
     }
 
     @Transactional
@@ -203,18 +268,27 @@ public class ScheduleService {
 
     private ScheduleStageResponse toStageResponse(ScheduleStage stage) {
         List<ScheduleTask> tasks = taskRepository.findByStageIdOrderBySortOrderAsc(stage.getId());
-        List<ScheduleTaskResponse> taskResponses = tasks.stream().map(this::toTaskResponse).toList();
+        Map<UUID, String> taskCardTitles = taskCardTitles(tasks);
+        List<ScheduleTaskResponse> taskResponses =
+                tasks.stream().map(task -> toTaskResponse(task, taskCardTitles.get(task.getTaskCardId()))).toList();
         return ScheduleStageResponse.from(stage, taskResponses);
     }
 
     private ScheduleTaskResponse toTaskResponse(ScheduleTask task) {
+        String taskCardTitle = task.getTaskCardId() == null
+                ? null
+                : taskCardRepository.findById(task.getTaskCardId()).map(TaskCard::getTitle).orElse(null);
+        return toTaskResponse(task, taskCardTitle);
+    }
+
+    private ScheduleTaskResponse toTaskResponse(ScheduleTask task, String taskCardTitle) {
         List<ScheduleDependencyRef> dependsOn = dependencyRepository
                 .findByPredecessorTaskIdOrSuccessorTaskId(task.getId(), task.getId())
                 .stream()
                 .filter(dep -> dep.getSuccessorTaskId().equals(task.getId()))
                 .map(ScheduleDependencyRef::from)
                 .toList();
-        return ScheduleTaskResponse.from(task, dependsOn);
+        return ScheduleTaskResponse.from(task, dependsOn, taskCardTitle);
     }
 
     private void requireManage(UUID siteId, UUID actingUserId) {

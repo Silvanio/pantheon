@@ -18,7 +18,7 @@ const { listOrcamentos, createOrcamento } = useOrcamentos()
 const { listPurchaseRequests } = usePurchaseRequests()
 const { listMembers } = useSiteMembers()
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 20
 
 const orcamentos = ref<Orcamento[]>([])
 const purchaseRequests = ref<PurchaseRequest[]>([])

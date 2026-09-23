@@ -14,4 +14,8 @@ public interface TaskCardRepository extends JpaRepository<TaskCard, UUID> {
     long countByConstructionSiteIdAndColumnId(UUID constructionSiteId, UUID columnId);
 
     boolean existsByColumnId(UUID columnId);
+
+    long countByConstructionSiteId(UUID constructionSiteId);
+
+    List<TaskCard> findTop5ByConstructionSiteIdOrderByCreatedAtDesc(UUID constructionSiteId);
 }

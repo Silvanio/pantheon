@@ -3,6 +3,7 @@ package com.pantheon.service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -22,13 +23,19 @@ import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.ScheduleStage;
 import com.pantheon.service.entity.ScheduleTask;
 import com.pantheon.service.entity.ScheduleTaskDependency;
+import com.pantheon.service.entity.TaskCard;
+import com.pantheon.service.entity.TaskColumn;
 import com.pantheon.service.exception.DuplicateDependencyException;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
+import com.pantheon.service.exception.NoTaskColumnsAvailableException;
+import com.pantheon.service.exception.ScheduleTaskAlreadyLinkedException;
 import com.pantheon.service.exception.SelfDependencyException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.ScheduleStageRepository;
 import com.pantheon.service.repository.ScheduleTaskDependencyRepository;
 import com.pantheon.service.repository.ScheduleTaskRepository;
+import com.pantheon.service.repository.TaskCardRepository;
+import com.pantheon.service.repository.TaskColumnRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -61,6 +68,15 @@ class ScheduleServiceTest {
     @Mock
     private SitePermissionService permissionService;
 
+    @Mock
+    private TaskCardRepository taskCardRepository;
+
+    @Mock
+    private TaskColumnRepository taskColumnRepository;
+
+    @Mock
+    private TaskCardService taskCardService;
+
     private ScheduleService service;
 
     private UUID siteId;
@@ -69,7 +85,7 @@ class ScheduleServiceTest {
     void setUp() {
         service = new ScheduleService(
                 stageRepository, taskRepository, dependencyRepository, siteRepository, siteAccessService,
-                permissionService);
+                permissionService, taskCardRepository, taskColumnRepository, taskCardService);
         siteId = UUID.randomUUID();
         lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
@@ -179,6 +195,45 @@ class ScheduleServiceTest {
         assertThat(response.percentComplete()).isEqualTo(0);
     }
 
+    /** Regression test: {@code ScheduleTaskUpdateRequest.clearResponsible} is a boxed {@code Boolean}
+     * (not a primitive) specifically so a request that omits it — like the Gantt checkbox's
+     * percent-only PATCH — deserializes without error instead of failing on a missing primitive. */
+    @Test
+    void updateTaskWithOmittedClearResponsibleDoesNotClearResponsible() {
+        ScheduleStage stage = stage();
+        UUID responsibleId = UUID.randomUUID();
+        ScheduleTask task = new ScheduleTask(
+                UUID.randomUUID(), stage.getId(), "Escavação", LocalDate.now(), LocalDate.now().plusDays(3),
+                responsibleId, 0, 0, Instant.now());
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(stageRepository.findById(stage.getId())).thenReturn(Optional.of(stage));
+        when(dependencyRepository.findByPredecessorTaskIdOrSuccessorTaskId(any(), any())).thenReturn(List.of());
+
+        ScheduleTaskResponse response = service.updateTask(
+                task.getId(), UUID.randomUUID(),
+                new ScheduleTaskUpdateRequest(null, null, null, null, null, 100, null));
+
+        assertThat(response.percentComplete()).isEqualTo(100);
+        assertThat(response.responsibleSiteMembershipId()).isEqualTo(responsibleId);
+    }
+
+    @Test
+    void updateTaskWithClearResponsibleTrueClearsResponsible() {
+        ScheduleStage stage = stage();
+        ScheduleTask task = new ScheduleTask(
+                UUID.randomUUID(), stage.getId(), "Escavação", LocalDate.now(), LocalDate.now().plusDays(3),
+                UUID.randomUUID(), 0, 0, Instant.now());
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(stageRepository.findById(stage.getId())).thenReturn(Optional.of(stage));
+        when(dependencyRepository.findByPredecessorTaskIdOrSuccessorTaskId(any(), any())).thenReturn(List.of());
+
+        ScheduleTaskResponse response = service.updateTask(
+                task.getId(), UUID.randomUUID(),
+                new ScheduleTaskUpdateRequest(null, null, null, null, true, null, null));
+
+        assertThat(response.responsibleSiteMembershipId()).isNull();
+    }
+
     @Test
     void deleteTaskAlsoDeletesItsDependencies() {
         ScheduleStage stage = stage();
@@ -194,6 +249,88 @@ class ScheduleServiceTest {
 
         verify(dependencyRepository).deleteAll(List.of(dependency));
         verify(taskRepository).delete(task);
+    }
+
+    @Test
+    void createLinkedTaskCreatesCardInFirstCompanyColumnAndLinksIt() {
+        ScheduleStage stage = stage();
+        ScheduleTask task = task(stage.getId(), 0);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(stageRepository.findById(stage.getId())).thenReturn(Optional.of(stage));
+        ConstructionSite site = site(stage.getConstructionSiteId());
+        when(siteRepository.findById(site.getId())).thenReturn(Optional.of(site));
+        TaskColumn firstColumn = new TaskColumn(UUID.randomUUID(), site.getCompanyId(), "A fazer", 0, Instant.now());
+        TaskColumn secondColumn = new TaskColumn(UUID.randomUUID(), site.getCompanyId(), "Feito", 1, Instant.now());
+        when(taskColumnRepository.findByCompanyIdOrderBySortOrderAsc(site.getCompanyId()))
+                .thenReturn(List.of(firstColumn, secondColumn));
+        TaskCard card = new TaskCard(
+                UUID.randomUUID(), site.getId(), firstColumn.getId(), task.getTitle(), null, task.getEndDate(), 0,
+                UUID.randomUUID(), Instant.now(), Instant.now());
+        when(taskCardService.createCard(eq(site.getId()), any(), any())).thenReturn(card);
+        when(dependencyRepository.findByPredecessorTaskIdOrSuccessorTaskId(any(), any())).thenReturn(List.of());
+
+        ScheduleTaskResponse response = service.createLinkedTask(task.getId(), UUID.randomUUID());
+
+        assertThat(response.taskCardId()).isEqualTo(card.getId());
+        assertThat(response.taskCardTitle()).isEqualTo(task.getTitle());
+        verify(taskCardService).createCard(eq(site.getId()), any(), argThat(
+                request -> request.columnId().equals(firstColumn.getId()) && request.title().equals(task.getTitle())
+                        && request.dueDate().equals(task.getEndDate())));
+        verify(taskCardService, never()).assign(any(), any(), any());
+    }
+
+    @Test
+    void createLinkedTaskAssignsCardToTaskResponsibleWhenSet() {
+        ScheduleStage stage = stage();
+        UUID responsibleSiteMembershipId = UUID.randomUUID();
+        ScheduleTask task = new ScheduleTask(
+                UUID.randomUUID(), stage.getId(), "Escavação", LocalDate.now(), LocalDate.now().plusDays(3),
+                responsibleSiteMembershipId, 0, 0, Instant.now());
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(stageRepository.findById(stage.getId())).thenReturn(Optional.of(stage));
+        ConstructionSite site = site(stage.getConstructionSiteId());
+        when(siteRepository.findById(site.getId())).thenReturn(Optional.of(site));
+        TaskColumn firstColumn = new TaskColumn(UUID.randomUUID(), site.getCompanyId(), "A fazer", 0, Instant.now());
+        when(taskColumnRepository.findByCompanyIdOrderBySortOrderAsc(site.getCompanyId()))
+                .thenReturn(List.of(firstColumn));
+        TaskCard card = new TaskCard(
+                UUID.randomUUID(), site.getId(), firstColumn.getId(), task.getTitle(), null, task.getEndDate(), 0,
+                UUID.randomUUID(), Instant.now(), Instant.now());
+        when(taskCardService.createCard(eq(site.getId()), any(), any())).thenReturn(card);
+        when(dependencyRepository.findByPredecessorTaskIdOrSuccessorTaskId(any(), any())).thenReturn(List.of());
+        UUID actingUserId = UUID.randomUUID();
+
+        service.createLinkedTask(task.getId(), actingUserId);
+
+        verify(taskCardService).assign(card.getId(), actingUserId, responsibleSiteMembershipId);
+    }
+
+    @Test
+    void createLinkedTaskRejectsWhenAlreadyLinked() {
+        ScheduleStage stage = stage();
+        ScheduleTask task = task(stage.getId(), 0);
+        task.linkTask(UUID.randomUUID(), Instant.now());
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(stageRepository.findById(stage.getId())).thenReturn(Optional.of(stage));
+
+        assertThatThrownBy(() -> service.createLinkedTask(task.getId(), UUID.randomUUID()))
+                .isInstanceOf(ScheduleTaskAlreadyLinkedException.class);
+        verify(taskCardService, never()).createCard(any(), any(), any());
+    }
+
+    @Test
+    void createLinkedTaskRejectsWhenCompanyHasNoTaskColumns() {
+        ScheduleStage stage = stage();
+        ScheduleTask task = task(stage.getId(), 0);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(stageRepository.findById(stage.getId())).thenReturn(Optional.of(stage));
+        ConstructionSite site = site(stage.getConstructionSiteId());
+        when(siteRepository.findById(site.getId())).thenReturn(Optional.of(site));
+        when(taskColumnRepository.findByCompanyIdOrderBySortOrderAsc(site.getCompanyId())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.createLinkedTask(task.getId(), UUID.randomUUID()))
+                .isInstanceOf(NoTaskColumnsAvailableException.class);
+        verify(taskCardService, never()).createCard(any(), any(), any());
     }
 
     @Test

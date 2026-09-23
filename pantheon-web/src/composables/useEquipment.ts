@@ -1,5 +1,6 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
+import type { PageResponse } from './usePurchaseRequests'
 
 export type EquipmentStatus = 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE' | 'UNAVAILABLE'
 
@@ -34,8 +35,11 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
 }
 
 export function useEquipment() {
-  function listEquipment(siteId: string): Promise<Equipment[]> {
-    return authFetch(`/api/construction-sites/${siteId}/equipment`)
+  function listEquipment(siteId: string, options: { page?: number; size?: number } = {}): Promise<PageResponse<Equipment>> {
+    const params = new URLSearchParams()
+    params.set('page', String(options.page ?? 0))
+    params.set('size', String(options.size ?? 20))
+    return authFetch(`/api/construction-sites/${siteId}/equipment?${params.toString()}`)
   }
 
   function createEquipment(siteId: string, data: EquipmentRegistrationData): Promise<Equipment> {

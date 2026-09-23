@@ -1,5 +1,6 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { useAuth } from './useAuth'
+import type { PageResponse } from './usePurchaseRequests'
 
 export type DailyReportStatus = 'DRAFT' | 'SUBMITTED'
 export type ActivityStatus = 'IN_PROGRESS' | 'COMPLETED'
@@ -133,8 +134,11 @@ async function authUpload<T>(path: string, formData: FormData): Promise<T> {
 }
 
 export function useDailyReports() {
-  function listReports(siteId: string): Promise<DailyReport[]> {
-    return authFetch(`/api/construction-sites/${siteId}/daily-reports`)
+  function listReports(siteId: string, options: { page?: number; size?: number } = {}): Promise<PageResponse<DailyReport>> {
+    const params = new URLSearchParams()
+    params.set('page', String(options.page ?? 0))
+    params.set('size', String(options.size ?? 20))
+    return authFetch(`/api/construction-sites/${siteId}/daily-reports?${params.toString()}`)
   }
 
   function createReport(siteId: string, reportDate: string): Promise<DailyReport> {

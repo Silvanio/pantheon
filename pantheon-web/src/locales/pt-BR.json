@@ -124,12 +124,50 @@
     "saved": "Dados salvos.",
     "error": "Não foi possível salvar. Verifique os dados e tente novamente."
   },
+  "siteSummary": {
+    "loadError": "Não foi possível carregar o resumo da obra.",
+    "empty": "Nada por aqui ainda.",
+    "new": "Novo",
+    "viewAll": "Ver todos ({count})",
+    "schedule": {
+      "title": "Progresso do cronograma"
+    },
+    "dailyReports": {
+      "title": "Diário de Obra",
+      "last": "Último em {date}",
+      "empty": "Nenhum relatório ainda"
+    },
+    "equipment": {
+      "title": "Equipamentos",
+      "unavailable": "{count} indisponível(is)"
+    },
+    "team": {
+      "title": "Equipe"
+    },
+    "pending": {
+      "title": "Pendências",
+      "hint": "Pedidos aguardando aprovação + orçamentos em rascunho"
+    },
+    "purchaseRequests": {
+      "title": "Pedido de Compra"
+    },
+    "orcamentos": {
+      "title": "Orçamentos"
+    },
+    "tasks": {
+      "title": "Tasks"
+    },
+    "projects": {
+      "title": "Projetos"
+    }
+  },
   "siteDetail": {
     "back": "Voltar ao painel",
     "changePhoto": "Alterar foto",
     "collapsePhoto": "Recolher foto de capa",
     "expandPhoto": "Expandir foto de capa",
     "tabs": {
+      "summary": "Resumo",
       "team": "Equipe",
       "dailyReport": "Diário de Obra",
       "projects": "Projetos",
@@ -309,7 +347,13 @@
       "selectDependency": "Selecione uma tarefa",
       "addDependency": "Vincular",
       "removeDependency": "Remover",
-      "dependencyError": "Não foi possível atualizar a dependência."
+      "dependencyError": "Não foi possível atualizar a dependência.",
+      "tasksBoardLabel": "Task",
+      "linkedTaskFallbackLabel": "Ver no board de Tasks",
+      "createLinkedTask": "Criar task",
+      "creatingLinkedTask": "Criando...",
+      "noLinkedTask": "Sem task vinculada",
+      "linkError": "Não foi possível criar a task."
     }
   },
   "globalTasksBoard": {
@@ -338,6 +382,11 @@
       "MAINTENANCE": "Manutenção",
       "UNAVAILABLE": "Indisponível",
       "updateError": "Não foi possível atualizar o status do equipamento."
+    },
+    "pagination": {
+      "summary": "Página {page} de {totalPages} · {totalElements} equipamentos",
+      "previous": "Anterior",
+      "next": "Próxima"
     }
   },
   "members": {
@@ -389,7 +438,12 @@
       },
       "deleteButton": "Excluir",
       "deleteConfirm": "Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.",
-      "deleteError": "Não foi possível excluir o relatório."
+      "deleteError": "Não foi possível excluir o relatório.",
+      "pagination": {
+        "summary": "Página {page} de {totalPages} · {totalElements} relatórios",
+        "previous": "Anterior",
+        "next": "Próxima"
+      }
     },
     "status": {
       "DRAFT": "Rascunho",

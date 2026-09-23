@@ -15,4 +15,8 @@ public interface SiteDocumentProjectRepository extends JpaRepository<SiteDocumen
     List<SiteDocumentProject> findChildren(@Param("siteId") UUID siteId, @Param("parentId") UUID parentId);
 
     List<SiteDocumentProject> findByParentId(UUID parentId);
+
+    long countByConstructionSiteId(UUID constructionSiteId);
+
+    List<SiteDocumentProject> findTop5ByConstructionSiteIdOrderByCreatedAtDesc(UUID constructionSiteId);
 }

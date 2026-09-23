@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import 'site_member_models.dart';
+import 'site_summary_models.dart';
 
 /// Capability -> access level map, mirroring `pantheon-web`'s `useSitePermissions.ts`
 /// `getMyPermissions`. Gates which obra-home entry cards and in-screen actions this app shows.
@@ -31,6 +32,11 @@ class SiteRepository {
   Future<List<Map<String, dynamic>>> listPermissionOverrides(String siteId) async {
     final json = await _client.get<List<dynamic>>('/api/sites/$siteId/permissions', offlineCapable: false);
     return json.cast<Map<String, dynamic>>();
+  }
+
+  Future<SiteSummary> getSummary(String siteId) async {
+    final json = await _client.get<Map<String, dynamic>>('/api/construction-sites/$siteId/summary');
+    return SiteSummary.fromJson(json);
   }
 }
 

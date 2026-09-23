@@ -7,6 +7,7 @@ import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import '../dashboard/dashboard_repository.dart';
 import 'site_repository.dart';
+import 'site_summary_section.dart';
 
 final _siteProvider = FutureProvider.family((ref, String siteId) => ref.watch(dashboardRepositoryProvider).getSite(siteId));
 final _myPermissionsProvider =
@@ -79,6 +80,8 @@ class SiteHomeScreen extends ConsumerWidget {
                   StatusBadge(kind: StatusBadgeKind.constructionSite, status: s.status),
                 ],
               ),
+              const SizedBox(height: 20),
+              SiteSummarySection(siteId: siteId),
               const SizedBox(height: 20),
               Expanded(
                 child: permissions.when(

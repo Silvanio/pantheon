@@ -1,8 +1,12 @@
 package com.pantheon.service.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,7 +15,10 @@ import com.pantheon.service.entity.CompanyMembership;
 import com.pantheon.service.entity.CompanyRole;
 import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.ConstructionSite;
+import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
+import com.pantheon.service.entity.SiteStatus;
+import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.CompanyRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
@@ -54,6 +61,9 @@ class ConstructionSiteServiceTest {
     @Mock
     private PlatformAdminService platformAdminService;
 
+    @Mock
+    private SitePermissionService permissionService;
+
     private ConstructionSiteService service;
 
     private UUID companyId;
@@ -63,7 +73,7 @@ class ConstructionSiteServiceTest {
     void setUp() {
         service = new ConstructionSiteService(
                 siteRepository, membershipRepository, siteMembershipRepository, companyRepository, planService,
-                siteAccessService, scheduleService, platformAdminService);
+                siteAccessService, scheduleService, platformAdminService, permissionService);
         companyId = UUID.randomUUID();
         adminUserId = UUID.randomUUID();
         lenient().when(scheduleService.computeProgress(any())).thenReturn(null);
@@ -134,6 +144,40 @@ class ConstructionSiteServiceTest {
 
         assertThat(logoKey).isEqualTo(company.getLogoObjectKey());
         verify(siteAccessService).requireAccess(siteId, userId);
+    }
+
+    @Test
+    void updateStatusSavesWhenPermittedToManageSiteStatus() {
+        UUID siteId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        ConstructionSite site =
+                new ConstructionSite(siteId, companyId, "Obra", "Endereco", LocalDate.now(), null, userId, Instant.now());
+        when(siteRepository.findById(siteId)).thenReturn(Optional.of(site));
+        SiteAccessContext access = new SiteAccessContext(false, null);
+        when(siteAccessService.requireAccess(siteId, userId)).thenReturn(access);
+
+        ConstructionSite result = service.updateStatus(siteId, userId, SiteStatus.IN_PROGRESS);
+
+        assertThat(result.getStatus()).isEqualTo(SiteStatus.IN_PROGRESS);
+        verify(permissionService).requireManage(siteId, access, PermissionCapability.SITE_STATUS);
+        verify(siteRepository).save(site);
+    }
+
+    @Test
+    void updateStatusRejectsWhenNotPermittedToManageSiteStatus() {
+        UUID siteId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        ConstructionSite site =
+                new ConstructionSite(siteId, companyId, "Obra", "Endereco", LocalDate.now(), null, userId, Instant.now());
+        when(siteRepository.findById(siteId)).thenReturn(Optional.of(site));
+        SiteAccessContext access = new SiteAccessContext(false, null);
+        when(siteAccessService.requireAccess(siteId, userId)).thenReturn(access);
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.SITE_STATUS))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.SITE_STATUS));
+
+        assertThatThrownBy(() -> service.updateStatus(siteId, userId, SiteStatus.IN_PROGRESS))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+        verify(siteRepository, never()).save(any());
     }
 
     private com.pantheon.service.entity.Company newCompany(UUID id, String name) {

@@ -6,6 +6,7 @@ import com.pantheon.service.entity.Company;
 import com.pantheon.service.entity.CompanyMembership;
 import com.pantheon.service.entity.CompanyRole;
 import com.pantheon.service.entity.ConstructionSite;
+import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.entity.SiteStatus;
 import com.pantheon.service.exception.CompanyNotFoundException;
@@ -35,6 +36,7 @@ public class ConstructionSiteService {
     private final SiteAccessService siteAccessService;
     private final ScheduleService scheduleService;
     private final PlatformAdminService platformAdminService;
+    private final SitePermissionService permissionService;
 
     public ConstructionSiteService(
             ConstructionSiteRepository siteRepository,
@@ -44,7 +46,8 @@ public class ConstructionSiteService {
             PlanService planService,
             SiteAccessService siteAccessService,
             ScheduleService scheduleService,
-            PlatformAdminService platformAdminService) {
+            PlatformAdminService platformAdminService,
+            SitePermissionService permissionService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
         this.siteMembershipRepository = siteMembershipRepository;
@@ -53,6 +56,7 @@ public class ConstructionSiteService {
         this.siteAccessService = siteAccessService;
         this.scheduleService = scheduleService;
         this.platformAdminService = platformAdminService;
+        this.permissionService = permissionService;
     }
 
     @Transactional
@@ -77,11 +81,17 @@ public class ConstructionSiteService {
         return site;
     }
 
+    /**
+     * Gated by the {@code SITE_STATUS} {@link PermissionCapability} (configurable per site, like
+     * every other capability) rather than company-admin — defaults to {@code MANAGE} for the
+     * {@code ADMIN} and {@code ENGINEER} site functions only, see {@code SitePermissionService}.
+     */
     @Transactional
     public ConstructionSite updateStatus(UUID siteId, UUID actingUserId, SiteStatus newStatus) {
         ConstructionSite site =
                 siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
-        requireAdmin(site.getCompanyId(), actingUserId);
+        var access = siteAccessService.requireAccess(siteId, actingUserId);
+        permissionService.requireManage(siteId, access, PermissionCapability.SITE_STATUS);
 
         site.updateStatus(newStatus, Instant.now());
         return siteRepository.save(site);

@@ -15,6 +15,7 @@ import OrcamentoDetailView from '../views/OrcamentoDetailView.vue'
 import PurchaseRequestDetailView from '../views/PurchaseRequestDetailView.vue'
 import GlobalTasksBoardView from '../views/GlobalTasksBoardView.vue'
 import UserProfileView from '../views/UserProfileView.vue'
+import AdminCompaniesView from '../views/AdminCompaniesView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -68,6 +69,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     { path: '/profile', name: 'user-profile', component: UserProfileView, meta: { requiresAuth: true } },
+    { path: '/admin', name: 'admin-companies', component: AdminCompaniesView, meta: { requiresAuth: true } },
   ],
 })
 
@@ -79,7 +81,7 @@ const onboardingRouteNames = new Set(['company-new', 'company-plan', 'company-pr
  * cached for the session and only refetched after company creation/plan/profile invalidates it.
  */
 router.beforeEach(async (to) => {
-  const { isAuthenticated, logout } = useAuth()
+  const { isAuthenticated, isSuperAdmin, logout } = useAuth()
 
   if (to.meta.requiresAuth && !isAuthenticated.value) {
     return { name: 'login' }
@@ -88,13 +90,23 @@ router.beforeEach(async (to) => {
     return true
   }
   if (to.name === 'login') {
-    return { name: 'dashboard' }
+    return { name: isSuperAdmin.value ? 'admin-companies' : 'dashboard' }
   }
   if (to.name === 'oauth2-callback') {
     return true
   }
   // The invitation page is reachable from an emailed link in any auth/onboarding state.
   if (to.name === 'invitation') {
+    return true
+  }
+
+  // A superadmin belongs to no company of their own (see PlatformAdminService's bypass —
+  // every company/site membership gate is skipped for them server-side too), so none of the
+  // onboarding-status logic below applies. Their home is the cross-tenant company picker.
+  if (isSuperAdmin.value) {
+    if (to.name === 'dashboard') {
+      return { name: 'admin-companies' }
+    }
     return true
   }
 

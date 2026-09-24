@@ -37,4 +37,9 @@ public class DailyReportExceptionHandler {
     public ResponseEntity<String> handleInvalidFile(InvalidFileException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
+
+    @ExceptionHandler(DailyReportCoreFieldsRequiredException.class)
+    public ResponseEntity<String> handleDailyReportCoreFieldsRequired(DailyReportCoreFieldsRequiredException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
 }

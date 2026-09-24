@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,8 +18,10 @@ import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestItem;
 import com.pantheon.service.entity.PurchaseRequestItemStatus;
 import com.pantheon.service.entity.PurchaseRequestStatus;
+import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.ItemsSpanMultiplePurchaseRequestsException;
 import com.pantheon.service.exception.OrcamentoLineItemNotLinkedException;
+import com.pantheon.service.exception.PurchaseRequestNotIniciadoException;
 import com.pantheon.service.exception.SelectionNotAllowedException;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
@@ -295,5 +298,41 @@ class PurchaseRequestItemServiceTest {
         PurchaseRequestItem result = service.setSelection(item.getId(), actingUserId, untracedLineItem.getId());
 
         assertThat(result.getSelectedOrcamentoLineItemId()).isEqualTo(untracedLineItem.getId());
+    }
+
+    @Test
+    void removeItemDeletesItWhileHeaderIsIniciado() {
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        service.removeItem(item.getId(), actingUserId);
+
+        verify(itemRepository).delete(item);
+    }
+
+    @Test
+    void removeItemRejectsWhenHeaderIsNotIniciado() {
+        purchaseRequest.markOrcado();
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.removeItem(item.getId(), actingUserId))
+                .isInstanceOf(PurchaseRequestNotIniciadoException.class);
+        verify(itemRepository, never()).delete(any());
+    }
+
+    @Test
+    void removeItemRejectsMemberWithoutManageAccess() {
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequestItem item = item(PurchaseRequestItemStatus.PENDING);
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.PURCHASE_REQUEST))
+                .when(permissionService).requireManage(eq(siteId), any(), eq(PermissionCapability.PURCHASE_REQUEST));
+
+        assertThatThrownBy(() -> service.removeItem(item.getId(), actingUserId))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+        verify(itemRepository, never()).delete(any());
     }
 }

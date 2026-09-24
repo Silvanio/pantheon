@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useConstructionSites, type ConstructionSite } from '../composables/useConstructionSites'
+import { useConstructionSites, type ConstructionSite, type SiteStatus } from '../composables/useConstructionSites'
 import { useCompanies } from '../composables/useCompanies'
 import { useSiteHeroCollapse } from '../composables/useSiteHeroCollapse'
 import { useSitePermissions, type AccessLevel, type PermissionCapability } from '../composables/useSitePermissions'
@@ -27,7 +27,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { getSite, updateSitePhoto } = useConstructionSites()
+const { getSite, updateSitePhoto, updateSiteStatus } = useConstructionSites()
 const { listMyCompanies } = useCompanies()
 const { collapsed: heroCollapsed, toggle: toggleHero } = useSiteHeroCollapse()
 const { getMyPermissions } = useSitePermissions()
@@ -59,6 +59,25 @@ const TAB_ORDER: Tab[] = ['summary', 'team', 'dailyReport', 'projects', 'equipme
 
 const myPermissions = ref<Record<PermissionCapability, AccessLevel> | null>(null)
 const pendingPurchaseRequestCount = ref(0)
+
+const SITE_STATUSES: SiteStatus[] = ['PLANNING', 'IN_PROGRESS', 'PAUSED', 'COMPLETED']
+const canManageSiteStatus = computed(() => myPermissions.value?.SITE_STATUS === 'MANAGE')
+const savingStatus = ref(false)
+const statusError = ref('')
+
+async function onStatusChange(event: Event) {
+  if (!site.value) return
+  const newStatus = (event.target as HTMLSelectElement).value as SiteStatus
+  statusError.value = ''
+  savingStatus.value = true
+  try {
+    site.value = await updateSiteStatus(site.value.id, newStatus)
+  } catch {
+    statusError.value = t('siteDetail.statusUpdateError')
+  } finally {
+    savingStatus.value = false
+  }
+}
 
 async function loadPendingPurchaseRequestCount() {
   try {
@@ -131,9 +150,21 @@ onMounted(load)
         </div>
         <div class="min-w-0">
           <p class="truncate text-sm font-bold text-steel-800 dark:text-steel-50">{{ site.name }}</p>
-          <StatusBadge kind="constructionSite" :status="site.status" class="mt-0.5" />
+          <StatusBadge v-if="!canManageSiteStatus" kind="constructionSite" :status="site.status" class="mt-0.5" />
+          <select
+            v-else
+            :value="site.status"
+            :disabled="savingStatus"
+            class="mt-0.5 rounded-md border border-steel-300 bg-white px-1.5 py-0.5 text-xs text-steel-700 dark:border-steel-600 dark:bg-steel-900 dark:text-steel-100"
+            @change="onStatusChange"
+          >
+            <option v-for="status in SITE_STATUSES" :key="status" :value="status">
+              {{ t(`constructionSites.status.${status}`) }}
+            </option>
+          </select>
         </div>
       </div>
+      <p v-if="statusError" class="mb-3 px-1 text-xs text-safety-600 dark:text-safety-500">{{ statusError }}</p>
       <nav class="flex flex-col gap-0.5">
         <button
           type="button"

@@ -20,6 +20,7 @@ import com.pantheon.service.entity.DailyReportWorkforceEntry;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.DailyReportCoreFieldsRequiredException;
 import com.pantheon.service.exception.DailyReportNotDeletableException;
 import com.pantheon.service.exception.DailyReportNotEditableException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
@@ -117,6 +118,9 @@ public class DailyReportService {
                 request.workHoursEnd(),
                 request.comments(),
                 Instant.now());
+        if (report.getWeatherCondition() == null || report.getWorkHoursStart() == null || report.getWorkHoursEnd() == null) {
+            throw new DailyReportCoreFieldsRequiredException(reportId);
+        }
         return dailyReportRepository.save(report);
     }
 

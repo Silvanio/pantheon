@@ -61,6 +61,7 @@ const WEATHER_OPTIONS = ['SUNNY', 'PARTLY_CLOUDY', 'CLOUDY', 'RAINY', 'STORM'] a
 
 const coreErrorMessage = ref('')
 const coreSaving = ref(false)
+const editingCore = ref(true)
 const weatherCondition = ref('')
 const weatherBlockedTasks = ref(false)
 const workHoursStart = ref('')
@@ -133,6 +134,7 @@ async function load() {
     workHoursStart.value = detail.value.report.workHoursStart ?? ''
     workHoursEnd.value = detail.value.report.workHoursEnd ?? ''
     comments.value = detail.value.report.comments ?? ''
+    editingCore.value = !weatherCondition.value || !workHoursStart.value || !workHoursEnd.value
 
     const siteId = detail.value.report.constructionSiteId
     equipmentCatalog.value = (await listEquipment(siteId, { size: 200 })).content
@@ -239,6 +241,10 @@ async function onDownloadPdf() {
 
 async function onSaveCore() {
   coreErrorMessage.value = ''
+  if (!weatherCondition.value || !workHoursStart.value || !workHoursEnd.value) {
+    coreErrorMessage.value = t('dailyReports.core.requiredError')
+    return
+  }
   coreSaving.value = true
   try {
     const updated = await updateCore(reportId, {
@@ -249,11 +255,16 @@ async function onSaveCore() {
       comments: comments.value || null,
     })
     if (detail.value) detail.value.report = updated
+    editingCore.value = false
   } catch {
     coreErrorMessage.value = t('dailyReports.core.error')
   } finally {
     coreSaving.value = false
   }
+}
+
+function onEditCore() {
+  editingCore.value = true
 }
 
 async function onAddWorkforce() {
@@ -433,10 +444,10 @@ onMounted(load)
       <!-- Core: weather, hours, comments -->
       <section class="card card-pad">
         <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.core.title') }}</h2>
-        <template v-if="isDraft">
+        <template v-if="isDraft && editingCore">
           <div class="flex flex-wrap items-start gap-x-6 gap-y-3">
             <div>
-              <label class="mb-1.5 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.weatherCondition') }}</label>
+              <label class="mb-1.5 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.weatherCondition') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
               <div class="flex flex-wrap gap-2">
                 <button
                   v-for="option in WEATHER_OPTIONS"
@@ -454,18 +465,21 @@ onMounted(load)
                 </button>
               </div>
             </div>
-            <label class="flex items-center gap-2 self-center text-sm text-steel-600 dark:text-steel-300">
-              <input v-model="weatherBlockedTasks" type="checkbox" class="field-checkbox shrink-0" />
-              {{ t('dailyReports.core.weatherBlockedTasks') }}
-            </label>
+            <div>
+              <label class="mb-1.5 hidden text-sm font-medium sm:block">&nbsp;</label>
+              <label class="flex h-[34px] items-center gap-2 text-sm text-steel-600 dark:text-steel-300">
+                <input v-model="weatherBlockedTasks" type="checkbox" class="field-checkbox shrink-0" />
+                {{ t('dailyReports.core.weatherBlockedTasks') }}
+              </label>
+            </div>
           </div>
           <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursStart') }}</label>
+              <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursStart') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
               <TimeClockPicker v-model="workHoursStart" />
             </div>
             <div>
-              <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursEnd') }}</label>
+              <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursEnd') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
               <TimeClockPicker v-model="workHoursEnd" />
             </div>
           </div>
@@ -475,14 +489,19 @@ onMounted(load)
           </div>
           <p v-if="coreErrorMessage" class="mt-2 text-sm text-safety-600 dark:text-safety-500">{{ coreErrorMessage }}</p>
           <button type="button" :disabled="coreSaving" class="btn-primary mt-3" @click="onSaveCore">
-            {{ t('dailyReports.core.save') }}
+            {{ coreSaving ? t('dailyReports.core.saving') : t('dailyReports.core.save') }}
           </button>
         </template>
-        <dl v-else class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <div><dt class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.core.weatherCondition') }}</dt><dd class="text-steel-800 dark:text-steel-50">{{ detail.report.weatherCondition ?? '—' }}</dd></div>
-          <div><dt class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.core.workHoursStart') }} / {{ t('dailyReports.core.workHoursEnd') }}</dt><dd class="text-steel-800 dark:text-steel-50">{{ detail.report.workHoursStart ?? '—' }} - {{ detail.report.workHoursEnd ?? '—' }}</dd></div>
-          <div class="sm:col-span-2"><dt class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.core.comments') }}</dt><dd class="text-steel-800 dark:text-steel-50">{{ detail.report.comments ?? '—' }}</dd></div>
-        </dl>
+        <template v-else>
+          <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <div><dt class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.core.weatherCondition') }}</dt><dd class="text-steel-800 dark:text-steel-50">{{ detail.report.weatherCondition ? t(`dailyReports.core.weatherOptions.${detail.report.weatherCondition}`) : '—' }}</dd></div>
+            <div><dt class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.core.workHoursStart') }} / {{ t('dailyReports.core.workHoursEnd') }}</dt><dd class="text-steel-800 dark:text-steel-50">{{ detail.report.workHoursStart ?? '—' }} - {{ detail.report.workHoursEnd ?? '—' }}</dd></div>
+            <div class="sm:col-span-2"><dt class="text-steel-500 dark:text-steel-400">{{ t('dailyReports.core.comments') }}</dt><dd class="text-steel-800 dark:text-steel-50">{{ detail.report.comments ?? '—' }}</dd></div>
+          </dl>
+          <button v-if="isDraft" type="button" class="btn-secondary mt-3" @click="onEditCore">
+            {{ t('dailyReports.core.edit') }}
+          </button>
+        </template>
       </section>
 
       <!-- Workforce -->

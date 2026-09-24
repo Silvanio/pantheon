@@ -33,6 +33,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class EquipmentServiceTest {
@@ -82,14 +83,14 @@ class EquipmentServiceTest {
     void listReturnsPagedResultsSortedByCreatedAtDescending() {
         Equipment equipment = new Equipment(
                 UUID.randomUUID(), siteId, "Betoneira", null, EquipmentStatus.AVAILABLE, UUID.randomUUID(), Instant.now());
-        when(equipmentRepository.findByConstructionSiteId(eq(siteId), any(Pageable.class)))
+        when(equipmentRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(equipment), PageRequest.of(0, 20), 1));
 
         Page<Equipment> result = service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20));
 
         assertThat(result.getContent()).containsExactly(equipment);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(equipmentRepository).findByConstructionSiteId(eq(siteId), pageableCaptor.capture());
+        verify(equipmentRepository).findAll(any(Specification.class), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
@@ -100,6 +101,30 @@ class EquipmentServiceTest {
                 .requireVisible(eq(siteId), any(), eq(PermissionCapability.EQUIPMENT));
 
         assertThatThrownBy(() -> service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20)))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void listFiltersByNameStatusAndType() {
+        Equipment matching = new Equipment(
+                UUID.randomUUID(), siteId, "Betoneira 400L", "Betoneira", EquipmentStatus.AVAILABLE, UUID.randomUUID(), Instant.now());
+        when(equipmentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(matching), PageRequest.of(0, 20), 1));
+
+        Page<Equipment> result = service.list(
+                siteId, UUID.randomUUID(), "betoneira", EquipmentStatus.AVAILABLE, "beton", PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(matching);
+        verify(equipmentRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void listWithNoFiltersStillRequiresVisibleAccess() {
+        doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.EQUIPMENT))
+                .when(permissionService)
+                .requireVisible(eq(siteId), any(), eq(PermissionCapability.EQUIPMENT));
+
+        assertThatThrownBy(() -> service.list(siteId, UUID.randomUUID(), "name", null, null, PageRequest.of(0, 20)))
                 .isInstanceOf(ForbiddenCapabilityException.class);
     }
 }

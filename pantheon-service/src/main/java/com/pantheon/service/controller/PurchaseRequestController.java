@@ -128,6 +128,13 @@ public class PurchaseRequestController {
                 orcamento, orcamentoService.getSourcePurchaseRequestName(orcamento.getSourcePurchaseRequestId())));
     }
 
+    @DeleteMapping("/api/purchase-requests/{id}/items/{itemId}")
+    public ResponseEntity<Void> removeItem(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID itemId) {
+        purchaseRequestItemService.removeItem(itemId, user.getId());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/api/purchase-requests/{id}/items/{itemId}/selection")
     public ResponseEntity<PurchaseRequestItemResponse> setItemSelection(
             @AuthenticationPrincipal AppUser user,

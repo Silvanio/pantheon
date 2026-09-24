@@ -29,6 +29,7 @@ const { t } = useI18n()
 const {
   getPurchaseRequest,
   addPurchaseRequestItems,
+  removePurchaseRequestItem,
   deletePurchaseRequest,
   convertToOrcamento,
   setItemSelection,
@@ -72,6 +73,10 @@ const showAddItemsForm = ref(false)
 const addingItems = ref(false)
 const addItemsError = ref('')
 const newItemRows = ref<PurchaseRequestItemCreationData[]>([{ name: '', type: null, quantity: '', unit: null }])
+
+const confirmingRemoveItemId = ref<string | null>(null)
+const removingItemId = ref<string | null>(null)
+const removeItemError = ref('')
 
 const selectionError = ref('')
 const printingOrcamentoId = ref<string | null>(null)
@@ -158,7 +163,7 @@ const canActOnApproval = computed(() => {
   return myAccessLevel.value === 'MANAGE'
 })
 
-const canDelete = computed(() => detail.value?.purchaseRequest.status === 'INICIADO')
+const canDelete = computed(() => detail.value?.purchaseRequest.status !== 'CONCLUIDO')
 const canAddItems = computed(() => detail.value?.purchaseRequest.status === 'INICIADO' && myAccessLevel.value === 'MANAGE')
 const canConclude = computed(() => detail.value?.purchaseRequest.status === 'CONFERIDO' && canApprove.value)
 const isConcluded = computed(() => detail.value?.purchaseRequest.status === 'CONCLUIDO')
@@ -293,6 +298,20 @@ async function onAddItems() {
     addItemsError.value = t('purchaseRequests.addItemsError')
   } finally {
     addingItems.value = false
+  }
+}
+
+async function onRemoveItem(itemId: string) {
+  removeItemError.value = ''
+  removingItemId.value = itemId
+  try {
+    await removePurchaseRequestItem(purchaseRequestId, itemId)
+    await loadDetail()
+  } catch {
+    removeItemError.value = t('purchaseRequests.removeItemError')
+  } finally {
+    removingItemId.value = null
+    confirmingRemoveItemId.value = null
   }
 }
 
@@ -722,11 +741,24 @@ onMounted(load)
                   >
                     {{ t('orcamento.label') }}
                   </router-link>
+                  <button
+                    v-if="canAddItems"
+                    type="button"
+                    :disabled="removingItemId === item.id"
+                    :title="t('purchaseRequests.removeItemButton')"
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-safety-600 transition hover:bg-safety-50 dark:text-safety-500 dark:hover:bg-safety-900/30"
+                    @click="confirmingRemoveItemId = item.id"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16zM10 11v6M14 11v6" />
+                    </svg>
+                  </button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p v-if="removeItemError" class="mt-3 text-sm text-safety-600 dark:text-safety-500">{{ removeItemError }}</p>
       </section>
 
       <!-- Comparison table -->
@@ -905,6 +937,30 @@ onMounted(load)
           <button type="button" class="btn-secondary" @click="showAddItemsForm = false">{{ t('purchaseRequests.form.cancel') }}</button>
         </div>
       </form>
+    </div>
+
+    <!-- Remove item confirm -->
+    <div
+      v-if="confirmingRemoveItemId"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+      @click.self="confirmingRemoveItemId = null"
+    >
+      <div class="modal-panel card-pad w-full max-w-sm">
+        <p class="mb-4 text-sm text-steel-600 dark:text-steel-300">{{ t('purchaseRequests.removeItemConfirm') }}</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" @click="confirmingRemoveItemId = null">
+            {{ t('purchaseRequests.form.cancel') }}
+          </button>
+          <button
+            type="button"
+            :disabled="removingItemId === confirmingRemoveItemId"
+            class="btn-danger"
+            @click="confirmingRemoveItemId && onRemoveItem(confirmingRemoveItemId)"
+          >
+            {{ t('purchaseRequests.removeItemButton') }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- All suppliers modal -->

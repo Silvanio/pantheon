@@ -2,10 +2,10 @@ package com.pantheon.service.exception;
 
 import java.util.UUID;
 
-/** Thrown when deletion is attempted on a Pedido de Compra that is not (still) {@code INICIADO}. */
+/** Thrown when deletion is attempted on a Pedido de Compra that has already reached {@code CONCLUIDO}. */
 public class PurchaseRequestNotDeletableException extends RuntimeException {
 
     public PurchaseRequestNotDeletableException(UUID purchaseRequestId) {
-        super("Purchase request can only be deleted while Iniciado: " + purchaseRequestId);
+        super("Purchase request can no longer be deleted once Concluido: " + purchaseRequestId);
     }
 }

@@ -13,6 +13,7 @@ import com.pantheon.service.exception.OrcamentoLineItemNotLinkedException;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestItemNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
+import com.pantheon.service.exception.PurchaseRequestNotIniciadoException;
 import com.pantheon.service.exception.SelectionNotAllowedException;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
@@ -126,6 +127,18 @@ public class PurchaseRequestItemService {
             item.select(orcamentoLineItemId);
         }
         return itemRepository.save(item);
+    }
+
+    /** Only while the header is still {@code INICIADO} — once Orçado, an item may already be quoted. */
+    @Transactional
+    public void removeItem(UUID itemId, UUID actingUserId) {
+        PurchaseRequestItem item = requireItem(itemId);
+        PurchaseRequest purchaseRequest = requirePurchaseRequest(item.getPurchaseRequestId());
+        requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
+        if (purchaseRequest.getStatus() != PurchaseRequestStatus.INICIADO) {
+            throw new PurchaseRequestNotIniciadoException(purchaseRequest.getId());
+        }
+        itemRepository.delete(item);
     }
 
     private PurchaseRequestItem requireItem(UUID itemId) {

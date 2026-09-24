@@ -30,6 +30,8 @@ public class SitePermissionService {
             new EnumMap<>(ConstructionFunction.class);
 
     static {
+        DEFAULTS.put(ConstructionFunction.ADMIN, Map.of(
+                PermissionCapability.SITE_STATUS, AccessLevel.MANAGE));
         DEFAULTS.put(ConstructionFunction.ENGINEER, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.MANAGE,
                 PermissionCapability.DAILY_REPORT, AccessLevel.MANAGE,
@@ -38,7 +40,8 @@ public class SitePermissionService {
                 PermissionCapability.ORCAMENTO_MANAGE, AccessLevel.MANAGE,
                 PermissionCapability.TASKS, AccessLevel.MANAGE,
                 PermissionCapability.SCHEDULE, AccessLevel.MANAGE,
-                PermissionCapability.TEAM_MANAGE, AccessLevel.MANAGE));
+                PermissionCapability.TEAM_MANAGE, AccessLevel.MANAGE,
+                PermissionCapability.SITE_STATUS, AccessLevel.MANAGE));
         DEFAULTS.put(ConstructionFunction.ARCHITECT, Map.of(
                 PermissionCapability.DOCUMENT_PROJECTS, AccessLevel.MANAGE,
                 PermissionCapability.DAILY_REPORT, AccessLevel.MANAGE,

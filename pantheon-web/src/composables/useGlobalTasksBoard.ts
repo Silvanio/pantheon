@@ -2,6 +2,7 @@ import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
 import type { TaskColumn } from './useTaskColumns'
 import type { TaskLabel } from './useTaskCards'
+import type { SiteMember } from './useSiteMembers'
 
 export interface GlobalTaskCard {
   id: string
@@ -14,6 +15,9 @@ export interface GlobalTaskCard {
   dueDate: string | null
   sortOrder: number
   labelIds: string[]
+  assigneeIds: string[]
+  commentCount: number
+  attachmentCount: number
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -23,6 +27,7 @@ export interface GlobalTaskBoard {
   columns: TaskColumn[]
   cards: GlobalTaskCard[]
   labels: TaskLabel[]
+  assignees: SiteMember[]
 }
 
 async function authFetch<T>(path: string): Promise<T> {

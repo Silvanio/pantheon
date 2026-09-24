@@ -15,7 +15,7 @@ const props = defineProps<{ siteId: string; canManage: boolean }>()
 
 const { t } = useI18n()
 const router = useRouter()
-const { listPurchaseRequests, createPurchaseRequest } = usePurchaseRequests()
+const { listPurchaseRequests, createPurchaseRequest, deletePurchaseRequest } = usePurchaseRequests()
 const { listMembers } = useSiteMembers()
 
 const PAGE_SIZE_OPTIONS = [1, 5, 10] as const
@@ -35,6 +35,10 @@ const hasActiveFilter = ref(false)
 
 const creating = ref(false)
 const createError = ref('')
+
+const deletingId = ref<string | null>(null)
+const confirmingDeleteId = ref<string | null>(null)
+const deleteError = ref('')
 
 const memberNames = ref<Record<string, string>>({})
 
@@ -124,6 +128,20 @@ async function onCreate() {
     createError.value = t('purchaseRequests.form.error')
   } finally {
     creating.value = false
+  }
+}
+
+async function onDelete(purchaseRequestId: string) {
+  deleteError.value = ''
+  deletingId.value = purchaseRequestId
+  try {
+    await deletePurchaseRequest(purchaseRequestId)
+    await Promise.all([load(), loadStats()])
+  } catch {
+    deleteError.value = t('purchaseRequests.deleteError')
+  } finally {
+    deletingId.value = null
+    confirmingDeleteId.value = null
   }
 }
 
@@ -241,7 +259,8 @@ onMounted(() => {
               <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.stage') }}</th>
               <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.suppliers') }}</th>
               <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.createdBy') }}</th>
-              <th class="pb-3 pr-5 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.date') }}</th>
+              <th class="pb-3 pt-4 text-left text-[11px] font-bold uppercase tracking-wide text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.table.date') }}</th>
+              <th v-if="canManage" class="pb-3 pr-5 pt-4"></th>
             </tr>
           </thead>
           <tbody>
@@ -261,7 +280,21 @@ onMounted(() => {
                 </span>
               </td>
               <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ memberNames[pr.createdBy] ?? '—' }}</td>
-              <td class="py-3.5 pr-5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(pr.createdAt) }}</td>
+              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(pr.createdAt) }}</td>
+              <td v-if="canManage" class="py-3.5 pr-5 text-right" @click.stop>
+                <button
+                  v-if="pr.status !== 'CONCLUIDO'"
+                  type="button"
+                  :disabled="deletingId === pr.id"
+                  :title="t('purchaseRequests.deleteButton')"
+                  class="inline-flex h-7 w-7 items-center justify-center rounded-md text-safety-600 transition hover:bg-safety-50 dark:text-safety-500 dark:hover:bg-safety-900/30"
+                  @click="confirmingDeleteId = pr.id"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16zM10 11v6M14 11v6" />
+                  </svg>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -289,5 +322,30 @@ onMounted(() => {
         </div>
       </div>
     </template>
+
+    <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
+
+    <div
+      v-if="confirmingDeleteId"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+      @click.self="confirmingDeleteId = null"
+    >
+      <div class="modal-panel card-pad w-full max-w-sm">
+        <p class="mb-4 text-sm text-steel-600 dark:text-steel-300">{{ t('purchaseRequests.deleteConfirm') }}</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" @click="confirmingDeleteId = null">
+            {{ t('purchaseRequests.form.cancel') }}
+          </button>
+          <button
+            type="button"
+            :disabled="deletingId === confirmingDeleteId"
+            class="btn-danger"
+            @click="confirmingDeleteId && onDelete(confirmingDeleteId)"
+          >
+            {{ t('purchaseRequests.deleteButton') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

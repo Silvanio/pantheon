@@ -377,14 +377,41 @@ public class PurchaseRequestService {
         return purchaseRequest;
     }
 
-    /** Only while still {@code INICIADO} — no Orcamento has been created from it yet, so nothing else to clean up. */
+    /**
+     * Deletable at any stage before {@code CONCLUIDO}, cascading to every Orcamento linked to it
+     * (and their line items), its whole approval history, invoices, and items. Once
+     * {@code CONCLUIDO}, {@link com.pantheon.service.entity.Material} delivery-tracking rows hold
+     * a hard FK into the linked Orcamentos' line items, so it can no longer be deleted.
+     *
+     * <p>{@code PurchaseRequestItem} and {@code OrcamentoLineItem} reference each other
+     * ({@code selectedOrcamentoLineItemId}/{@code convertedToOrcamentoId} one way,
+     * {@code sourcePurchaseRequestItemId} the other), so items must have those two columns
+     * cleared before the Orcamentos/line items are deleted — otherwise deleting the referenced
+     * line item/Orcamento first violates the item's own FK.
+     */
     @Transactional
     public void delete(UUID purchaseRequestId, UUID actingUserId) {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
         requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
-        if (purchaseRequest.getStatus() != PurchaseRequestStatus.INICIADO) {
+        if (purchaseRequest.getStatus() == PurchaseRequestStatus.CONCLUIDO) {
             throw new PurchaseRequestNotDeletableException(purchaseRequestId);
         }
+
+        List<PurchaseRequestItem> items = itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
+        for (PurchaseRequestItem item : items) {
+            item.clearSelection();
+            item.revertConversion();
+        }
+        itemRepository.saveAll(items);
+
+        List<Orcamento> orcamentos = orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
+        for (Orcamento orcamento : orcamentos) {
+            orcamentoLineItemRepository.deleteAll(orcamentoLineItemRepository.findByOrcamentoId(orcamento.getId()));
+        }
+        orcamentoRepository.deleteAll(orcamentos);
+
+        approvalRepository.deleteAll(
+                approvalRepository.findByPurchaseRequestIdOrderByCycleNumberAscStepOrderAsc(purchaseRequestId));
 
         List<PurchaseRequestInvoice> invoices = invoiceRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId);
         for (PurchaseRequestInvoice invoice : invoices) {
@@ -392,7 +419,7 @@ public class PurchaseRequestService {
         }
         invoiceRepository.deleteAll(invoices);
 
-        itemRepository.deleteAll(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequestId));
+        itemRepository.deleteAll(items);
         purchaseRequestRepository.delete(purchaseRequest);
     }
 

@@ -9,5 +9,6 @@ public enum PermissionCapability {
     ORCAMENTO_MANAGE,
     TASKS,
     SCHEDULE,
-    TEAM_MANAGE
+    TEAM_MANAGE,
+    SITE_STATUS
 }

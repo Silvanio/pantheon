@@ -208,6 +208,16 @@ onMounted(load)
           :site-name="siteName"
           tab="orcamentos"
           :label="t('orcamento.title')"
+          :parent="
+            detail.orcamento.sourcePurchaseRequestId
+              ? {
+                  tab: 'purchaseRequests',
+                  label: t('purchaseRequests.title'),
+                  name: detail.orcamento.sourcePurchaseRequestName ?? '…',
+                  to: `/purchase-requests/${detail.orcamento.sourcePurchaseRequestId}`,
+                }
+              : null
+          "
         />
       </template>
     </AppHeader>

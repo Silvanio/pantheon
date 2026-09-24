@@ -34,9 +34,20 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
   return (await response.json()) as T
 }
 
+export interface EquipmentListFilter {
+  name?: string
+  status?: EquipmentStatus
+  type?: string
+  page?: number
+  size?: number
+}
+
 export function useEquipment() {
-  function listEquipment(siteId: string, options: { page?: number; size?: number } = {}): Promise<PageResponse<Equipment>> {
+  function listEquipment(siteId: string, options: EquipmentListFilter = {}): Promise<PageResponse<Equipment>> {
     const params = new URLSearchParams()
+    if (options.name) params.set('name', options.name)
+    if (options.status) params.set('status', options.status)
+    if (options.type) params.set('type', options.type)
     params.set('page', String(options.page ?? 0))
     params.set('size', String(options.size ?? 20))
     return authFetch(`/api/construction-sites/${siteId}/equipment?${params.toString()}`)

@@ -10,11 +10,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.pantheon.service.dto.DailyReportCoreUpdateRequest;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportAttachment;
 import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.entity.MediaType;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.exception.DailyReportCoreFieldsRequiredException;
 import com.pantheon.service.exception.DailyReportNotDeletableException;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
@@ -30,6 +32,7 @@ import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.storage.StorageService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -110,6 +113,52 @@ class DailyReportServiceTest {
 
     private DailyReport draftReport() {
         return new DailyReport(UUID.randomUUID(), siteId, LocalDate.now(), 1, UUID.randomUUID(), Instant.now());
+    }
+
+    @Test
+    void updateCoreSavesWhenWeatherAndHoursArePresent() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        lenient().when(dailyReportRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DailyReport result = service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
+                "SUNNY", true, LocalTime.of(8, 0), LocalTime.of(17, 0), null));
+
+        assertThat(result.getWeatherCondition()).isEqualTo("SUNNY");
+        verify(dailyReportRepository).save(report);
+    }
+
+    @Test
+    void updateCoreRejectsWhenWeatherConditionMissing() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
+                null, true, LocalTime.of(8, 0), LocalTime.of(17, 0), null)))
+                .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
+        verify(dailyReportRepository, never()).save(any());
+    }
+
+    @Test
+    void updateCoreRejectsWhenWorkHoursMissing() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
+                "SUNNY", true, null, null, null)))
+                .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
+        verify(dailyReportRepository, never()).save(any());
+    }
+
+    @Test
+    void updateCoreRejectsSavingCommentsAloneOnAFreshReport() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
+                null, null, null, null, "Sem intercorrências")))
+                .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
+        verify(dailyReportRepository, never()).save(any());
     }
 
     @Test

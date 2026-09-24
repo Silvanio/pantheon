@@ -235,6 +235,48 @@ class SitePermissionServiceTest {
     }
 
     @Test
+    void adminCanManageSiteStatusByDefault() {
+        SiteMembership admin = SiteMembership.invited(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.ADMIN, null, null, Instant.now());
+        admin.accept();
+        SiteAccessContext adminAccess = new SiteAccessContext(false, admin);
+        when(overrideRepository.findBySiteMembershipIdAndCapability(admin.getId(), PermissionCapability.SITE_STATUS))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.ADMIN, PermissionCapability.SITE_STATUS))
+                .thenReturn(Optional.empty());
+
+        service.requireManage(siteId, adminAccess, PermissionCapability.SITE_STATUS);
+    }
+
+    @Test
+    void engineerCanManageSiteStatusByDefault() {
+        SiteMembership engineer = SiteMembership.invited(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), ConstructionFunction.ENGINEER, null, null, Instant.now());
+        engineer.accept();
+        SiteAccessContext engineerAccess = new SiteAccessContext(false, engineer);
+        when(overrideRepository.findBySiteMembershipIdAndCapability(engineer.getId(), PermissionCapability.SITE_STATUS))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.ENGINEER, PermissionCapability.SITE_STATUS))
+                .thenReturn(Optional.empty());
+
+        service.requireManage(siteId, engineerAccess, PermissionCapability.SITE_STATUS);
+    }
+
+    @Test
+    void clientCannotManageSiteStatusByDefault() {
+        when(overrideRepository.findBySiteMembershipIdAndCapability(clientMembership.getId(), PermissionCapability.SITE_STATUS))
+                .thenReturn(Optional.empty());
+        when(overrideRepository.findByConstructionSiteIdAndFunctionAndCapability(
+                        siteId, ConstructionFunction.CLIENT, PermissionCapability.SITE_STATUS))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requireManage(siteId, clientAccess, PermissionCapability.SITE_STATUS))
+                .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
     void resolveAllReturnsEveryCapability() {
         SiteAccessContext staffAccess = new SiteAccessContext(true, null);
 

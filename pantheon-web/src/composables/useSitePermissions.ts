@@ -11,6 +11,7 @@ export type PermissionCapability =
   | 'TASKS'
   | 'SCHEDULE'
   | 'TEAM_MANAGE'
+  | 'SITE_STATUS'
 export type AccessLevel = 'VIEW' | 'MANAGE' | 'VIEW_AND_APPROVE' | 'HIDDEN'
 
 export interface SitePermissionOverride {

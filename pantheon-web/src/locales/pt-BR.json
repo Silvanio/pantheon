@@ -188,6 +188,7 @@
   },
   "siteDetail": {
     "back": "Voltar ao painel",
+    "statusUpdateError": "Não foi possível atualizar o status da obra.",
     "changePhoto": "Alterar foto",
     "collapsePhoto": "Recolher foto de capa",
     "expandPhoto": "Expandir foto de capa",
@@ -289,7 +290,8 @@
       "PURCHASE_REQUEST": "Pedido de compra",
       "ORCAMENTO_MANAGE": "Orçamentos",
       "TASKS": "Tasks",
-      "TEAM_MANAGE": "Equipe"
+      "TEAM_MANAGE": "Equipe",
+      "SITE_STATUS": "Status da obra"
     },
     "accessLevel": {
       "VIEW": "Apenas ver",
@@ -397,6 +399,18 @@
     "empty": "Nenhum equipamento cadastrado ainda.",
     "newButton": "Novo equipamento",
     "toggleLabel": "Equipamentos",
+    "filter": {
+      "button": "Filtrar",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Buscar por nome...",
+      "typeLabel": "Tipo",
+      "typePlaceholder": "Buscar por tipo...",
+      "statusLabel": "Status",
+      "allStatuses": "Todos os status",
+      "clear": "Limpar",
+      "apply": "Aplicar",
+      "noResults": "Nenhum equipamento encontrado para este filtro."
+    },
     "form": {
       "name": "Nome",
       "type": "Tipo",
@@ -504,7 +518,10 @@
       "workHoursEnd": "Fim do expediente",
       "comments": "Comentários",
       "save": "Salvar",
-      "error": "Não foi possível salvar. Tente novamente."
+      "saving": "Salvando...",
+      "edit": "Editar",
+      "error": "Não foi possível salvar. Tente novamente.",
+      "requiredError": "Condição climática, início e fim do expediente são obrigatórios."
     },
     "workforce": {
       "title": "Mão de obra",
@@ -657,6 +674,9 @@
     "addItemsButton": "Adicionar produtos",
     "addItemsSubmit": "Adicionar produtos",
     "addItemsError": "Não foi possível adicionar os produtos. Verifique os dados informados.",
+    "removeItemButton": "Remover produto",
+    "removeItemConfirm": "Tem certeza que deseja remover este produto do pedido? Esta ação não pode ser desfeita.",
+    "removeItemError": "Não foi possível remover o produto.",
     "convertButton": "Criar orçamento",
     "convertError": "Não foi possível criar o orçamento a partir dos itens selecionados.",
     "table": {
@@ -708,7 +728,7 @@
       "removeError": "Não foi possível remover a nota fiscal."
     },
     "deleteButton": "Excluir",
-    "deleteConfirm": "Tem certeza que deseja excluir este pedido de compra? Esta ação não pode ser desfeita.",
+    "deleteConfirm": "Tem certeza que deseja excluir este pedido de compra? Os orçamentos vinculados a ele também serão excluídos. Esta ação não pode ser desfeita.",
     "deleteError": "Não foi possível excluir o pedido de compra.",
     "form": {
       "name": "Nome",

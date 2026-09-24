@@ -20,6 +20,7 @@ import com.pantheon.service.dto.EquipmentResponse;
 import com.pantheon.service.dto.EquipmentStatusUpdateRequest;
 import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.Equipment;
+import com.pantheon.service.entity.EquipmentStatus;
 import com.pantheon.service.service.EquipmentService;
 @RestController
 public class EquipmentController {
@@ -43,10 +44,14 @@ public class EquipmentController {
     public ResponseEntity<Page<EquipmentResponse>> list(
             @AuthenticationPrincipal AppUser user,
             @PathVariable UUID siteId,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) EquipmentStatus status,
+            @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Page<EquipmentResponse> equipment =
-                equipmentService.list(siteId, user.getId(), PageRequest.of(page, size)).map(EquipmentResponse::from);
+        Page<EquipmentResponse> equipment = equipmentService
+                .list(siteId, user.getId(), name, status, type, PageRequest.of(page, size))
+                .map(EquipmentResponse::from);
         return ResponseEntity.ok(equipment);
     }
 

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,6 +60,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -800,14 +802,56 @@ class PurchaseRequestServiceTest {
     }
 
     @Test
-    void deleteRejectsWhenNotIniciado() {
+    void deleteRejectsWhenConcluido() {
         PurchaseRequest purchaseRequest = purchaseRequest();
         purchaseRequest.markOrcado();
+        purchaseRequest.submitForApproval(Instant.now());
+        purchaseRequest.approve(Instant.now());
+        purchaseRequest.complete(Instant.now());
         when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
 
         assertThatThrownBy(() -> service.delete(purchaseRequest.getId(), UUID.randomUUID()))
                 .isInstanceOf(PurchaseRequestNotDeletableException.class);
         verify(purchaseRequestRepository, never()).delete(any(PurchaseRequest.class));
+    }
+
+    @Test
+    void deleteWhileOrcadoCascadesLinkedOrcamentosAndApprovalHistory() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        Orcamento orcamento = new Orcamento(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "111", "Fornecedor A", null, null, null,
+                null, null, null, purchaseRequest.getId());
+        when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of(orcamento));
+        OrcamentoLineItem lineItem = new OrcamentoLineItem(
+                UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, UUID.randomUUID());
+        when(orcamentoLineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of(lineItem));
+
+        PurchaseRequestItem item = item(purchaseRequest.getId());
+        item.convertTo(orcamento.getId(), Instant.now());
+        item.select(lineItem.getId());
+        when(itemRepository.findByPurchaseRequestIdOrderByCreatedAtDesc(purchaseRequest.getId())).thenReturn(List.of(item));
+
+        PurchaseRequestApproval approval = new PurchaseRequestApproval(
+                UUID.randomUUID(), purchaseRequest.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findByPurchaseRequestIdOrderByCycleNumberAscStepOrderAsc(purchaseRequest.getId()))
+                .thenReturn(List.of(approval));
+
+        service.delete(purchaseRequest.getId(), UUID.randomUUID());
+
+        // The item's own FK columns must be cleared before its referenced Orcamento/line item
+        // are deleted, otherwise the delete would violate that FK against a real database.
+        assertThat(item.getConvertedToOrcamentoId()).isNull();
+        assertThat(item.getSelectedOrcamentoLineItemId()).isNull();
+        InOrder order = inOrder(itemRepository, orcamentoLineItemRepository, orcamentoRepository, purchaseRequestRepository);
+        order.verify(itemRepository).saveAll(List.of(item));
+        order.verify(orcamentoLineItemRepository).deleteAll(List.of(lineItem));
+        order.verify(orcamentoRepository).deleteAll(List.of(orcamento));
+        order.verify(itemRepository).deleteAll(List.of(item));
+        order.verify(purchaseRequestRepository).delete(purchaseRequest);
+        verify(approvalRepository).deleteAll(List.of(approval));
     }
 
     @Test

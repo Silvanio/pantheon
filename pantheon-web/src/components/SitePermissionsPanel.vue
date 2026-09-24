@@ -23,6 +23,7 @@ const capabilities: PermissionCapability[] = [
   'ORCAMENTO_MANAGE',
   'TASKS',
   'TEAM_MANAGE',
+  'SITE_STATUS',
 ]
 
 const overrides = ref<SitePermissionOverride[]>([])

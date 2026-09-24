@@ -1,5 +1,6 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { HttpError, useAuth } from './useAuth'
+import type { PageResponse } from './usePurchaseRequests'
 
 export type PlanCode = 'BASIC' | 'PROFISSIONAL' | 'ILIMITADO'
 export type CompanyRole = 'ADMIN' | 'MEMBER'
@@ -149,6 +150,14 @@ export function useCompanies() {
     return authFetch(`/api/companies/${companyId}/staff`)
   }
 
+  function listAllCompanies(options: { search?: string; page?: number; size?: number } = {}): Promise<PageResponse<Company>> {
+    const params = new URLSearchParams()
+    if (options.search) params.set('search', options.search)
+    params.set('page', String(options.page ?? 0))
+    params.set('size', String(options.size ?? 20))
+    return authFetch(`/api/admin/companies?${params.toString()}`)
+  }
+
   return {
     getOnboardingStatus,
     listMyCompanies,
@@ -160,5 +169,6 @@ export function useCompanies() {
     getLogoBlob,
     addStaffMember,
     listStaff,
+    listAllCompanies,
   }
 }

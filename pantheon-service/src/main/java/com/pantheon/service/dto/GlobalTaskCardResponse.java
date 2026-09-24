@@ -10,13 +10,16 @@ import java.util.UUID;
 
 public record GlobalTaskCardResponse(
         UUID id, UUID constructionSiteId, String siteName, String siteColorHex, UUID columnId, String title,
-        String description, LocalDate dueDate, int sortOrder, List<UUID> labelIds, UUID createdBy, Instant createdAt,
-        Instant updatedAt) {
+        String description, LocalDate dueDate, int sortOrder, List<UUID> labelIds, List<UUID> assigneeIds,
+        long commentCount, long attachmentCount, UUID createdBy, Instant createdAt, Instant updatedAt) {
 
-    public static GlobalTaskCardResponse from(TaskCard card, ConstructionSite site, List<UUID> labelIds) {
+    public static GlobalTaskCardResponse from(
+            TaskCard card, ConstructionSite site, List<UUID> labelIds, List<UUID> assigneeIds, long commentCount,
+            long attachmentCount) {
         return new GlobalTaskCardResponse(
                 card.getId(), card.getConstructionSiteId(), site.getName(), GlobalTaskBoardService.colorFor(site.getId()),
                 card.getColumnId(), card.getTitle(), card.getDescription(), card.getDueDate(), card.getSortOrder(),
-                labelIds, card.getCreatedBy(), card.getCreatedAt(), card.getUpdatedAt());
+                labelIds, assigneeIds, commentCount, attachmentCount, card.getCreatedBy(), card.getCreatedAt(),
+                card.getUpdatedAt());
     }
 }

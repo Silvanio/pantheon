@@ -88,8 +88,13 @@ async function load() {
     site.value = siteResult
     isCompanyAdmin.value = memberships.some((m) => m.companyId === site.value?.companyId && m.role === 'ADMIN')
     myPermissions.value = permissions
+    const requestedTab = route.query.tab as Tab | undefined
     const firstVisible = TAB_ORDER.find(isTabVisible)
-    if (firstVisible) activeTab.value = firstVisible
+    if (requestedTab && TAB_ORDER.includes(requestedTab) && isTabVisible(requestedTab)) {
+      activeTab.value = requestedTab
+    } else if (firstVisible) {
+      activeTab.value = firstVisible
+    }
     if (isTabVisible('purchaseRequests')) loadPendingPurchaseRequestCount()
   } finally {
     loading.value = false

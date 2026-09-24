@@ -38,7 +38,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         AppUser user = userService.registerWithPassword(request.email(), request.password(), request.displayName());
-        String token = jwtService.issueToken(user.getId(), user.getEmail());
+        String token = jwtService.issueToken(user.getId(), user.getEmail(), user.isSuperAdmin());
         return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponse(token));
     }
 
@@ -48,7 +48,8 @@ public class AuthController {
             var authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.email(), request.password()));
             AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
-            String token = jwtService.issueToken(principal.getUser().getId(), principal.getUsername());
+            String token = jwtService.issueToken(
+                    principal.getUser().getId(), principal.getUsername(), principal.getUser().isSuperAdmin());
             return ResponseEntity.ok(new AuthResponse(token));
         } catch (AuthenticationException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

@@ -14,12 +14,14 @@ import { useMaterialDeliveries, type Material } from '../composables/useMaterial
 import { useSitePermissions, type AccessLevel } from '../composables/useSitePermissions'
 import { useSiteMembers, type ConstructionFunction } from '../composables/useSiteMembers'
 import { useOrcamentos, type Orcamento } from '../composables/useOrcamentos'
+import { useConstructionSites } from '../composables/useConstructionSites'
 import type { FornecedorInput } from '../composables/useFornecedores'
 import FornecedorPicker from '../components/FornecedorPicker.vue'
 import AppHeader from '../components/AppHeader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import PurchaseRequestComparisonTable from '../components/PurchaseRequestComparisonTable.vue'
+import SiteBreadcrumb from '../components/SiteBreadcrumb.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,8 +48,10 @@ const { listMaterials, markDelivered, markChecked } = useMaterialDeliveries()
 const { getMyPermissions } = useSitePermissions()
 const { getMyFunction, listMembers } = useSiteMembers()
 const { getOrcamento } = useOrcamentos()
+const { getSite } = useConstructionSites()
 
 const purchaseRequestId = route.params.id as string
+const siteName = ref<string | null>(null)
 const detail = ref<PurchaseRequestDetail | null>(null)
 const comparison = ref<PurchaseRequestComparison | null>(null)
 const materials = ref<Material[]>([])
@@ -179,6 +183,7 @@ async function loadDetail() {
   const [permissions, fn] = await Promise.all([getMyPermissions(siteId), getMyFunction(siteId)])
   myAccessLevel.value = permissions.PURCHASE_REQUEST
   myFunction.value = fn
+  getSite(siteId).then((s) => (siteName.value = s.name)).catch(() => {})
 }
 
 async function loadComparison() {
@@ -391,8 +396,9 @@ async function onDelete() {
   deleteError.value = ''
   deleting.value = true
   try {
+    const siteId = detail.value?.purchaseRequest.constructionSiteId
     await deletePurchaseRequest(purchaseRequestId)
-    router.back()
+    router.push({ path: siteId ? `/sites/${siteId}` : '/', query: siteId ? { tab: 'purchaseRequests' } : undefined })
   } catch {
     deleteError.value = t('purchaseRequests.deleteError')
     deleting.value = false
@@ -489,13 +495,13 @@ onMounted(load)
     <AppSidebar />
     <div class="min-w-0 flex-1">
     <AppHeader>
-      <template #left>
-        <button type="button" class="btn-ghost -ml-2" @click="router.back()">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
-          </svg>
-          {{ t('purchaseRequests.backToList') }}
-        </button>
+      <template v-if="detail" #left>
+        <SiteBreadcrumb
+          :site-id="detail.purchaseRequest.constructionSiteId"
+          :site-name="siteName"
+          tab="purchaseRequests"
+          :label="t('purchaseRequests.title')"
+        />
       </template>
     </AppHeader>
 
@@ -674,7 +680,7 @@ onMounted(load)
             <thead class="sticky top-0 bg-white dark:bg-steel-800">
               <tr class="border-b border-steel-200 text-left text-xs uppercase tracking-wide text-steel-500 dark:border-steel-700 dark:text-steel-400">
                 <th class="w-8 py-2 pl-3">
-                  <input type="checkbox" :checked="allSelected" class="h-4 w-4" @change="toggleSelectAll" />
+                  <input type="checkbox" :checked="allSelected" class="field-checkbox" @change="toggleSelectAll" />
                 </th>
                 <th class="py-2 pr-3 font-medium">{{ t('purchaseRequests.table.product') }}</th>
                 <th class="py-2 pr-3 font-medium">{{ t('purchaseRequests.table.quantity') }}</th>
@@ -691,7 +697,7 @@ onMounted(load)
                 :class="selectedIds.has(item.id) ? 'bg-blueprint-50 dark:bg-blueprint-900/20' : ''"
               >
                 <td class="py-1.5 pl-3">
-                  <input type="checkbox" :checked="selectedIds.has(item.id)" class="h-4 w-4" @change="toggleSelection(item.id)" />
+                  <input type="checkbox" :checked="selectedIds.has(item.id)" class="field-checkbox" @change="toggleSelection(item.id)" />
                 </td>
                 <td class="max-w-xs truncate py-1.5 pr-3">
                   <span class="font-medium text-steel-800 dark:text-steel-50">{{ item.name }}</span>

@@ -11,12 +11,13 @@ const { t } = useI18n()
 const router = useRouter()
 const { listReports, createReport, deleteReport } = useDailyReports()
 
-const PAGE_SIZE = 20
+const PAGE_SIZE_OPTIONS = [1, 5, 10] as const
 
 const reports = ref<DailyReport[]>([])
 const totalPages = ref(0)
 const totalElements = ref(0)
 const page = ref(0)
+const pageSize = ref<number>(10)
 const loading = ref(false)
 const showForm = ref(false)
 const submitting = ref(false)
@@ -24,6 +25,7 @@ const errorMessage = ref('')
 const reportDate = ref('')
 
 const deletingId = ref<string | null>(null)
+const confirmingDeleteId = ref<string | null>(null)
 const deleteError = ref('')
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR')
@@ -34,7 +36,7 @@ function formatDate(value: string): string {
 async function load() {
   loading.value = true
   try {
-    const result = await listReports(props.siteId, { page: page.value, size: PAGE_SIZE })
+    const result = await listReports(props.siteId, { page: page.value, size: pageSize.value })
     reports.value = result.content
     totalPages.value = result.totalPages
     totalElements.value = result.totalElements
@@ -46,6 +48,11 @@ async function load() {
 function goToPage(target: number) {
   if (target < 0 || target >= totalPages.value) return
   page.value = target
+  load()
+}
+
+function onPageSizeChange() {
+  page.value = 0
   load()
 }
 
@@ -66,7 +73,6 @@ async function onSubmit() {
 }
 
 async function onDelete(reportId: string) {
-  if (!window.confirm(t('dailyReports.history.deleteConfirm'))) return
   deleteError.value = ''
   deletingId.value = reportId
   try {
@@ -76,6 +82,7 @@ async function onDelete(reportId: string) {
     deleteError.value = t('dailyReports.history.deleteError')
   } finally {
     deletingId.value = null
+    confirmingDeleteId.value = null
   }
 }
 
@@ -145,7 +152,7 @@ onMounted(load)
                 :disabled="deletingId === report.id"
                 :title="t('dailyReports.history.deleteButton')"
                 class="inline-flex h-7 w-7 items-center justify-center rounded-md text-safety-600 transition hover:bg-safety-50 dark:text-safety-500 dark:hover:bg-safety-900/30"
-                @click="onDelete(report.id)"
+                @click="confirmingDeleteId = report.id"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16zM10 11v6M14 11v6" />
@@ -157,20 +164,51 @@ onMounted(load)
       </table>
     </div>
 
-    <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
-      <p class="text-xs text-steel-500 dark:text-steel-400">
-        {{ t('dailyReports.history.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
-      </p>
-      <div class="flex gap-2">
-        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
-          {{ t('dailyReports.history.pagination.previous') }}
-        </button>
-        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
-          {{ t('dailyReports.history.pagination.next') }}
-        </button>
+    <div v-if="!loading && reports.length > 0" class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-steel-500 dark:text-steel-400">{{ t('common.pagination.pageSizeLabel') }}</label>
+        <select v-model.number="pageSize" class="field-input w-auto py-1 text-xs" @change="onPageSizeChange">
+          <option v-for="size in PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+        </select>
+      </div>
+      <div v-if="totalPages > 1" class="flex items-center gap-3">
+        <p class="text-xs text-steel-500 dark:text-steel-400">
+          {{ t('dailyReports.history.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
+        </p>
+        <div class="flex gap-2">
+          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
+            {{ t('dailyReports.history.pagination.previous') }}
+          </button>
+          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
+            {{ t('dailyReports.history.pagination.next') }}
+          </button>
+        </div>
       </div>
     </div>
 
     <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
+
+    <div
+      v-if="confirmingDeleteId"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+      @click.self="confirmingDeleteId = null"
+    >
+      <div class="modal-panel card-pad w-full max-w-sm">
+        <p class="mb-4 text-sm text-steel-600 dark:text-steel-300">{{ t('dailyReports.history.deleteConfirm') }}</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" @click="confirmingDeleteId = null">
+            {{ t('dailyReports.history.form.cancel') }}
+          </button>
+          <button
+            type="button"
+            :disabled="deletingId === confirmingDeleteId"
+            class="btn-danger"
+            @click="confirmingDeleteId && onDelete(confirmingDeleteId)"
+          >
+            {{ t('dailyReports.history.deleteButton') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

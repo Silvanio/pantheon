@@ -18,13 +18,14 @@ const router = useRouter()
 const { listPurchaseRequests, createPurchaseRequest } = usePurchaseRequests()
 const { listMembers } = useSiteMembers()
 
-const PAGE_SIZE = 20
+const PAGE_SIZE_OPTIONS = [1, 5, 10] as const
 const STATUSES: PurchaseRequestStatus[] = ['INICIADO', 'ORCADO', 'CONFERIDO', 'CONCLUIDO']
 
 const purchaseRequests = ref<PurchaseRequest[]>([])
 const totalPages = ref(0)
 const totalElements = ref(0)
 const page = ref(0)
+const pageSize = ref<number>(10)
 const loading = ref(false)
 
 const showFilterPanel = ref(false)
@@ -46,7 +47,7 @@ async function load() {
       date: dateFilter.value || undefined,
       status: statusFilter.value || undefined,
       page: page.value,
-      size: PAGE_SIZE,
+      size: pageSize.value,
     })
     purchaseRequests.value = result.content
     totalPages.value = result.totalPages
@@ -105,6 +106,11 @@ function clearFilters() {
 function goToPage(target: number) {
   if (target < 0 || target >= totalPages.value) return
   page.value = target
+  load()
+}
+
+function onPageSizeChange() {
+  page.value = 0
   load()
 }
 
@@ -261,17 +267,25 @@ onMounted(() => {
         </table>
       </div>
 
-      <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
-        <p class="text-xs text-steel-500 dark:text-steel-400">
-          {{ t('purchaseRequests.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
-        </p>
-        <div class="flex gap-2">
-          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
-            {{ t('purchaseRequests.pagination.previous') }}
-          </button>
-          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
-            {{ t('purchaseRequests.pagination.next') }}
-          </button>
+      <div class="flex items-center justify-between gap-3 border-t border-steel-200 pt-4 dark:border-steel-700">
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-steel-500 dark:text-steel-400">{{ t('common.pagination.pageSizeLabel') }}</label>
+          <select v-model.number="pageSize" class="field-input w-auto py-1 text-xs" @change="onPageSizeChange">
+            <option v-for="size in PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </div>
+        <div v-if="totalPages > 1" class="flex items-center gap-3">
+          <p class="text-xs text-steel-500 dark:text-steel-400">
+            {{ t('purchaseRequests.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
+          </p>
+          <div class="flex gap-2">
+            <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
+              {{ t('purchaseRequests.pagination.previous') }}
+            </button>
+            <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
+              {{ t('purchaseRequests.pagination.next') }}
+            </button>
+          </div>
         </div>
       </div>
     </template>

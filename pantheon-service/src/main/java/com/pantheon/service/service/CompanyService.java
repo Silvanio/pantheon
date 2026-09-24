@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +49,7 @@ public class CompanyService {
     private final MembershipInvitationIssuer invitationIssuer;
     private final SiteMembershipRepository siteMembershipRepository;
     private final TaskLabelRepository taskLabelRepository;
+    private final PlatformAdminService platformAdminService;
 
     public CompanyService(
             CompanyRepository companyRepository,
@@ -55,7 +58,8 @@ public class CompanyService {
             MembershipInvitationRepository invitationRepository,
             MembershipInvitationIssuer invitationIssuer,
             SiteMembershipRepository siteMembershipRepository,
-            TaskLabelRepository taskLabelRepository) {
+            TaskLabelRepository taskLabelRepository,
+            PlatformAdminService platformAdminService) {
         this.companyRepository = companyRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
@@ -63,6 +67,7 @@ public class CompanyService {
         this.invitationIssuer = invitationIssuer;
         this.siteMembershipRepository = siteMembershipRepository;
         this.taskLabelRepository = taskLabelRepository;
+        this.platformAdminService = platformAdminService;
     }
 
     @Transactional
@@ -179,7 +184,19 @@ public class CompanyService {
         return getOnboardingStatus(userId).companies();
     }
 
+    /** System-wide, paginated, optionally name-filtered company listing — superadmin only. */
+    public Page<Company> listAllCompanies(UUID actingUserId, String search, Pageable pageable) {
+        platformAdminService.requireSuperAdmin(actingUserId);
+        if (search != null && !search.isBlank()) {
+            return companyRepository.findByNameContainingIgnoreCase(search.trim(), pageable);
+        }
+        return companyRepository.findAll(pageable);
+    }
+
     private void requireAdmin(UUID companyId, UUID userId) {
+        if (platformAdminService.isSuperAdmin(userId)) {
+            return;
+        }
         CompanyMembership membership = membershipRepository
                 .findByCompanyIdAndUserId(companyId, userId)
                 .filter(CompanyMembership::isActive)
@@ -190,6 +207,9 @@ public class CompanyService {
     }
 
     private void requireMembership(UUID companyId, UUID userId) {
+        if (platformAdminService.isSuperAdmin(userId)) {
+            return;
+        }
         membershipRepository
                 .findByCompanyIdAndUserId(companyId, userId)
                 .filter(CompanyMembership::isActive)

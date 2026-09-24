@@ -230,7 +230,7 @@ watch([rows, visibleMonth], recomputeLines, { flush: 'post' })
             <input
               v-else-if="row.kind === 'task' && canManage"
               type="checkbox"
-              class="h-3.5 w-3.5 shrink-0 rounded border-steel-300"
+              class="field-checkbox h-3.5 w-3.5"
               :checked="row.done"
               @change="emit('toggle-done', row.id, ($event.target as HTMLInputElement).checked)"
             />

@@ -13,8 +13,11 @@ import {
 } from '../composables/useDailyReports'
 import { useEquipment, type Equipment } from '../composables/useEquipment'
 import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
+import { useConstructionSites } from '../composables/useConstructionSites'
 import AppHeader from '../components/AppHeader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
+import SiteBreadcrumb from '../components/SiteBreadcrumb.vue'
+import TimeClockPicker from '../components/TimeClockPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,17 +44,21 @@ const {
 } = useDailyReports()
 const { listEquipment } = useEquipment()
 const { listMembers } = useSiteMembers()
+const { getSite } = useConstructionSites()
 
 const reportId = route.params.id as string
 const detail = ref<DailyReportDetail | null>(null)
 const equipmentCatalog = ref<Equipment[]>([])
 const siteMembers = ref<SiteMember[]>([])
+const siteName = ref<string | null>(null)
 const loading = ref(false)
 const loadError = ref('')
 
 const isDraft = computed(() => detail.value?.report.status === 'DRAFT')
 
 // core section
+const WEATHER_OPTIONS = ['SUNNY', 'PARTLY_CLOUDY', 'CLOUDY', 'RAINY', 'STORM'] as const
+
 const coreErrorMessage = ref('')
 const coreSaving = ref(false)
 const weatherCondition = ref('')
@@ -130,6 +137,7 @@ async function load() {
     const siteId = detail.value.report.constructionSiteId
     equipmentCatalog.value = (await listEquipment(siteId, { size: 200 })).content
     siteMembers.value = await listMembers(siteId)
+    getSite(siteId).then((s) => (siteName.value = s.name)).catch(() => {})
 
     media.value = await listMedia(reportId)
     attachments.value = await listAttachments(reportId)
@@ -343,8 +351,9 @@ async function onDelete() {
   deleteError.value = ''
   deleting.value = true
   try {
+    const siteId = detail.value?.report.constructionSiteId
     await deleteReport(reportId)
-    router.back()
+    router.push({ path: siteId ? `/sites/${siteId}` : '/', query: siteId ? { tab: 'dailyReport' } : undefined })
   } catch {
     deleteError.value = t('dailyReports.detail.deleteError')
     deleting.value = false
@@ -364,13 +373,13 @@ onMounted(load)
     <AppSidebar />
     <div class="min-w-0 flex-1">
     <AppHeader>
-      <template #left>
-        <button type="button" class="btn-ghost -ml-2" @click="router.back()">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
-          </svg>
-          {{ t('dailyReports.history.back') }}
-        </button>
+      <template v-if="detail" #left>
+        <SiteBreadcrumb
+          :site-id="detail.report.constructionSiteId"
+          :site-name="siteName"
+          tab="dailyReport"
+          :label="t('dailyReports.history.title')"
+        />
       </template>
     </AppHeader>
 
@@ -425,24 +434,39 @@ onMounted(load)
       <section class="card card-pad">
         <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.core.title') }}</h2>
         <template v-if="isDraft">
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="flex flex-wrap items-start gap-x-6 gap-y-3">
             <div>
-              <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.weatherCondition') }}</label>
-              <input v-model="weatherCondition" type="text" :placeholder="t('dailyReports.core.weatherConditionPlaceholder')" class="field-input" />
+              <label class="mb-1.5 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.weatherCondition') }}</label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="option in WEATHER_OPTIONS"
+                  :key="option"
+                  type="button"
+                  class="rounded-lg border px-3 py-1.5 text-sm font-medium transition"
+                  :class="
+                    weatherCondition === option
+                      ? 'border-blueprint-600 bg-blueprint-600 text-white'
+                      : 'border-steel-300 text-steel-600 hover:bg-steel-50 dark:border-steel-700 dark:text-steel-300 dark:hover:bg-steel-800'
+                  "
+                  @click="weatherCondition = weatherCondition === option ? '' : option"
+                >
+                  {{ t(`dailyReports.core.weatherOptions.${option}`) }}
+                </button>
+              </div>
             </div>
-            <div class="flex items-end">
-              <label class="flex items-center gap-2 text-sm text-steel-600 dark:text-steel-300">
-                <input v-model="weatherBlockedTasks" type="checkbox" />
-                {{ t('dailyReports.core.weatherBlockedTasks') }}
-              </label>
-            </div>
+            <label class="flex items-center gap-2 self-center text-sm text-steel-600 dark:text-steel-300">
+              <input v-model="weatherBlockedTasks" type="checkbox" class="field-checkbox shrink-0" />
+              {{ t('dailyReports.core.weatherBlockedTasks') }}
+            </label>
+          </div>
+          <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursStart') }}</label>
-              <input v-model="workHoursStart" type="time" class="field-input" />
+              <TimeClockPicker v-model="workHoursStart" />
             </div>
             <div>
               <label class="mb-1 block text-sm font-medium text-steel-600 dark:text-steel-300">{{ t('dailyReports.core.workHoursEnd') }}</label>
-              <input v-model="workHoursEnd" type="time" class="field-input" />
+              <TimeClockPicker v-model="workHoursEnd" />
             </div>
           </div>
           <div class="mt-3">

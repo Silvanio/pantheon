@@ -34,6 +34,7 @@ public class ConstructionSiteService {
     private final PlanService planService;
     private final SiteAccessService siteAccessService;
     private final ScheduleService scheduleService;
+    private final PlatformAdminService platformAdminService;
 
     public ConstructionSiteService(
             ConstructionSiteRepository siteRepository,
@@ -42,7 +43,8 @@ public class ConstructionSiteService {
             CompanyRepository companyRepository,
             PlanService planService,
             SiteAccessService siteAccessService,
-            ScheduleService scheduleService) {
+            ScheduleService scheduleService,
+            PlatformAdminService platformAdminService) {
         this.siteRepository = siteRepository;
         this.membershipRepository = membershipRepository;
         this.siteMembershipRepository = siteMembershipRepository;
@@ -50,6 +52,7 @@ public class ConstructionSiteService {
         this.planService = planService;
         this.siteAccessService = siteAccessService;
         this.scheduleService = scheduleService;
+        this.platformAdminService = platformAdminService;
     }
 
     @Transactional
@@ -139,6 +142,9 @@ public class ConstructionSiteService {
     }
 
     private void requireAdmin(UUID companyId, UUID userId) {
+        if (platformAdminService.isSuperAdmin(userId)) {
+            return;
+        }
         CompanyMembership membership = membershipRepository
                 .findByCompanyIdAndUserId(companyId, userId)
                 .filter(CompanyMembership::isActive)
@@ -149,6 +155,9 @@ public class ConstructionSiteService {
     }
 
     private void requireMembership(UUID companyId, UUID userId) {
+        if (platformAdminService.isSuperAdmin(userId)) {
+            return;
+        }
         membershipRepository
                 .findByCompanyIdAndUserId(companyId, userId)
                 .filter(CompanyMembership::isActive)

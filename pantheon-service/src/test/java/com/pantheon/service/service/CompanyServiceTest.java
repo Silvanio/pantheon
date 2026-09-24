@@ -3,7 +3,9 @@ package com.pantheon.service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.entity.AppUser;
@@ -16,6 +18,7 @@ import com.pantheon.service.entity.MembershipType;
 import com.pantheon.service.exception.MemberAlreadyActiveException;
 import com.pantheon.service.exception.NotCompanyAdminException;
 import com.pantheon.service.exception.NotCompanyMemberException;
+import com.pantheon.service.exception.NotSuperAdminException;
 import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.CompanyRepository;
@@ -31,6 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class CompanyServiceTest {
@@ -56,17 +62,21 @@ class CompanyServiceTest {
     @Mock
     private TaskLabelRepository taskLabelRepository;
 
+    @Mock
+    private PlatformAdminService platformAdminService;
+
     private CompanyService service;
 
     @BeforeEach
     void setUp() {
         service = new CompanyService(
                 companyRepository, membershipRepository, userRepository, invitationRepository, invitationIssuer,
-                siteMembershipRepository, taskLabelRepository);
+                siteMembershipRepository, taskLabelRepository, platformAdminService);
         lenient().when(companyRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(taskLabelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(siteMembershipRepository.findByUserId(any())).thenReturn(List.of());
+        lenient().when(platformAdminService.isSuperAdmin(any())).thenReturn(false);
     }
 
     @Test
@@ -201,5 +211,48 @@ class CompanyServiceTest {
         when(membershipRepository.findByCompanyIdAndUserId(companyId, outsiderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.listStaff(companyId, outsiderId)).isInstanceOf(NotCompanyMemberException.class);
+    }
+
+    @Test
+    void superAdminCanListStaffWithoutAnyMembership() {
+        UUID companyId = UUID.randomUUID();
+        UUID superAdminId = UUID.randomUUID();
+        when(platformAdminService.isSuperAdmin(superAdminId)).thenReturn(true);
+        when(membershipRepository.findByCompanyId(companyId)).thenReturn(List.of());
+
+        assertThat(service.listStaff(companyId, superAdminId)).isEmpty();
+    }
+
+    @Test
+    void listAllCompaniesRequiresSuperAdmin() {
+        UUID nonAdminId = UUID.randomUUID();
+        doThrow(new NotSuperAdminException(nonAdminId)).when(platformAdminService).requireSuperAdmin(nonAdminId);
+
+        assertThatThrownBy(() -> service.listAllCompanies(nonAdminId, null, PageRequest.of(0, 20)))
+                .isInstanceOf(NotSuperAdminException.class);
+    }
+
+    @Test
+    void listAllCompaniesReturnsAllCompaniesForSuperAdmin() {
+        UUID superAdminId = UUID.randomUUID();
+        Company company = new Company(UUID.randomUUID(), "Construtora", UUID.randomUUID(), Instant.now());
+        when(companyRepository.findAll(PageRequest.of(0, 20))).thenReturn(new PageImpl<>(List.of(company)));
+
+        Page<Company> result = service.listAllCompanies(superAdminId, null, PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(company);
+        verify(platformAdminService).requireSuperAdmin(superAdminId);
+    }
+
+    @Test
+    void listAllCompaniesFiltersByNameWhenSearchProvided() {
+        UUID superAdminId = UUID.randomUUID();
+        Company company = new Company(UUID.randomUUID(), "Construtora ABC", UUID.randomUUID(), Instant.now());
+        when(companyRepository.findByNameContainingIgnoreCase("ABC", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(company)));
+
+        Page<Company> result = service.listAllCompanies(superAdminId, "ABC", PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(company);
     }
 }

@@ -2,6 +2,8 @@ package com.pantheon.service.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.entity.CompanyMembership;
@@ -35,6 +37,9 @@ class SiteAccessServiceTest {
     @Mock
     private SiteMembershipRepository siteMembershipRepository;
 
+    @Mock
+    private PlatformAdminService platformAdminService;
+
     private SiteAccessService service;
 
     private UUID companyId;
@@ -43,12 +48,14 @@ class SiteAccessServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SiteAccessService(siteRepository, companyMembershipRepository, siteMembershipRepository);
+        service = new SiteAccessService(
+                siteRepository, companyMembershipRepository, siteMembershipRepository, platformAdminService);
         companyId = UUID.randomUUID();
         siteId = UUID.randomUUID();
         site = new ConstructionSite(
                 siteId, companyId, "Obra Centro", "Endereco", LocalDate.now(), null, UUID.randomUUID(), Instant.now());
         when(siteRepository.findById(siteId)).thenReturn(Optional.of(site));
+        lenient().when(platformAdminService.isSuperAdmin(any())).thenReturn(false);
     }
 
     @Test
@@ -89,6 +96,17 @@ class SiteAccessServiceTest {
                 .thenReturn(Optional.of(stillInvited));
 
         assertThatThrownBy(() -> service.requireAccess(siteId, invitedUserId)).isInstanceOf(NotSiteMemberException.class);
+    }
+
+    @Test
+    void superAdminAlwaysHasAccessWithNoSiteMembership() {
+        UUID superAdminId = UUID.randomUUID();
+        when(platformAdminService.isSuperAdmin(superAdminId)).thenReturn(true);
+
+        SiteAccessContext access = service.requireAccess(siteId, superAdminId);
+
+        assertThat(access.companyStaff()).isTrue();
+        assertThat(access.siteMembership()).isNull();
     }
 
     @Test

@@ -1,10 +1,35 @@
 {
+  "common": {
+    "pagination": {
+      "pageSizeLabel": "Mostrar"
+    },
+    "breadcrumb": {
+      "list": "Lista de {label}"
+    }
+  },
+  "timeClockPicker": {
+    "placeholder": "Selecionar horário",
+    "confirm": "OK"
+  },
   "appSidebar": {
     "home": "Pantheon",
     "myObras": "Minhas obras",
     "companySettings": "Configurações da empresa",
     "logout": "Sair",
     "profile": "Meu perfil"
+  },
+  "admin": {
+    "companies": {
+      "title": "Painel administrativo",
+      "subtitle": "Selecione uma empresa para ver suas obras e configurações.",
+      "selectCompany": "Selecionar empresa",
+      "searchPlaceholder": "Buscar empresa... (mín. 3 caracteres)",
+      "empty": "Nenhuma empresa encontrada.",
+      "selectHint": "Selecione uma empresa para ver suas obras.",
+      "noSites": "Esta empresa ainda não tem obras cadastradas.",
+      "sitesError": "Não foi possível carregar as obras desta empresa.",
+      "settingsButton": "Configurações"
+    }
   },
   "company": {
     "creation": {
@@ -360,7 +385,11 @@
     "back": "Voltar ao painel",
     "title": "Quadro global de Tasks",
     "subtitle": "Todas as tasks de todas as obras da empresa, em um só quadro.",
-    "noColumns": "Nenhuma coluna configurada ainda."
+    "noColumns": "Nenhuma coluna configurada ainda.",
+    "allSites": "Todas as obras",
+    "searchSitePlaceholder": "Buscar obra... (mín. 3 caracteres)",
+    "noSitesFound": "Nenhuma obra encontrada.",
+    "clearFilter": "Limpar filtro"
   },
   "equipment": {
     "title": "Equipamentos",
@@ -463,7 +492,13 @@
     "core": {
       "title": "Clima, horário e comentários",
       "weatherCondition": "Condição climática",
-      "weatherConditionPlaceholder": "Ex: Ensolarado, Chuvoso",
+      "weatherOptions": {
+        "SUNNY": "Ensolarado",
+        "PARTLY_CLOUDY": "Parcialmente nublado",
+        "CLOUDY": "Nublado",
+        "RAINY": "Chuvoso",
+        "STORM": "Tempestade"
+      },
       "weatherBlockedTasks": "O clima impediu a execução de tarefas planejadas",
       "workHoursStart": "Início do expediente",
       "workHoursEnd": "Fim do expediente",

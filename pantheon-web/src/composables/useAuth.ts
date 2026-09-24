@@ -31,21 +31,25 @@ async function postJson(path: string, body: unknown): Promise<AuthResponse> {
   return (await response.json()) as AuthResponse
 }
 
-/** Decodes the JWT payload's `email` claim for display purposes only — never trust this for authorization. */
-function decodeEmail(jwt: string | null): string | null {
-  if (!jwt) return null
+/**
+ * Decodes the JWT payload for display/routing purposes only — never trust this for
+ * authorization. Every server-side check re-reads the real flag from the database.
+ */
+function decodeClaims(jwt: string | null): { email?: string; superAdmin?: boolean } {
+  if (!jwt) return {}
   try {
     const payload = jwt.split('.')[1]
     const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
-    return (JSON.parse(json) as { email?: string }).email ?? null
+    return JSON.parse(json) as { email?: string; superAdmin?: boolean }
   } catch {
-    return null
+    return {}
   }
 }
 
 export function useAuth() {
   const isAuthenticated = computed(() => token.value !== null)
-  const userEmail = computed(() => decodeEmail(token.value))
+  const userEmail = computed(() => decodeClaims(token.value).email ?? null)
+  const isSuperAdmin = computed(() => decodeClaims(token.value).superAdmin === true)
 
   function setToken(newToken: string) {
     token.value = newToken
@@ -71,5 +75,5 @@ export function useAuth() {
     return `${SERVICE_BASE_URL}/oauth2/authorization/google`
   }
 
-  return { token, isAuthenticated, userEmail, login, register, logout, setToken, googleLoginUrl }
+  return { token, isAuthenticated, userEmail, isSuperAdmin, login, register, logout, setToken, googleLoginUrl }
 }

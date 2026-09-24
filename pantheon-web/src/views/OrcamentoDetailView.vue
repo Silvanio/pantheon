@@ -8,17 +8,21 @@ import {
   type OrcamentoLineItem,
   type OrcamentoLineItemInput,
 } from '../composables/useOrcamentos'
+import { useConstructionSites } from '../composables/useConstructionSites'
 import AppHeader from '../components/AppHeader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import SiteBreadcrumb from '../components/SiteBreadcrumb.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { getOrcamento, addLineItem, updateLineItem, removeLineItem, deleteOrcamento } = useOrcamentos()
+const { getSite } = useConstructionSites()
 
 const orcamentoId = route.params.id as string
 const detail = ref<OrcamentoDetail | null>(null)
+const siteName = ref<string | null>(null)
 const loading = ref(false)
 const loadError = ref('')
 const confirmingDelete = ref(false)
@@ -70,6 +74,7 @@ async function load() {
   try {
     detail.value = await getOrcamento(orcamentoId)
     syncPriceDrafts()
+    getSite(detail.value.orcamento.constructionSiteId).then((s) => (siteName.value = s.name)).catch(() => {})
   } catch {
     loadError.value = t('orcamento.loadError')
   } finally {
@@ -179,8 +184,9 @@ async function onDelete() {
   deleteError.value = ''
   deleting.value = true
   try {
+    const siteId = detail.value?.orcamento.constructionSiteId
     await deleteOrcamento(orcamentoId)
-    router.back()
+    router.push({ path: siteId ? `/sites/${siteId}` : '/', query: siteId ? { tab: 'orcamentos' } : undefined })
   } catch {
     deleteError.value = t('orcamento.deleteError')
     deleting.value = false
@@ -196,13 +202,13 @@ onMounted(load)
     <AppSidebar />
     <div class="min-w-0 flex-1">
     <AppHeader>
-      <template #left>
-        <button type="button" class="btn-ghost -ml-2" @click="router.back()">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
-          </svg>
-          {{ t('orcamento.back') }}
-        </button>
+      <template v-if="detail" #left>
+        <SiteBreadcrumb
+          :site-id="detail.orcamento.constructionSiteId"
+          :site-name="siteName"
+          tab="orcamentos"
+          :label="t('orcamento.title')"
+        />
       </template>
     </AppHeader>
 

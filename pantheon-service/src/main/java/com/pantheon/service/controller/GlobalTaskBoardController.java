@@ -32,9 +32,12 @@ public class GlobalTaskBoardController {
         List<GlobalTaskCardResponse> cards = board.cards().stream()
                 .map(card -> GlobalTaskCardResponse.from(
                         card, board.siteById().get(card.getConstructionSiteId()),
-                        board.labelIdsByCard().getOrDefault(card.getId(), List.of())))
+                        board.labelIdsByCard().getOrDefault(card.getId(), List.of()),
+                        board.assigneeIdsByCard().getOrDefault(card.getId(), List.of()),
+                        board.commentCountByCard().getOrDefault(card.getId(), 0L),
+                        board.attachmentCountByCard().getOrDefault(card.getId(), 0L)))
                 .toList();
         List<TaskLabelResponse> labels = board.labels().stream().map(TaskLabelResponse::from).toList();
-        return ResponseEntity.ok(new GlobalTaskBoardResponse(columns, cards, labels));
+        return ResponseEntity.ok(new GlobalTaskBoardResponse(columns, cards, labels, board.assignees()));
     }
 }

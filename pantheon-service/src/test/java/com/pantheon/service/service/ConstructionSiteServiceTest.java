@@ -51,6 +51,9 @@ class ConstructionSiteServiceTest {
     @Mock
     private ScheduleService scheduleService;
 
+    @Mock
+    private PlatformAdminService platformAdminService;
+
     private ConstructionSiteService service;
 
     private UUID companyId;
@@ -60,10 +63,11 @@ class ConstructionSiteServiceTest {
     void setUp() {
         service = new ConstructionSiteService(
                 siteRepository, membershipRepository, siteMembershipRepository, companyRepository, planService,
-                siteAccessService, scheduleService);
+                siteAccessService, scheduleService, platformAdminService);
         companyId = UUID.randomUUID();
         adminUserId = UUID.randomUUID();
         lenient().when(scheduleService.computeProgress(any())).thenReturn(null);
+        lenient().when(platformAdminService.isSuperAdmin(any())).thenReturn(false);
 
         lenient().when(membershipRepository.findByCompanyIdAndUserId(companyId, adminUserId)).thenReturn(
                 Optional.of(new CompanyMembership(UUID.randomUUID(), companyId, adminUserId, CompanyRole.ADMIN, Instant.now())));

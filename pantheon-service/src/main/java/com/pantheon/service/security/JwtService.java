@@ -33,10 +33,20 @@ public class JwtService {
     }
 
     public String issueToken(UUID userId, String email) {
+        return issueToken(userId, email, false);
+    }
+
+    /**
+     * {@code superAdmin} is embedded purely as a client-side routing hint (like {@code email},
+     * decoded but never trusted for authorization) — every server-side check re-reads the flag
+     * fresh from {@code AppUser} via {@link com.pantheon.service.service.PlatformAdminService}.
+     */
+    public String issueToken(UUID userId, String email, boolean superAdmin) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim("email", email)
+                .claim("superAdmin", superAdmin)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(expiration)))
                 .signWith(key)

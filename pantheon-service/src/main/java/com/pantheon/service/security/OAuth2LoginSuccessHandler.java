@@ -41,7 +41,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         String name = oAuth2User.getAttribute("name");
 
         AppUser user = userService.findOrCreateFromGoogle(googleSubject, email, name != null ? name : email);
-        String token = jwtService.issueToken(user.getId(), user.getEmail());
+        String token = jwtService.issueToken(user.getId(), user.getEmail(), user.isSuperAdmin());
 
         String redirectUrl = UriComponentsBuilder.fromUriString(webOrigin + "/oauth2/callback")
                 .queryParam("token", token)

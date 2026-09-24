@@ -8,12 +8,13 @@ const props = defineProps<{ siteId: string }>()
 const { t } = useI18n()
 const { listEquipment, createEquipment, updateEquipmentStatus } = useEquipment()
 
-const PAGE_SIZE = 20
+const PAGE_SIZE_OPTIONS = [1, 5, 10] as const
 
 const items = ref<Equipment[]>([])
 const totalPages = ref(0)
 const totalElements = ref(0)
 const page = ref(0)
+const pageSize = ref<number>(10)
 const loading = ref(false)
 const showForm = ref(false)
 const submitting = ref(false)
@@ -28,7 +29,7 @@ const statuses: EquipmentStatus[] = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'UNAV
 async function load() {
   loading.value = true
   try {
-    const result = await listEquipment(props.siteId, { page: page.value, size: PAGE_SIZE })
+    const result = await listEquipment(props.siteId, { page: page.value, size: pageSize.value })
     items.value = result.content
     totalPages.value = result.totalPages
     totalElements.value = result.totalElements
@@ -40,6 +41,11 @@ async function load() {
 function goToPage(target: number) {
   if (target < 0 || target >= totalPages.value) return
   page.value = target
+  load()
+}
+
+function onPageSizeChange() {
+  page.value = 0
   load()
 }
 
@@ -118,17 +124,25 @@ onMounted(load)
       </li>
     </ul>
 
-    <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between gap-3 border-t border-steel-200 pt-3 dark:border-steel-700">
-      <p class="text-xs text-steel-500 dark:text-steel-400">
-        {{ t('equipment.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
-      </p>
-      <div class="flex gap-2">
-        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
-          {{ t('equipment.pagination.previous') }}
-        </button>
-        <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
-          {{ t('equipment.pagination.next') }}
-        </button>
+    <div v-if="!loading && items.length > 0" class="mt-4 flex items-center justify-between gap-3 border-t border-steel-200 pt-3 dark:border-steel-700">
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-steel-500 dark:text-steel-400">{{ t('common.pagination.pageSizeLabel') }}</label>
+        <select v-model.number="pageSize" class="field-input w-auto py-1 text-xs" @change="onPageSizeChange">
+          <option v-for="size in PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+        </select>
+      </div>
+      <div v-if="totalPages > 1" class="flex items-center gap-3">
+        <p class="text-xs text-steel-500 dark:text-steel-400">
+          {{ t('equipment.pagination.summary', { page: page + 1, totalPages, totalElements }) }}
+        </p>
+        <div class="flex gap-2">
+          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page === 0" @click="goToPage(page - 1)">
+            {{ t('equipment.pagination.previous') }}
+          </button>
+          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">
+            {{ t('equipment.pagination.next') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

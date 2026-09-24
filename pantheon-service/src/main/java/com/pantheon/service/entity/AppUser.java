@@ -38,6 +38,12 @@ public class AppUser {
     @Column(name = "registration_status")
     private RegistrationStatus registrationStatus;
 
+    /** Platform-wide admin flag, independent of any {@link CompanyMembership}/{@link SiteMembership} —
+     * see {@code SiteAccessService}/{@code CompanyService}'s superadmin bypass. Nullable, read as
+     * {@code false} for every pre-existing row. */
+    @Column(name = "super_admin")
+    private Boolean superAdmin;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -123,6 +129,11 @@ public class AppUser {
 
     public boolean isPendingRegistration() {
         return getRegistrationStatus() == RegistrationStatus.PENDING_REGISTRATION;
+    }
+
+    /** Reads a null column (every pre-existing account) as {@code false}. */
+    public boolean isSuperAdmin() {
+        return Boolean.TRUE.equals(superAdmin);
     }
 
     public Instant getCreatedAt() {

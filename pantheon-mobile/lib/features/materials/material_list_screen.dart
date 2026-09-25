@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart' hide Material;
-import 'package:flutter/material.dart' as flutter show Material;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -140,7 +139,7 @@ class _MaterialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return flutter.Material(
+    return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
       child: Container(

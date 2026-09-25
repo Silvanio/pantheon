@@ -37,6 +37,7 @@ class _TaskBoardScreenState extends ConsumerState<TaskBoardScreen> {
             const Padding(padding: EdgeInsets.all(16), child: Text('Mover para coluna', style: TextStyle(fontWeight: FontWeight.w700))),
             ...board.columns.map(
               (col) => ListTile(
+                leading: const Icon(Icons.view_column_outlined),
                 title: Text(col.name),
                 trailing: col.id == card.columnId ? const Icon(Icons.check, color: AppColors.blueprint600) : null,
                 onTap: () => Navigator.pop(context, col),
@@ -89,11 +90,14 @@ class _TaskBoardScreenState extends ConsumerState<TaskBoardScreen> {
   Widget build(BuildContext context) {
     final board = ref.watch(_boardProvider(widget.siteId));
     return Scaffold(
+      backgroundColor: AppColors.steel50,
       appBar: AppBar(title: const Text('Tasks')),
       body: AsyncValueView(
         value: board,
         data: (b) {
-          if (b.columns.isEmpty) return const EmptyState(message: 'Nenhuma coluna configurada ainda.');
+          if (b.columns.isEmpty) {
+            return const EmptyState(icon: Icons.view_kanban_outlined, message: 'Nenhuma coluna configurada ainda.');
+          }
           return Column(
             children: [
               Padding(
@@ -129,37 +133,30 @@ class _TaskBoardScreenState extends ConsumerState<TaskBoardScreen> {
                           child: Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  '${column.name} (${cards.length})',
-                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                                child: Row(
+                                  children: [
+                                    Text(column.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: AppColors.steel100, borderRadius: BorderRadius.circular(999)),
+                                      child: Text('${cards.length}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5, color: AppColors.steel600)),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              IconButton(icon: const Icon(Icons.add), onPressed: () => _createCard(column.id)),
+                              IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _createCard(column.id)),
                             ],
                           ),
                         ),
                         Expanded(
                           child: cards.isEmpty
-                              ? const Center(child: Text('Nenhum card nesta coluna.', style: TextStyle(color: AppColors.steel500)))
+                              ? const EmptyState(icon: Icons.inbox_outlined, message: 'Nenhum card nesta coluna.')
                               : ListView.separated(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                                   itemCount: cards.length,
-                                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                                  itemBuilder: (context, i) {
-                                    final card = cards[i];
-                                    return Card(
-                                      child: ListTile(
-                                        title: Text(card.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                        subtitle: card.description != null && card.description!.isNotEmpty
-                                            ? Text(card.description!, maxLines: 2, overflow: TextOverflow.ellipsis)
-                                            : null,
-                                        trailing: IconButton(
-                                          icon: const Icon(Icons.swap_horiz, color: AppColors.steel500),
-                                          onPressed: () => _moveCard(card, b),
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                  itemBuilder: (context, i) => _TaskCardTile(card: cards[i], onMove: () => _moveCard(cards[i], b)),
                                 ),
                         ),
                       ],
@@ -170,6 +167,100 @@ class _TaskBoardScreenState extends ConsumerState<TaskBoardScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _TaskCardTile extends StatelessWidget {
+  const _TaskCardTile({required this.card, required this.onMove});
+  final TaskCard card;
+  final VoidCallback onMove;
+
+  bool get _isOverdue {
+    if (card.dueDate == null) return false;
+    final due = DateTime.tryParse(card.dueDate!);
+    if (due == null) return false;
+    final today = DateTime.now();
+    return due.isBefore(DateTime(today.year, today.month, today.day));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.steel200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(card.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              ),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onMove,
+                child: const Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(Icons.swap_horiz, size: 19, color: AppColors.steel500),
+                ),
+              ),
+            ],
+          ),
+          if (card.description != null && card.description!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              card.description!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.steel500),
+            ),
+          ],
+          if (card.dueDate != null || card.commentCount > 0 || card.attachmentCount > 0) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (card.dueDate != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _isOverdue ? AppColors.safety50 : AppColors.steel100,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.event_outlined, size: 11, color: _isOverdue ? AppColors.safety600 : AppColors.steel500),
+                        const SizedBox(width: 3),
+                        Text(
+                          card.dueDate!,
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: _isOverdue ? AppColors.safety600 : AppColors.steel600),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Spacer(),
+                if (card.commentCount > 0) ...[
+                  const Icon(Icons.mode_comment_outlined, size: 13, color: AppColors.steel400),
+                  const SizedBox(width: 3),
+                  Text('${card.commentCount}', style: const TextStyle(fontSize: 11, color: AppColors.steel500)),
+                  const SizedBox(width: 10),
+                ],
+                if (card.attachmentCount > 0) ...[
+                  const Icon(Icons.attach_file, size: 13, color: AppColors.steel400),
+                  const SizedBox(width: 3),
+                  Text('${card.attachmentCount}', style: const TextStyle(fontSize: 11, color: AppColors.steel500)),
+                ],
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

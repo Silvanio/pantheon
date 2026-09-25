@@ -33,6 +33,7 @@ class Orcamento {
     required this.constructionSiteId,
     required this.status,
     required this.createdBy,
+    this.createdByName,
     required this.createdAt,
     required this.fornecedorCnpj,
     required this.fornecedorNome,
@@ -50,6 +51,7 @@ class Orcamento {
         constructionSiteId: json['constructionSiteId'] as String,
         status: json['status'] as String,
         createdBy: json['createdBy'] as String,
+        createdByName: json['createdByName'] as String?,
         createdAt: json['createdAt'] as String,
         fornecedorCnpj: json['fornecedorCnpj'] as String,
         fornecedorNome: json['fornecedorNome'] as String,
@@ -66,6 +68,8 @@ class Orcamento {
   final String constructionSiteId;
   final String status;
   final String createdBy;
+  // Resolved server-side (see OrcamentoResponse.createdByName) — no client-side lookup needed.
+  final String? createdByName;
   final String createdAt;
   final String fornecedorCnpj;
   final String fornecedorNome;

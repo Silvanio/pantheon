@@ -33,6 +33,7 @@ const _entries = [
   _Entry('Diário de Obra', Icons.article_outlined, _dailyReportsRoute, capability: 'DAILY_REPORT'),
   _Entry('Pedido de Compra', Icons.shopping_cart_outlined, _purchaseRequestsRoute, capability: 'PURCHASE_REQUEST'),
   _Entry('Orçamentos', Icons.attach_money, _orcamentosRoute, capability: 'ORCAMENTO_MANAGE'),
+  _Entry('Materiais', Icons.local_shipping_outlined, _materialsRoute, capability: 'ORCAMENTO_MANAGE'),
   _Entry('Tasks', Icons.view_kanban_outlined, _tasksRoute, capability: 'TASKS'),
   _Entry('Equipamentos', Icons.construction_outlined, _equipmentRoute, capability: 'EQUIPMENT'),
   _Entry('Projetos', Icons.folder_outlined, _projectsRoute, capability: 'DOCUMENT_PROJECTS'),
@@ -43,6 +44,7 @@ String _teamRoute(String id) => '/sites/$id/team';
 String _dailyReportsRoute(String id) => '/sites/$id/daily-reports';
 String _purchaseRequestsRoute(String id) => '/sites/$id/purchase-requests';
 String _orcamentosRoute(String id) => '/sites/$id/orcamentos';
+String _materialsRoute(String id) => '/sites/$id/materials';
 String _tasksRoute(String id) => '/sites/$id/tasks';
 String _equipmentRoute(String id) => '/sites/$id/equipment';
 String _projectsRoute(String id) => '/sites/$id/projects';

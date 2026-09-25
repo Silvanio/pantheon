@@ -8,6 +8,7 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/daily_reports/daily_report_detail_screen.dart';
 import '../../features/daily_reports/daily_report_list_screen.dart';
 import '../../features/equipment/equipment_list_screen.dart';
+import '../../features/materials/material_list_screen.dart';
 import '../../features/orcamentos/orcamento_detail_screen.dart';
 import '../../features/orcamentos/orcamento_list_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -84,6 +85,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sites/:id/projects',
         builder: (context, state) => ProjectBrowserScreen(siteId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/sites/:id/materials',
+        builder: (context, state) => MaterialListScreen(siteId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/sites/:id/permissions',

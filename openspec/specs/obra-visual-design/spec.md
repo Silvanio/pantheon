@@ -2,9 +2,7 @@
 
 ## Purpose
 Defines Pantheon's shared visual design system for `pantheon-web` — color tokens, typography, and the persistent sidebar navigation shell — and how generated PDFs stay visually consistent with it. Introduced by the 2026 redesign (see the archived `redesign-app-visual-language` change) as the reference every screen and PDF should follow going forward.
-
 ## Requirements
-
 ### Requirement: Shared design tokens
 `pantheon-web` SHALL define its color palette as named Tailwind `@theme` tokens in `style.css` — `blueprint-*` (brand blue, primary actions and links), `steel-*` (neutrals, backgrounds and text, flips with light/dark theme), `ink-*` (the global sidebar's own scale, which SHALL stay dark regardless of the active theme), and `safety-*` (coral, danger/destructive actions) — rather than one-off hex values in component markup, so a future palette change is a token edit, not a per-component search-and-replace. `pantheon-web` SHALL NOT define a custom color scale under a name that collides with one of Tailwind's built-in palette names (e.g. `amber`, `emerald`); status semantics SHALL reuse Tailwind's built-in scales instead.
 
@@ -51,3 +49,11 @@ Defines Pantheon's shared visual design system for `pantheon-web` — color toke
 #### Scenario: PDF generation does not depend on webfont embedding
 - **WHEN** a PDF is generated for a company whose obra names or content include characters outside a narrow font's coverage
 - **THEN** `pantheon-service` still renders successfully, because PDF text uses a standard, always-available font family rather than an embedded webfont
+
+### Requirement: Standard checkbox appearance
+`pantheon-web` SHALL style every native `<input type="checkbox">` with the shared `.field-checkbox` component class (bordered, rounded, `accent-color` set to the brand blueprint color in both light and dark mode, with a focus ring matching `.field-input`), rather than the browser's unstyled default appearance.
+
+#### Scenario: Checkbox uses the shared style in both themes
+- **WHEN** a member views any checkbox in the app (e.g. Pedido de Compra item selection, Diário de Obra's weather-blocked-tasks toggle, a Cronograma task's done toggle) in either light or dark mode
+- **THEN** `pantheon-web` renders it with the `.field-checkbox` class's bordered, rounded, brand-colored appearance instead of the browser's default checkbox
+

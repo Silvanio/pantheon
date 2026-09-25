@@ -1,3 +1,11 @@
+/// Mirrors `pantheon-web`'s `DailyReportDetailView.vue` `onSaveCore` guard: weather condition
+/// and both work-hours fields are mandatory together — a save can't go through with only some of
+/// them filled in. `weatherBlockedTasks` and `comments` aren't part of this rule (optional either
+/// way). Pulled out as a standalone function so it's testable without a widget harness.
+bool dailyReportCoreFieldsComplete({required String weatherCondition, required String workHoursStart, required String workHoursEnd}) {
+  return weatherCondition.isNotEmpty && workHoursStart.isNotEmpty && workHoursEnd.isNotEmpty;
+}
+
 class DailyReport {
   DailyReport({
     required this.id,
@@ -6,6 +14,7 @@ class DailyReport {
     required this.sequenceNo,
     required this.status,
     this.weatherCondition,
+    this.weatherBlockedTasks,
     this.workHoursStart,
     this.workHoursEnd,
     this.comments,
@@ -19,6 +28,7 @@ class DailyReport {
         sequenceNo: json['sequenceNo'] as int,
         status: json['status'] as String,
         weatherCondition: json['weatherCondition'] as String?,
+        weatherBlockedTasks: json['weatherBlockedTasks'] as bool?,
         workHoursStart: json['workHoursStart'] as String?,
         workHoursEnd: json['workHoursEnd'] as String?,
         comments: json['comments'] as String?,
@@ -31,6 +41,7 @@ class DailyReport {
   final int sequenceNo;
   final String status;
   final String? weatherCondition;
+  final bool? weatherBlockedTasks;
   final String? workHoursStart;
   final String? workHoursEnd;
   final String? comments;

@@ -619,10 +619,14 @@ onBeforeUnmount(() => {
               <span
                 v-for="memberId in card.assigneeIds.slice(0, 3)"
                 :key="memberId"
-                class="flex h-5 w-5 items-center justify-center rounded-full border border-white bg-blueprint-500 text-[9px] font-semibold text-white dark:border-steel-900"
-                :title="memberLabel(memberId)"
+                class="group relative flex h-5 w-5 items-center justify-center rounded-full border border-white bg-blueprint-500 text-[9px] font-semibold text-white dark:border-steel-900"
               >
                 {{ memberInitials(memberId) }}
+                <span
+                  class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 dark:bg-ink-950"
+                >
+                  {{ memberLabel(memberId) }}
+                </span>
               </span>
               <span
                 v-if="card.assigneeIds.length > 3"

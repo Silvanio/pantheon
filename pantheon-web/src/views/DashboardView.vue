@@ -327,11 +327,15 @@ watch(companyId, loadSites)
                 <span
                   v-for="(member, index) in membersFor(site.id).slice(0, 3)"
                   :key="member.membershipId"
-                  class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white"
+                  class="group relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white"
                   :style="{ backgroundColor: avatarColor(index), marginLeft: index > 0 ? '-8px' : '0' }"
-                  :title="member.displayName || member.email || ''"
                 >
                   {{ memberInitials(member) }}
+                  <span
+                    class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink-900 px-2 py-1 text-[11px] font-medium normal-case text-white opacity-0 group-hover:opacity-100 dark:bg-ink-950"
+                  >
+                    {{ member.displayName || member.email || '' }}
+                  </span>
                 </span>
                 <span
                   v-if="membersFor(site.id).length > 3"

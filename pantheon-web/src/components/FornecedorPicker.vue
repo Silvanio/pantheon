@@ -7,6 +7,7 @@ import {
   type FornecedorPaymentMethod,
   type FornecedorSuggestion,
 } from '../composables/useFornecedores'
+import { isValidCpfOrCnpj } from '../lib/documentValidation'
 
 const props = defineProps<{ siteId: string }>()
 const emit = defineEmits<{ confirm: [FornecedorInput]; cancel: [] }>()
@@ -57,8 +58,8 @@ function onCnpjInput() {
 }
 
 function selectSuggestion(suggestion: FornecedorSuggestion) {
-  cnpj.value = suggestion.cnpj
-  name.value = suggestion.name
+  cnpj.value = suggestion.cnpj ?? ''
+  name.value = suggestion.name ?? ''
   address.value = suggestion.address ?? ''
   contactName.value = suggestion.contactName ?? ''
   contactPhone.value = suggestion.contactPhone ?? ''
@@ -72,6 +73,10 @@ function onContinue() {
   errorMessage.value = ''
   if (!cnpj.value.trim() || !name.value.trim()) {
     errorMessage.value = t('fornecedor.error')
+    return
+  }
+  if (!isValidCpfOrCnpj(cnpj.value)) {
+    errorMessage.value = t('fornecedor.invalidDocumentError')
     return
   }
   if (paymentMethod.value === 'PIX' && !pixKey.value.trim()) {
@@ -89,22 +94,35 @@ function onContinue() {
   })
 }
 
+function formatPhone(digits: string): string {
+  if (digits.length <= 2) return digits.length ? `(${digits}` : ''
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
+function onContactPhoneInput(event: Event) {
+  const digits = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 11)
+  contactPhone.value = formatPhone(digits)
+}
+
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
 })
 </script>
 
 <template>
-  <div class="rounded-lg border border-blueprint-200 bg-blueprint-50 p-4 dark:border-blueprint-800 dark:bg-blueprint-900/20">
-    <h3 class="mb-1 text-sm font-semibold text-steel-800 dark:text-steel-50">{{ t('fornecedor.title') }}</h3>
+  <div class="modal-panel card-pad">
+    <h3 class="mb-1 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('fornecedor.title') }}</h3>
     <p class="mb-3 text-sm text-steel-500 dark:text-steel-400">{{ t('fornecedor.subtitle') }}</p>
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div class="relative sm:col-span-2">
-        <label class="field-label">{{ t('fornecedor.cnpjLabel') }}</label>
+        <label class="field-label">{{ t('fornecedor.cnpjLabel') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
         <input
           v-model="cnpj"
           type="text"
+          required
           :placeholder="t('fornecedor.cnpjPlaceholder')"
           class="field-input"
           @input="onCnpjInput"
@@ -133,8 +151,8 @@ onBeforeUnmount(() => {
       </div>
 
       <div>
-        <label class="field-label">{{ t('fornecedor.nameLabel') }}</label>
-        <input v-model="name" type="text" class="field-input" />
+        <label class="field-label">{{ t('fornecedor.nameLabel') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
+        <input v-model="name" type="text" required class="field-input" />
       </div>
       <div>
         <label class="field-label">{{ t('fornecedor.addressLabel') }}</label>
@@ -146,7 +164,15 @@ onBeforeUnmount(() => {
       </div>
       <div>
         <label class="field-label">{{ t('fornecedor.contactPhoneLabel') }}</label>
-        <input v-model="contactPhone" type="text" class="field-input" />
+        <input
+          :value="contactPhone"
+          type="text"
+          inputmode="numeric"
+          maxlength="15"
+          placeholder="(00) 00000-0000"
+          class="field-input"
+          @input="onContactPhoneInput"
+        />
       </div>
       <div>
         <label class="field-label">{{ t('fornecedor.paymentMethodLabel') }}</label>
@@ -165,9 +191,9 @@ onBeforeUnmount(() => {
 
     <p v-if="errorMessage" class="mt-3 text-sm text-safety-600 dark:text-safety-500">{{ errorMessage }}</p>
 
-    <div class="mt-4 flex gap-2">
-      <button type="button" class="btn-primary" @click="onContinue">{{ t('fornecedor.continueButton') }}</button>
+    <div class="mt-4 flex justify-end gap-2 border-t border-steel-200 pt-4 dark:border-steel-700">
       <button type="button" class="btn-secondary" @click="emit('cancel')">{{ t('fornecedor.cancelButton') }}</button>
+      <button type="button" class="btn-primary" @click="onContinue">{{ t('fornecedor.continueButton') }}</button>
     </div>
   </div>
 </template>

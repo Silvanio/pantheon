@@ -12,8 +12,10 @@ import java.util.UUID;
 /**
  * A supplier that has quoted an Orçamento, scoped to the owning {@link Company} (not to a single
  * construction site) so it can be reused across every obra of that company. Identified within a
- * company by CNPJ (free text, no checksum validation — same convention as
- * {@link Company#getCnpj()}). Never edited once created; see {@code supplier-registry}'s
+ * company by CPF/CNPJ (free text, no checksum validation server-side — same convention as
+ * {@link Company#getCnpj()} — the frontend validates the format when one is entered), both
+ * optional: without one, {@code FornecedorService.findOrCreate} always creates a fresh record
+ * since there's no reliable dedup key. Never edited once created; see {@code supplier-registry}'s
  * find-or-create requirement.
  */
 @Entity
@@ -26,10 +28,10 @@ public class Fornecedor {
     @Column(name = "company_id", nullable = false)
     private UUID companyId;
 
-    @Column(nullable = false)
+    @Column
     private String cnpj;
 
-    @Column(nullable = false)
+    @Column
     private String name;
 
     @Column

@@ -6,11 +6,15 @@ import com.pantheon.service.entity.Fornecedor;
 import com.pantheon.service.entity.FornecedorPaymentMethod;
 import com.pantheon.service.exception.CnpjPrefixTooShortException;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.InvalidCpfCnpjException;
 import com.pantheon.service.exception.PixKeyRequiredException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.FornecedorRepository;
+import com.pantheon.service.validation.CnpjValidator;
+import com.pantheon.service.validation.CpfValidator;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,10 +40,21 @@ public class FornecedorService {
         this.siteAccessService = siteAccessService;
     }
 
-    /** Reuses an existing Fornecedor for (companyId, cnpj) if present, ignoring any differences in the other fields. */
+    /**
+     * Reuses an existing Fornecedor for (companyId, cnpj) if present, ignoring any differences in
+     * the other fields. The CPF/CNPJ is optional — without one there's no reliable identity key,
+     * so a fresh Fornecedor is always created instead of attempting to find one.
+     */
     @Transactional
     Fornecedor findOrCreate(UUID companyId, UUID actingUserId, FornecedorRequest request) {
-        return fornecedorRepository.findByCompanyIdAndCnpj(companyId, request.cnpj()).orElseGet(() -> {
+        boolean hasDocument = request.cnpj() != null && !request.cnpj().isBlank();
+        if (hasDocument) {
+            requireValidCpfOrCnpj(request.cnpj());
+        }
+        Optional<Fornecedor> existing = hasDocument
+                ? fornecedorRepository.findByCompanyIdAndCnpj(companyId, request.cnpj())
+                : Optional.empty();
+        return existing.orElseGet(() -> {
             boolean isPix = request.paymentMethod() == FornecedorPaymentMethod.PIX;
             if (isPix && (request.pixKey() == null || request.pixKey().isBlank())) {
                 throw new PixKeyRequiredException();
@@ -62,5 +77,21 @@ public class FornecedorService {
 
     private ConstructionSite requireSite(UUID siteId) {
         return siteRepository.findById(siteId).orElseThrow(() -> new ConstructionSiteNotFoundException(siteId));
+    }
+
+    /**
+     * Validates {@code document} as a CPF (11 digits) or CNPJ (14 digits) by its digit count —
+     * any other length, or a checksum mismatch, is rejected.
+     */
+    private void requireValidCpfOrCnpj(String document) {
+        String digits = document.replaceAll("\\D", "");
+        boolean valid = switch (digits.length()) {
+            case 11 -> CpfValidator.isValid(digits);
+            case 14 -> CnpjValidator.isValid(digits);
+            default -> false;
+        };
+        if (!valid) {
+            throw new InvalidCpfCnpjException(document);
+        }
     }
 }

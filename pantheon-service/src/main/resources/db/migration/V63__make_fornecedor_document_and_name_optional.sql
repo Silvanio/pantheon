@@ -1,0 +1,4 @@
+ALTER TABLE fornecedor ALTER COLUMN cnpj DROP NOT NULL;
+ALTER TABLE fornecedor ALTER COLUMN name DROP NOT NULL;
+ALTER TABLE orcamento ALTER COLUMN fornecedor_cnpj DROP NOT NULL;
+ALTER TABLE orcamento ALTER COLUMN fornecedor_nome DROP NOT NULL;

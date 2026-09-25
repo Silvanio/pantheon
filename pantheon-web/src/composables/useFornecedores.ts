@@ -5,8 +5,8 @@ export type FornecedorPaymentMethod = 'CARTAO' | 'BOLETO' | 'PIX' | 'DINHEIRO'
 
 export interface FornecedorSuggestion {
   id: string
-  cnpj: string
-  name: string
+  cnpj: string | null
+  name: string | null
   address: string | null
   contactName: string | null
   contactPhone: string | null
@@ -15,8 +15,8 @@ export interface FornecedorSuggestion {
 }
 
 export interface FornecedorInput {
-  cnpj: string
-  name: string
+  cnpj: string | null
+  name: string | null
   address: string | null
   contactName: string | null
   contactPhone: string | null

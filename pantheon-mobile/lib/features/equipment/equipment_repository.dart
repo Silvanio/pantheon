@@ -24,11 +24,12 @@ class EquipmentRepository {
 
   /// The backend paginates this endpoint (see `PageResponse`); mobile has no pagination UI here
   /// (same precedent as `PurchaseRequestRepository.list`), so it just requests one generously
-  /// sized page and returns its content flat.
-  Future<List<Equipment>> list(String siteId) async {
+  /// sized page and returns its content flat. `name`/`status`/`type` mirror the backend's
+  /// optional filter query params (`EquipmentController.list`).
+  Future<List<Equipment>> list(String siteId, {String? name, String? status, String? type}) async {
     final json = await _client.get<Map<String, dynamic>>(
       '/api/construction-sites/$siteId/equipment',
-      query: {'size': 100},
+      query: {'size': 100, 'name': ?name, 'status': ?status, 'type': ?type},
     );
     final page = PageResponse.fromJson(json, (e) => Equipment.fromJson(e));
     return page.content;

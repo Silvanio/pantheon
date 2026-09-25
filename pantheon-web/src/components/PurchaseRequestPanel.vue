@@ -7,7 +7,6 @@ import {
   type PurchaseRequest,
   type PurchaseRequestStatus,
 } from '../composables/usePurchaseRequests'
-import { useSiteMembers } from '../composables/useSiteMembers'
 import { vDatePicker } from '../lib/datePicker'
 import StatusBadge from './StatusBadge.vue'
 
@@ -16,7 +15,6 @@ const props = defineProps<{ siteId: string; canManage: boolean }>()
 const { t } = useI18n()
 const router = useRouter()
 const { listPurchaseRequests, createPurchaseRequest, deletePurchaseRequest } = usePurchaseRequests()
-const { listMembers } = useSiteMembers()
 
 const PAGE_SIZE_OPTIONS = [1, 5, 10] as const
 const STATUSES: PurchaseRequestStatus[] = ['INICIADO', 'ORCADO', 'CONFERIDO', 'CONCLUIDO']
@@ -40,8 +38,6 @@ const deletingId = ref<string | null>(null)
 const confirmingDeleteId = ref<string | null>(null)
 const deleteError = ref('')
 
-const memberNames = ref<Record<string, string>>({})
-
 const stats = ref<{ awaitingApproval: number; budgeting: number; approved: number; completed: number } | null>(null)
 
 async function load() {
@@ -58,17 +54,6 @@ async function load() {
     totalElements.value = result.totalElements
   } finally {
     loading.value = false
-  }
-}
-
-async function loadMemberNames() {
-  try {
-    const members = await listMembers(props.siteId)
-    memberNames.value = Object.fromEntries(
-      members.filter((m) => m.userId).map((m) => [m.userId as string, m.displayName || m.email || '—']),
-    )
-  } catch {
-    memberNames.value = {}
   }
 }
 
@@ -171,14 +156,12 @@ watch(
   () => {
     page.value = 0
     load()
-    loadMemberNames()
     loadStats()
   },
 )
 
 onMounted(() => {
   load()
-  loadMemberNames()
   loadStats()
 })
 </script>
@@ -279,7 +262,7 @@ onMounted(() => {
                   <span v-if="pr.linkedOrcamentos.length > 1" class="text-steel-400">+{{ pr.linkedOrcamentos.length - 1 }}</span>
                 </span>
               </td>
-              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ memberNames[pr.createdBy] ?? '—' }}</td>
+              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ pr.createdByName ?? '—' }}</td>
               <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(pr.createdAt) }}</td>
               <td v-if="canManage" class="py-3.5 pr-5 text-right" @click.stop>
                 <button

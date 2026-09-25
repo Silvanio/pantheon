@@ -34,10 +34,10 @@ public class Orcamento {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "fornecedor_cnpj", nullable = false)
+    @Column(name = "fornecedor_cnpj")
     private String fornecedorCnpj;
 
-    @Column(name = "fornecedor_nome", nullable = false)
+    @Column(name = "fornecedor_nome")
     private String fornecedorNome;
 
     @Column(name = "fornecedor_endereco")

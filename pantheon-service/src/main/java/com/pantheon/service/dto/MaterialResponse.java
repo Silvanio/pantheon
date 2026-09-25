@@ -18,13 +18,19 @@ public record MaterialResponse(
         UUID deliveredBy,
         Instant checkedAt,
         UUID checkedBy,
-        Instant createdAt) {
+        Instant createdAt,
+        UUID sourcePurchaseRequestId,
+        String sourcePurchaseRequestName) {
 
     public static MaterialResponse from(Material material) {
+        return from(material, null, null);
+    }
+
+    public static MaterialResponse from(Material material, UUID sourcePurchaseRequestId, String sourcePurchaseRequestName) {
         return new MaterialResponse(
                 material.getId(), material.getConstructionSiteId(), material.getOrcamentoLineItemId(),
                 material.getName(), material.getType(), material.getQuantity(), material.getStatus(),
                 material.getDeliveredAt(), material.getDeliveredBy(), material.getCheckedAt(),
-                material.getCheckedBy(), material.getCreatedAt());
+                material.getCheckedBy(), material.getCreatedAt(), sourcePurchaseRequestId, sourcePurchaseRequestName);
     }
 }

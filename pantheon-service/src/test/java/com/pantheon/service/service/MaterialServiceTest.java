@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MaterialDeliveryStatus;
+import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
@@ -19,10 +20,13 @@ import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MaterialDeliveryPhotoRepository;
 import com.pantheon.service.repository.MaterialRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
+import com.pantheon.service.repository.OrcamentoRepository;
+import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.storage.StorageService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +48,12 @@ class MaterialServiceTest {
     private OrcamentoLineItemRepository lineItemRepository;
 
     @Mock
+    private OrcamentoRepository orcamentoRepository;
+
+    @Mock
+    private PurchaseRequestRepository purchaseRequestRepository;
+
+    @Mock
     private ConstructionSiteRepository siteRepository;
 
     @Mock
@@ -62,8 +72,8 @@ class MaterialServiceTest {
     @BeforeEach
     void setUp() {
         service = new MaterialService(
-                materialRepository, photoRepository, lineItemRepository, siteRepository, siteAccessService,
-                permissionService, storageService);
+                materialRepository, photoRepository, lineItemRepository, orcamentoRepository, purchaseRequestRepository,
+                siteRepository, siteAccessService, permissionService, storageService);
 
         siteId = UUID.randomUUID();
         lenient().when(materialRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -128,5 +138,44 @@ class MaterialServiceTest {
         Material result = service.markChecked(delivered.getId(), UUID.randomUUID(), null);
 
         assertThat(result.getStatus()).isEqualTo(MaterialDeliveryStatus.DELIVERED_AND_CHECKED);
+    }
+
+    @Test
+    void resolveSourcePurchaseRequestsTracesMaterialBackThroughOrcamentoLineItem() {
+        UUID lineItemId = UUID.randomUUID();
+        UUID orcamentoId = UUID.randomUUID();
+        UUID purchaseRequestId = UUID.randomUUID();
+        Material material = material(lineItemId);
+
+        OrcamentoLineItem lineItem = new OrcamentoLineItem(
+                lineItemId, orcamentoId, "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, null);
+        when(lineItemRepository.findAllById(List.of(lineItemId))).thenReturn(List.of(lineItem));
+
+        Orcamento orcamento = new Orcamento(
+                orcamentoId, siteId, UUID.randomUUID(), Instant.now(), "12345678000199", "Fornecedor", null, null,
+                null, null, null, null, purchaseRequestId);
+        when(orcamentoRepository.findAllById(List.of(orcamentoId))).thenReturn(List.of(orcamento));
+
+        PurchaseRequest purchaseRequest = new PurchaseRequest(
+                purchaseRequestId, siteId, "Pedido 07/09/2026 #1", UUID.randomUUID(), Instant.now());
+        when(purchaseRequestRepository.findAllById(List.of(purchaseRequestId))).thenReturn(List.of(purchaseRequest));
+
+        Map<UUID, MaterialService.SourcePurchaseRequestRef> result =
+                service.resolveSourcePurchaseRequests(List.of(material));
+
+        assertThat(result).containsKey(material.getId());
+        assertThat(result.get(material.getId()).id()).isEqualTo(purchaseRequestId);
+        assertThat(result.get(material.getId()).name()).isEqualTo("Pedido 07/09/2026 #1");
+    }
+
+    @Test
+    void resolveSourcePurchaseRequestsOmitsMaterialWhenChainIsUnresolvable() {
+        Material material = material(UUID.randomUUID());
+        when(lineItemRepository.findAllById(any())).thenReturn(List.of());
+
+        Map<UUID, MaterialService.SourcePurchaseRequestRef> result =
+                service.resolveSourcePurchaseRequests(List.of(material));
+
+        assertThat(result).doesNotContainKey(material.getId());
     }
 }

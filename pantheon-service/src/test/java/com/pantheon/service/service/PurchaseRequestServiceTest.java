@@ -36,7 +36,6 @@ import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
-import com.pantheon.service.exception.PurchaseRequestNotIniciadoException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
 import com.pantheon.service.exception.PurchaseRequestSelectionIncompleteException;
 import com.pantheon.service.messaging.EventPublisher;
@@ -224,14 +223,32 @@ class PurchaseRequestServiceTest {
     }
 
     @Test
-    void addItemsRejectsWhenHeaderIsNotIniciado() {
+    void addItemsWhileOrcadoSucceedsAndResetsHeaderToIniciado() {
         PurchaseRequest purchaseRequest = purchaseRequest();
         purchaseRequest.markOrcado();
         when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
 
-        assertThatThrownBy(() -> service.addItems(purchaseRequest.getId(), UUID.randomUUID(), oneItem()))
-                .isInstanceOf(PurchaseRequestNotIniciadoException.class);
-        verify(itemRepository, never()).save(any());
+        List<PurchaseRequestItem> added = service.addItems(purchaseRequest.getId(), UUID.randomUUID(), oneItem());
+
+        assertThat(added).hasSize(1);
+        assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.INICIADO);
+        verify(itemRepository).save(argThat(item -> item.getPurchaseRequestId().equals(purchaseRequest.getId())));
+        verify(purchaseRequestRepository).save(purchaseRequest);
+    }
+
+    @Test
+    void addItemsWhileConferidoOrConcluidoSucceedsAndResetsHeaderToIniciado() {
+        PurchaseRequest purchaseRequest = purchaseRequest();
+        purchaseRequest.markOrcado();
+        purchaseRequest.approve(Instant.now());
+        purchaseRequest.complete(Instant.now());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+
+        List<PurchaseRequestItem> added = service.addItems(purchaseRequest.getId(), UUID.randomUUID(), oneItem());
+
+        assertThat(added).hasSize(1);
+        assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.INICIADO);
+        verify(purchaseRequestRepository).save(purchaseRequest);
     }
 
     @Test
@@ -999,5 +1016,44 @@ class PurchaseRequestServiceTest {
         assertThatThrownBy(() -> service.deleteInvoice(invoice.getId(), UUID.randomUUID()))
                 .isInstanceOf(ForbiddenCapabilityException.class);
         verify(invoiceRepository, never()).delete(any());
+    }
+
+    @Test
+    void resolveDisplayNamePrefersDisplayNameOverEmail() {
+        UUID userId = UUID.randomUUID();
+        AppUser user = new AppUser(userId, "user@example.com", "Nome Completo", null, null, Instant.now(), Instant.now());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        assertThat(service.resolveDisplayName(userId)).isEqualTo("Nome Completo");
+    }
+
+    @Test
+    void resolveDisplayNameFallsBackToEmailWhenNoDisplayName() {
+        UUID userId = UUID.randomUUID();
+        AppUser user = new AppUser(userId, "user@example.com", null, null, null, Instant.now(), Instant.now());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        assertThat(service.resolveDisplayName(userId)).isEqualTo("user@example.com");
+    }
+
+    @Test
+    void resolveDisplayNameReturnsNullWhenUserNotFound() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThat(service.resolveDisplayName(userId)).isNull();
+    }
+
+    @Test
+    void resolveDisplayNamesBatchResolvesEveryRequestedUser() {
+        UUID userIdA = UUID.randomUUID();
+        UUID userIdB = UUID.randomUUID();
+        AppUser userA = new AppUser(userIdA, "a@example.com", "Fulano A", null, null, Instant.now(), Instant.now());
+        AppUser userB = new AppUser(userIdB, "b@example.com", null, null, null, Instant.now(), Instant.now());
+        when(userRepository.findAllById(List.of(userIdA, userIdB))).thenReturn(List.of(userA, userB));
+
+        var result = service.resolveDisplayNames(List.of(userIdA, userIdB));
+
+        assertThat(result).containsEntry(userIdA, "Fulano A").containsEntry(userIdB, "b@example.com");
     }
 }

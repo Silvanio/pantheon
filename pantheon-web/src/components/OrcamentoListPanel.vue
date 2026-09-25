@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useOrcamentos, type Orcamento } from '../composables/useOrcamentos'
 import { usePurchaseRequests, type PurchaseRequest } from '../composables/usePurchaseRequests'
-import { useSiteMembers } from '../composables/useSiteMembers'
 import type { FornecedorInput } from '../composables/useFornecedores'
 import FornecedorPicker from './FornecedorPicker.vue'
 import StatusBadge from './StatusBadge.vue'
@@ -16,7 +15,6 @@ const { t } = useI18n()
 const router = useRouter()
 const { listOrcamentos, createOrcamento } = useOrcamentos()
 const { listPurchaseRequests } = usePurchaseRequests()
-const { listMembers } = useSiteMembers()
 
 const PAGE_SIZE_OPTIONS = [1, 5, 10] as const
 
@@ -37,22 +35,9 @@ const purchaseRequestFilter = ref('')
 const supplierFilter = ref('')
 const hasActiveFilter = ref(false)
 
-const memberNames = ref<Record<string, string>>({})
-
 const dateFormatter = new Intl.DateTimeFormat('pt-BR')
 function formatDate(value: string): string {
   return dateFormatter.format(new Date(value))
-}
-
-async function loadMemberNames() {
-  try {
-    const members = await listMembers(props.siteId)
-    memberNames.value = Object.fromEntries(
-      members.filter((m) => m.userId).map((m) => [m.userId as string, m.displayName || m.email || '—']),
-    )
-  } catch {
-    memberNames.value = {}
-  }
 }
 
 async function load() {
@@ -117,14 +102,12 @@ async function onCreateConfirmed(fornecedor: FornecedorInput) {
 watch(() => props.siteId, () => {
   page.value = 0
   load()
-  loadMemberNames()
 })
 
 onMounted(async () => {
   const prPage = await listPurchaseRequests(props.siteId, { size: 100 })
   purchaseRequests.value = prPage.content
   await load()
-  await loadMemberNames()
 })
 </script>
 
@@ -201,7 +184,7 @@ onMounted(async () => {
               <td class="py-3.5 pl-5 text-[13.5px] font-bold text-steel-800 dark:text-steel-50">{{ orcamento.fornecedorNome }}</td>
               <td class="py-3.5"><StatusBadge kind="orcamento" :status="orcamento.status" /></td>
               <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ orcamento.sourcePurchaseRequestName ?? '—' }}</td>
-              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ memberNames[orcamento.createdBy] ?? '—' }}</td>
+              <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ orcamento.createdByName ?? '—' }}</td>
               <td class="py-3.5 pr-5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(orcamento.createdAt) }}</td>
             </tr>
           </tbody>

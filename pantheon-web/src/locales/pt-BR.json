@@ -200,6 +200,7 @@
       "equipment": "Equipamentos",
       "purchaseRequests": "Pedido de Compra",
       "orcamentos": "Orçamentos",
+      "materials": "Materiais",
       "tasks": "Tasks",
       "schedule": "Cronograma",
       "permissions": "Permissões"
@@ -651,6 +652,8 @@
     "sourcePurchaseRequestLabel": "Originado do pedido",
     "supplierSectionTitle": "Fornecedor",
     "totalLabel": "Total",
+    "savePricesButton": "Salvar",
+    "savingPrices": "Salvando...",
     "changeSupplierButton": "Trocar fornecedor",
     "table": {
       "supplier": "Fornecedor",
@@ -672,6 +675,7 @@
     "itemsTitle": "Produtos",
     "noItems": "Nenhum produto neste pedido.",
     "addItemsButton": "Adicionar produtos",
+    "addItemsSubtitle": "Informe os produtos que devem ser incluídos neste pedido.",
     "addItemsSubmit": "Adicionar produtos",
     "addItemsError": "Não foi possível adicionar os produtos. Verifique os dados informados.",
     "removeItemButton": "Remover produto",
@@ -817,6 +821,8 @@
   },
   "materialDelivery": {
     "title": "Materiais",
+    "subtitle": "Materiais gerados a partir dos pedidos de compra concluídos desta obra.",
+    "empty": "Nenhum material registrado ainda.",
     "markDeliveredButton": "Marcar como entregue",
     "markCheckedButton": "Marcar como conferido",
     "uploadPhotoLabel": "Anexar foto(s) da conferência",
@@ -825,13 +831,25 @@
       "AWAITING_DELIVERY": "Aguardando entrega",
       "DELIVERED": "Entregue",
       "DELIVERED_AND_CHECKED": "Entregue e conferido"
+    },
+    "table": {
+      "material": "Material",
+      "quantity": "Quantidade",
+      "purchaseRequest": "Pedido de compra",
+      "status": "Status",
+      "actions": "Ações"
+    },
+    "pagination": {
+      "summary": "Página {page} de {totalPages} · {totalElements} materiais",
+      "previous": "Anterior",
+      "next": "Próxima"
     }
   },
   "fornecedor": {
     "title": "Fornecedor",
     "subtitle": "Dados da empresa que está fazendo este orçamento.",
-    "cnpjLabel": "CNPJ",
-    "cnpjPlaceholder": "Digite o CNPJ",
+    "cnpjLabel": "CPF/CNPJ",
+    "cnpjPlaceholder": "Digite o CPF ou CNPJ",
     "nameLabel": "Nome",
     "addressLabel": "Endereço",
     "contactNameLabel": "Contato (nome)",
@@ -847,10 +865,11 @@
     "pixKeyRequiredError": "Informe a chave Pix.",
     "searching": "Buscando fornecedores...",
     "suggestionsTitle": "Fornecedores encontrados",
-    "noMatchHint": "Nenhum fornecedor encontrado com este CNPJ. Preencha os dados abaixo para cadastrar um novo.",
+    "noMatchHint": "Nenhum fornecedor encontrado com este CPF/CNPJ. Preencha os dados abaixo para cadastrar um novo.",
     "selectedHint": "Dados preenchidos automaticamente. Você pode ajustá-los se necessário.",
     "continueButton": "Continuar",
     "cancelButton": "Cancelar",
-    "error": "Preencha o CNPJ e o nome do fornecedor."
+    "error": "Informe o CPF/CNPJ e o nome do fornecedor.",
+    "invalidDocumentError": "CPF/CNPJ inválido."
   }
 }

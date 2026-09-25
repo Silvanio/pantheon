@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.dto.OrcamentoLineItemRequest;
+import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.Fornecedor;
 import com.pantheon.service.entity.FornecedorPaymentMethod;
@@ -30,6 +31,7 @@ import com.pantheon.service.exception.OrcamentoNotDeletableException;
 import com.pantheon.service.exception.OrcamentoNotDraftException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
@@ -77,6 +79,9 @@ class OrcamentoServiceTest {
     @Mock
     private FornecedorService fornecedorService;
 
+    @Mock
+    private AppUserRepository userRepository;
+
     private OrcamentoService service;
 
     private UUID siteId;
@@ -86,7 +91,7 @@ class OrcamentoServiceTest {
     void setUp() {
         service = new OrcamentoService(
                 orcamentoRepository, lineItemRepository, siteRepository, purchaseRequestRepository,
-                purchaseRequestItemRepository, siteAccessService, permissionService, fornecedorService);
+                purchaseRequestItemRepository, siteAccessService, permissionService, fornecedorService, userRepository);
 
         siteId = UUID.randomUUID();
         companyId = UUID.randomUUID();
@@ -201,17 +206,51 @@ class OrcamentoServiceTest {
     }
 
     @Test
-    void createFromPurchaseRequestItemsLeavesAlreadyOrcadoHeaderUnchanged() {
+    void createFromPurchaseRequestItemsLeavesAlreadyOrcadoHeaderOrcado() {
         UUID actingUserId = UUID.randomUUID();
         PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
         PurchaseRequestItem item = purchaseRequestItem(purchaseRequest.getId());
         when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(purchaseRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.createFromPurchaseRequestItems(
                 siteId, actingUserId, List.of(item), purchaseRequest.getId(), fornecedorRequest());
 
         assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.ORCADO);
-        verify(purchaseRequestRepository, never()).save(purchaseRequest);
+        verify(purchaseRequestRepository).save(purchaseRequest);
+    }
+
+    @Test
+    void createFromPurchaseRequestItemsReopensConferidoHeaderBackToOrcado() {
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
+        purchaseRequest.approve(Instant.now());
+        PurchaseRequestItem item = purchaseRequestItem(purchaseRequest.getId());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(purchaseRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createFromPurchaseRequestItems(
+                siteId, actingUserId, List.of(item), purchaseRequest.getId(), fornecedorRequest());
+
+        assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.ORCADO);
+        verify(purchaseRequestRepository).save(purchaseRequest);
+    }
+
+    @Test
+    void createFromPurchaseRequestItemsReopensConcluidoHeaderBackToOrcado() {
+        UUID actingUserId = UUID.randomUUID();
+        PurchaseRequest purchaseRequest = purchaseRequest(PurchaseRequestStatus.ORCADO);
+        purchaseRequest.approve(Instant.now());
+        purchaseRequest.complete(Instant.now());
+        PurchaseRequestItem item = purchaseRequestItem(purchaseRequest.getId());
+        when(purchaseRequestRepository.findById(purchaseRequest.getId())).thenReturn(Optional.of(purchaseRequest));
+        when(purchaseRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createFromPurchaseRequestItems(
+                siteId, actingUserId, List.of(item), purchaseRequest.getId(), fornecedorRequest());
+
+        assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.ORCADO);
+        verify(purchaseRequestRepository).save(purchaseRequest);
     }
 
     @Test
@@ -417,5 +456,26 @@ class OrcamentoServiceTest {
 
         assertThat(purchaseRequest.getStatus()).isEqualTo(PurchaseRequestStatus.ORCADO);
         verify(purchaseRequestRepository, never()).findById(purchaseRequest.getId());
+    }
+
+    @Test
+    void resolveDisplayNameFallsBackToEmailWhenNoDisplayName() {
+        UUID userId = UUID.randomUUID();
+        AppUser user = new AppUser(userId, "user@example.com", null, null, null, Instant.now(), Instant.now());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        assertThat(service.resolveDisplayName(userId)).isEqualTo("user@example.com");
+    }
+
+    @Test
+    void resolveDisplayNamesBatchResolvesEveryRequestedUser() {
+        UUID userIdA = UUID.randomUUID();
+        UUID userIdB = UUID.randomUUID();
+        AppUser userA = new AppUser(userIdA, "a@example.com", "Fulano A", null, null, Instant.now(), Instant.now());
+        when(userRepository.findAllById(List.of(userIdA, userIdB))).thenReturn(List.of(userA));
+
+        var result = service.resolveDisplayNames(List.of(userIdA, userIdB));
+
+        assertThat(result).containsEntry(userIdA, "Fulano A").doesNotContainKey(userIdB);
     }
 }

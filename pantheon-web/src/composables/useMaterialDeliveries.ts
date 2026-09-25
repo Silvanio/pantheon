@@ -16,6 +16,8 @@ export interface Material {
   checkedAt: string | null
   checkedBy: string | null
   createdAt: string
+  sourcePurchaseRequestId: string | null
+  sourcePurchaseRequestName: string | null
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

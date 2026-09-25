@@ -15,6 +15,7 @@ import SitePurchaseRequestApprovalLevelsPanel from '../components/SitePurchaseRe
 import EquipmentPanel from '../components/EquipmentPanel.vue'
 import PurchaseRequestPanel from '../components/PurchaseRequestPanel.vue'
 import OrcamentoListPanel from '../components/OrcamentoListPanel.vue'
+import MaterialsPanel from '../components/MaterialsPanel.vue'
 import DailyReportsPanel from '../components/DailyReportsPanel.vue'
 import TasksBoardPanel from '../components/TasksBoardPanel.vue'
 import SchedulePanel from '../components/SchedulePanel.vue'
@@ -38,7 +39,7 @@ const site = ref<ConstructionSite | null>(null)
 const loading = ref(false)
 const isCompanyAdmin = ref(false)
 
-type Tab = 'summary' | 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'tasks' | 'schedule' | 'permissions'
+type Tab = 'summary' | 'team' | 'dailyReport' | 'projects' | 'equipment' | 'purchaseRequests' | 'orcamentos' | 'materials' | 'tasks' | 'schedule' | 'permissions'
 const activeTab = ref<Tab>('summary')
 
 // Tabs backed by a PermissionCapability can be hidden per member; 'summary' (aggregates every
@@ -51,11 +52,12 @@ const TAB_CAPABILITY: Partial<Record<Tab, PermissionCapability>> = {
   equipment: 'EQUIPMENT',
   purchaseRequests: 'PURCHASE_REQUEST',
   orcamentos: 'ORCAMENTO_MANAGE',
+  materials: 'ORCAMENTO_MANAGE',
   tasks: 'TASKS',
   schedule: 'SCHEDULE',
 }
 // 'summary' leads so it's always the default landing tab (TAB_ORDER.find(isTabVisible) below).
-const TAB_ORDER: Tab[] = ['summary', 'team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'tasks', 'schedule']
+const TAB_ORDER: Tab[] = ['summary', 'team', 'dailyReport', 'projects', 'equipment', 'purchaseRequests', 'orcamentos', 'materials', 'tasks', 'schedule']
 
 const myPermissions = ref<Record<PermissionCapability, AccessLevel> | null>(null)
 const pendingPurchaseRequestCount = ref(0)
@@ -239,6 +241,16 @@ onMounted(load)
           {{ t('siteDetail.tabs.orcamentos') }}
         </button>
         <button
+          v-if="isTabVisible('materials')"
+          type="button"
+          class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition"
+          :class="activeTab === 'materials' ? 'bg-blueprint-50 text-blueprint-700 dark:bg-blueprint-900/40 dark:text-blueprint-300' : 'text-steel-500 hover:bg-steel-100 dark:text-steel-400 dark:hover:bg-steel-800'"
+          @click="activeTab = 'materials'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0"><path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></svg>
+          {{ t('siteDetail.tabs.materials') }}
+        </button>
+        <button
           v-if="isTabVisible('tasks')"
           type="button"
           class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition"
@@ -409,6 +421,15 @@ onMounted(load)
             {{ t('siteDetail.tabs.orcamentos') }}
           </button>
           <button
+            v-if="isTabVisible('materials')"
+            type="button"
+            class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
+            :class="activeTab === 'materials' ? 'bg-blueprint-600 text-white shadow-sm' : 'text-steel-600 hover:bg-steel-100 dark:text-steel-300 dark:hover:bg-steel-800'"
+            @click="activeTab = 'materials'"
+          >
+            {{ t('siteDetail.tabs.materials') }}
+          </button>
+          <button
             v-if="isTabVisible('tasks')"
             type="button"
             class="rounded-lg px-3.5 py-2 text-sm font-medium transition"
@@ -452,6 +473,11 @@ onMounted(load)
           :can-manage="myPermissions?.PURCHASE_REQUEST === 'MANAGE'"
         />
         <OrcamentoListPanel v-if="activeTab === 'orcamentos' && isTabVisible('orcamentos')" :site-id="siteId" />
+        <MaterialsPanel
+          v-if="activeTab === 'materials' && isTabVisible('materials')"
+          :site-id="siteId"
+          :can-manage="myPermissions?.ORCAMENTO_MANAGE === 'MANAGE'"
+        />
         <TasksBoardPanel
           v-if="activeTab === 'tasks' && isTabVisible('tasks')"
           :site-id="siteId"

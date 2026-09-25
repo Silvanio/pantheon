@@ -118,6 +118,11 @@ public class ConstructionExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 
+    @ExceptionHandler(InvalidCpfCnpjException.class)
+    public ResponseEntity<String> handleInvalidCpfCnpj(InvalidCpfCnpjException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
     @ExceptionHandler(EmailRequiredException.class)
     public ResponseEntity<String> handleEmailRequired(EmailRequiredException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());

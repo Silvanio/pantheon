@@ -27,6 +27,7 @@ export interface PurchaseRequest {
   name: string
   status: PurchaseRequestStatus
   createdBy: string
+  createdByName: string | null
   createdAt: string
   submittedAt: string | null
   approvedAt: string | null

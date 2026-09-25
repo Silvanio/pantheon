@@ -2,8 +2,10 @@ package com.pantheon.service.controller;
 
 import com.pantheon.service.dto.MaterialResponse;
 import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.Material;
 import com.pantheon.service.service.MaterialService;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,9 +31,16 @@ public class MaterialController {
             @AuthenticationPrincipal AppUser user,
             @PathVariable UUID siteId,
             @RequestParam(required = false) UUID orcamentoId) {
-        List<MaterialResponse> materials =
-                materialService.list(siteId, user.getId(), orcamentoId).stream().map(MaterialResponse::from).toList();
-        return ResponseEntity.ok(materials);
+        List<Material> materials = materialService.list(siteId, user.getId(), orcamentoId);
+        Map<UUID, MaterialService.SourcePurchaseRequestRef> sourcePurchaseRequests =
+                materialService.resolveSourcePurchaseRequests(materials);
+        List<MaterialResponse> response = materials.stream()
+                .map(m -> {
+                    var ref = sourcePurchaseRequests.get(m.getId());
+                    return MaterialResponse.from(m, ref != null ? ref.id() : null, ref != null ? ref.name() : null);
+                })
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/api/materials/{id}/mark-delivered")

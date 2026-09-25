@@ -22,7 +22,6 @@ import com.pantheon.service.exception.NoPendingApprovalStepException;
 import com.pantheon.service.exception.NotCurrentApprovalStepException;
 import com.pantheon.service.exception.PurchaseRequestInvoiceNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotConferidoException;
-import com.pantheon.service.exception.PurchaseRequestNotIniciadoException;
 import com.pantheon.service.exception.PurchaseRequestNotDeletableException;
 import com.pantheon.service.exception.PurchaseRequestNotFoundException;
 import com.pantheon.service.exception.PurchaseRequestNotOrcadoException;
@@ -48,12 +47,14 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -153,14 +154,16 @@ public class PurchaseRequestService {
         return purchaseRequest;
     }
 
+    /**
+     * Allowed in any status — adding a fresh, unquoted item always reopens the header back to
+     * INICIADO (see {@link PurchaseRequest#revertToIniciado}), even if it was already
+     * ORCADO/CONFERIDO/CONCLUIDO, since a new item means it's no longer meaningfully "fully quoted".
+     */
     @Transactional
     public List<PurchaseRequestItem> addItems(
             UUID purchaseRequestId, UUID actingUserId, List<PurchaseRequestItemCreationRequest> items) {
         PurchaseRequest purchaseRequest = requirePurchaseRequest(purchaseRequestId);
         requireManage(purchaseRequest.getConstructionSiteId(), actingUserId);
-        if (purchaseRequest.getStatus() != PurchaseRequestStatus.INICIADO) {
-            throw new PurchaseRequestNotIniciadoException(purchaseRequestId);
-        }
 
         Instant now = Instant.now();
         List<PurchaseRequestItem> added = new ArrayList<>();
@@ -169,6 +172,8 @@ public class PurchaseRequestService {
                     UUID.randomUUID(), purchaseRequest.getConstructionSiteId(), purchaseRequest.getId(), item.name(),
                     item.type(), item.quantity(), item.unit(), actingUserId, now)));
         }
+        purchaseRequest.revertToIniciado();
+        purchaseRequestRepository.save(purchaseRequest);
         return added;
     }
 
@@ -262,6 +267,22 @@ public class PurchaseRequestService {
     /** Every Orcamento converted from this header — used to populate the response's linked-Orcamento summaries. */
     public List<Orcamento> listLinkedOrcamentos(UUID purchaseRequestId) {
         return orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
+    }
+
+    /**
+     * Resolves {@code createdBy}'s display name for the response — falls back to email, then
+     * null. {@code createdBy} is an {@link AppUser} id regardless of whether that user also has a
+     * {@link SiteMembership} on this site, so this must not rely on site-membership lookups (which
+     * miss company staff acting on a site without one).
+     */
+    public String resolveDisplayName(UUID userId) {
+        return userRepository.findById(userId).map(u -> u.getDisplayName() != null ? u.getDisplayName() : u.getEmail()).orElse(null);
+    }
+
+    /** Batch form of {@link #resolveDisplayName(UUID)} for a page of headers. */
+    public Map<UUID, String> resolveDisplayNames(Collection<UUID> userIds) {
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(AppUser::getId, u -> u.getDisplayName() != null ? u.getDisplayName() : u.getEmail()));
     }
 
     public List<PurchaseRequestApproval> listApprovals(UUID purchaseRequestId) {

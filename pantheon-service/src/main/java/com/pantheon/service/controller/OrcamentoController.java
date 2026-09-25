@@ -48,7 +48,8 @@ public class OrcamentoController {
             @PathVariable UUID siteId,
             @Valid @RequestBody OrcamentoCreationRequest request) {
         Orcamento orcamento = orcamentoService.create(siteId, user.getId(), request.items(), request.fornecedor());
-        return ResponseEntity.status(HttpStatus.CREATED).body(OrcamentoResponse.from(orcamento));
+        String createdByName = user.getDisplayName() != null ? user.getDisplayName() : user.getEmail();
+        return ResponseEntity.status(HttpStatus.CREATED).body(OrcamentoResponse.from(orcamento, null, createdByName));
     }
 
     @GetMapping("/api/construction-sites/{siteId}/orcamentos")
@@ -62,8 +63,10 @@ public class OrcamentoController {
             @RequestParam(defaultValue = "20") int size) {
         Page<Orcamento> result = orcamentoService.list(
                 siteId, user.getId(), date, purchaseRequestId, supplier, PageRequest.of(page, size));
+        Map<UUID, String> creatorNames = orcamentoService.resolveDisplayNames(
+                result.getContent().stream().map(Orcamento::getCreatedBy).distinct().toList());
         Page<OrcamentoResponse> response = result.map(o -> OrcamentoResponse.from(
-                o, orcamentoService.getSourcePurchaseRequestName(o.getSourcePurchaseRequestId())));
+                o, orcamentoService.getSourcePurchaseRequestName(o.getSourcePurchaseRequestId()), creatorNames.get(o.getCreatedBy())));
         return ResponseEntity.ok(response);
     }
 
@@ -78,8 +81,9 @@ public class OrcamentoController {
                 .map(MaterialResponse::from)
                 .toList();
         String sourcePurchaseRequestName = orcamentoService.getSourcePurchaseRequestName(orcamento.getSourcePurchaseRequestId());
+        String createdByName = orcamentoService.resolveDisplayName(orcamento.getCreatedBy());
         return ResponseEntity.ok(new OrcamentoDetailResponse(
-                OrcamentoResponse.from(orcamento, sourcePurchaseRequestName),
+                OrcamentoResponse.from(orcamento, sourcePurchaseRequestName, createdByName),
                 lineItems.stream()
                         .map(item -> OrcamentoLineItemResponse.from(item, selectedFlags.getOrDefault(item.getId(), false)))
                         .toList(),

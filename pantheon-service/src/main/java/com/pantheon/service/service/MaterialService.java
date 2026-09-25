@@ -4,6 +4,7 @@ import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MaterialDeliveryPhoto;
 import com.pantheon.service.entity.MaterialDeliveryStatus;
+import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.OrcamentoLineItem;
 import com.pantheon.service.entity.PermissionCapability;
 import com.pantheon.service.entity.PurchaseRequest;
@@ -16,14 +17,20 @@ import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.MaterialDeliveryPhotoRepository;
 import com.pantheon.service.repository.MaterialRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
+import com.pantheon.service.repository.OrcamentoRepository;
+import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.storage.StorageKeys;
 import com.pantheon.service.storage.StorageService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,6 +46,8 @@ public class MaterialService {
     private final MaterialRepository materialRepository;
     private final MaterialDeliveryPhotoRepository photoRepository;
     private final OrcamentoLineItemRepository lineItemRepository;
+    private final OrcamentoRepository orcamentoRepository;
+    private final PurchaseRequestRepository purchaseRequestRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
@@ -48,6 +57,8 @@ public class MaterialService {
             MaterialRepository materialRepository,
             MaterialDeliveryPhotoRepository photoRepository,
             OrcamentoLineItemRepository lineItemRepository,
+            OrcamentoRepository orcamentoRepository,
+            PurchaseRequestRepository purchaseRequestRepository,
             ConstructionSiteRepository siteRepository,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
@@ -55,6 +66,8 @@ public class MaterialService {
         this.materialRepository = materialRepository;
         this.photoRepository = photoRepository;
         this.lineItemRepository = lineItemRepository;
+        this.orcamentoRepository = orcamentoRepository;
+        this.purchaseRequestRepository = purchaseRequestRepository;
         this.siteRepository = siteRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
@@ -131,6 +144,44 @@ public class MaterialService {
     /** Used to assemble an Orcamento's detail view; caller has already authorized access to the Orcamento. */
     public List<Material> listByLineItemIds(List<UUID> lineItemIds) {
         return lineItemIds.isEmpty() ? List.of() : materialRepository.findByOrcamentoLineItemIdIn(lineItemIds);
+    }
+
+    /** A Material's originating Pedido de Compra, if it can still be traced. */
+    public record SourcePurchaseRequestRef(UUID id, String name) {
+    }
+
+    /**
+     * Resolves each material's originating Pedido de Compra via
+     * Material -&gt; OrcamentoLineItem -&gt; Orcamento -&gt; PurchaseRequest, batched across the whole
+     * list to avoid N+1 queries — for the site-wide Materiais screen, which links each row back to
+     * its Pedido de Compra. A material with no resolvable chain (shouldn't normally happen) is
+     * simply absent from the returned map.
+     */
+    public Map<UUID, SourcePurchaseRequestRef> resolveSourcePurchaseRequests(List<Material> materials) {
+        List<UUID> lineItemIds = materials.stream().map(Material::getOrcamentoLineItemId).distinct().toList();
+        Map<UUID, OrcamentoLineItem> lineItemsById = lineItemRepository.findAllById(lineItemIds).stream()
+                .collect(Collectors.toMap(OrcamentoLineItem::getId, li -> li));
+
+        List<UUID> orcamentoIds = lineItemsById.values().stream().map(OrcamentoLineItem::getOrcamentoId).distinct().toList();
+        Map<UUID, Orcamento> orcamentosById = orcamentoRepository.findAllById(orcamentoIds).stream()
+                .collect(Collectors.toMap(Orcamento::getId, o -> o));
+
+        List<UUID> purchaseRequestIds = orcamentosById.values().stream()
+                .map(Orcamento::getSourcePurchaseRequestId).filter(Objects::nonNull).distinct().toList();
+        Map<UUID, String> purchaseRequestNamesById = purchaseRequestRepository.findAllById(purchaseRequestIds).stream()
+                .collect(Collectors.toMap(PurchaseRequest::getId, PurchaseRequest::getName));
+
+        Map<UUID, SourcePurchaseRequestRef> result = new HashMap<>();
+        for (Material material : materials) {
+            OrcamentoLineItem lineItem = lineItemsById.get(material.getOrcamentoLineItemId());
+            Orcamento orcamento = lineItem != null ? orcamentosById.get(lineItem.getOrcamentoId()) : null;
+            UUID purchaseRequestId = orcamento != null ? orcamento.getSourcePurchaseRequestId() : null;
+            if (purchaseRequestId != null) {
+                result.put(material.getId(), new SourcePurchaseRequestRef(
+                        purchaseRequestId, purchaseRequestNamesById.get(purchaseRequestId)));
+            }
+        }
+        return result;
     }
 
     public List<MaterialDeliveryPhoto> listPhotos(UUID materialId) {

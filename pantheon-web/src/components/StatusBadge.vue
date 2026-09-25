@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
  * `redesign-purchase-request-approval-and-comparison`'s design.md decision 9.
  */
 const props = defineProps<{
-  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval' | 'constructionSite'
+  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval' | 'constructionSite' | 'material'
   status: string
 }>()
 
@@ -40,6 +40,11 @@ const CLASS_MAP: Record<string, Record<string, string>> = {
     PAUSED: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
     COMPLETED: 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200',
   },
+  material: {
+    AWAITING_DELIVERY: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+    DELIVERED: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
+    DELIVERED_AND_CHECKED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+  },
 }
 
 const LABEL_KEY: Record<string, string> = {
@@ -48,6 +53,7 @@ const LABEL_KEY: Record<string, string> = {
   orcamento: 'orcamento.status',
   approval: 'purchaseRequests.approvalStatus',
   constructionSite: 'constructionSites.status',
+  material: 'materialDelivery.status',
 }
 
 const badgeClass = computed(() => CLASS_MAP[props.kind]?.[props.status] ?? 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200')

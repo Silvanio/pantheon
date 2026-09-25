@@ -6,5 +6,5 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
 public record PurchaseRequestItemCreationRequest(
-        @NotBlank String name, String type, @NotNull @Positive BigDecimal quantity, String unit) {
+        @NotBlank String name, String type, @NotNull @Positive BigDecimal quantity, @NotBlank String unit) {
 }

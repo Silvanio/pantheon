@@ -11,6 +11,7 @@ export interface Orcamento {
   constructionSiteId: string
   status: OrcamentoStatus
   createdBy: string
+  createdByName: string | null
   createdAt: string
   fornecedorCnpj: string
   fornecedorNome: string

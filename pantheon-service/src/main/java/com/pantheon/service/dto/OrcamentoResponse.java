@@ -11,6 +11,7 @@ public record OrcamentoResponse(
         UUID constructionSiteId,
         OrcamentoStatus status,
         UUID createdBy,
+        String createdByName,
         Instant createdAt,
         String fornecedorCnpj,
         String fornecedorNome,
@@ -22,14 +23,10 @@ public record OrcamentoResponse(
         UUID sourcePurchaseRequestId,
         String sourcePurchaseRequestName) {
 
-    public static OrcamentoResponse from(Orcamento orcamento) {
-        return from(orcamento, null);
-    }
-
-    public static OrcamentoResponse from(Orcamento orcamento, String sourcePurchaseRequestName) {
+    public static OrcamentoResponse from(Orcamento orcamento, String sourcePurchaseRequestName, String createdByName) {
         return new OrcamentoResponse(
                 orcamento.getId(), orcamento.getConstructionSiteId(), orcamento.getStatus(), orcamento.getCreatedBy(),
-                orcamento.getCreatedAt(), orcamento.getFornecedorCnpj(), orcamento.getFornecedorNome(),
+                createdByName, orcamento.getCreatedAt(), orcamento.getFornecedorCnpj(), orcamento.getFornecedorNome(),
                 orcamento.getFornecedorEndereco(), orcamento.getFornecedorContatoNome(),
                 orcamento.getFornecedorContatoTelefone(), orcamento.getFornecedorFormaPagamento(),
                 orcamento.getFornecedorPixKey(), orcamento.getSourcePurchaseRequestId(), sourcePurchaseRequestName);

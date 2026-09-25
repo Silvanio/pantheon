@@ -54,11 +54,17 @@ const itemUnitPrice = ref('')
 const itemSubmitting = ref(false)
 const itemError = ref('')
 
-// Inline-editable unit price per line item — always a text field so only digits/one decimal
-// separator can ever be typed, rather than relying on a native number input's quirks.
+// Inline-editable unit price per line item — typing only updates a local draft (always a text
+// field so only digits/one decimal separator can ever be typed); nothing is sent to the backend
+// until "Salvar preços" is clicked, so many rows can be edited and saved together in one go.
 const priceDrafts = ref<Record<string, string>>({})
-const priceSaving = ref<Record<string, boolean>>({})
-const priceError = ref('')
+const savingPrices = ref(false)
+const pricesError = ref('')
+
+const hasUnsavedPriceChanges = computed(() => {
+  if (!detail.value) return false
+  return detail.value.lineItems.some((item) => (priceDrafts.value[item.id] ?? '') !== (item.unitPrice ?? ''))
+})
 
 function syncPriceDrafts() {
   const drafts: Record<string, string> = {}
@@ -105,26 +111,46 @@ function onPriceInput(itemId: string, event: Event) {
   }
 }
 
-async function onPriceBlur(item: OrcamentoLineItem) {
-  const newValue = priceDrafts.value[item.id] ?? ''
-  const currentValue = item.unitPrice ?? ''
-  if (newValue === currentValue) return
-  priceError.value = ''
-  priceSaving.value[item.id] = true
-  try {
-    await updateLineItem(orcamentoId, item.id, {
-      name: item.name,
-      type: item.type,
-      quantity: item.quantity,
-      unitPrice: newValue || null,
-    })
-    await load()
-  } catch {
-    priceError.value = t('orcamento.form.error')
-    priceDrafts.value[item.id] = currentValue
-  } finally {
-    priceSaving.value[item.id] = false
+function goBackToOrigin() {
+  const sourcePurchaseRequestId = detail.value?.orcamento.sourcePurchaseRequestId
+  const siteId = detail.value?.orcamento.constructionSiteId
+  if (sourcePurchaseRequestId) {
+    router.push(`/purchase-requests/${sourcePurchaseRequestId}`)
+  } else if (siteId) {
+    router.push({ path: `/sites/${siteId}`, query: { tab: 'orcamentos' } })
+  } else {
+    router.push('/')
   }
+}
+
+async function onSavePrices() {
+  if (!detail.value) return
+  pricesError.value = ''
+  savingPrices.value = true
+  const changedItems = detail.value.lineItems.filter(
+    (item) => (priceDrafts.value[item.id] ?? '') !== (item.unitPrice ?? ''),
+  )
+  try {
+    await Promise.all(
+      changedItems.map((item) =>
+        updateLineItem(orcamentoId, item.id, {
+          name: item.name,
+          type: item.type,
+          quantity: item.quantity,
+          unitPrice: priceDrafts.value[item.id] || null,
+        }),
+      ),
+    )
+    goBackToOrigin()
+  } catch {
+    pricesError.value = t('orcamento.form.error')
+    await load()
+    savingPrices.value = false
+  }
+}
+
+function onCancelPrices() {
+  goBackToOrigin()
 }
 
 function startAddItem() {
@@ -322,7 +348,6 @@ onMounted(load)
           </div>
         </form>
 
-        <p v-if="priceError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ priceError }}</p>
         <p v-if="detail.lineItems.length === 0" class="text-sm text-steel-500 dark:text-steel-400">{{ t('orcamento.lineItemsEmpty') }}</p>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -348,11 +373,9 @@ onMounted(load)
                     type="text"
                     inputmode="decimal"
                     class="field-input w-28 py-1"
-                    :disabled="priceSaving[item.id]"
+                    :disabled="savingPrices"
                     :value="priceDrafts[item.id]"
                     @input="onPriceInput(item.id, $event)"
-                    @blur="onPriceBlur(item)"
-                    @keyup.enter="($event.target as HTMLInputElement).blur()"
                   />
                   <span v-else>{{ item.unitPrice ?? '—' }}</span>
                 </td>
@@ -384,6 +407,16 @@ onMounted(load)
             </tfoot>
           </table>
         </div>
+
+        <div v-if="isDraft" class="mt-4 flex items-center justify-end gap-2">
+          <button type="button" class="btn-danger px-3 py-1.5" :disabled="savingPrices" @click="onCancelPrices">
+            {{ t('orcamento.form.cancel') }}
+          </button>
+          <button type="button" class="btn-primary px-3 py-1.5" :disabled="savingPrices" @click="onSavePrices">
+            {{ savingPrices ? t('orcamento.savingPrices') : t('orcamento.savePricesButton') }}
+          </button>
+        </div>
+        <p v-if="pricesError" class="mt-2 text-right text-sm text-safety-600 dark:text-safety-500">{{ pricesError }}</p>
       </section>
     </main>
 

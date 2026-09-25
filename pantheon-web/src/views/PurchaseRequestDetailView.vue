@@ -47,7 +47,7 @@ const {
 } = usePurchaseRequests()
 const { listMaterials, markDelivered, markChecked } = useMaterialDeliveries()
 const { getMyPermissions } = useSitePermissions()
-const { getMyFunction, listMembers } = useSiteMembers()
+const { getMyFunction } = useSiteMembers()
 const { getOrcamento } = useOrcamentos()
 const { getSite } = useConstructionSites()
 
@@ -104,7 +104,6 @@ const confirmingDeleteInvoiceId = ref<string | null>(null)
 
 const fornecedores = ref<Orcamento[]>([])
 const showFornecedoresModal = ref(false)
-const memberNames = ref<Record<string, string>>({})
 
 const items = computed(() => detail.value?.items ?? [])
 const allSelected = computed(() => items.value.length > 0 && items.value.every((i) => selectedIds.value.has(i.id)))
@@ -229,24 +228,12 @@ async function loadFornecedores() {
   fornecedores.value = results.filter((o): o is Orcamento => o !== null)
 }
 
-async function loadMemberNames() {
-  if (!detail.value) return
-  try {
-    const members = await listMembers(detail.value.purchaseRequest.constructionSiteId)
-    memberNames.value = Object.fromEntries(
-      members.filter((m) => m.userId).map((m) => [m.userId as string, m.displayName || m.email || '—']),
-    )
-  } catch {
-    memberNames.value = {}
-  }
-}
-
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
     await loadDetail()
-    await Promise.all([loadComparison(), loadMaterials(), loadInvoices(), loadFornecedores(), loadMemberNames()])
+    await Promise.all([loadComparison(), loadMaterials(), loadInvoices(), loadFornecedores()])
   } catch {
     loadError.value = t('purchaseRequests.loadError')
   } finally {
@@ -283,13 +270,12 @@ async function onAddItems() {
   addItemsError.value = ''
   addingItems.value = true
   try {
-    const newItems = newItemRows.value
-      .filter((r) => r.name.trim() && r.quantity)
-      .map((r) => ({ name: r.name.trim(), type: r.type || null, quantity: r.quantity, unit: r.unit || null }))
-    if (newItems.length === 0) {
-      addItemsError.value = t('purchaseRequests.addItemsError')
-      return
-    }
+    const newItems = newItemRows.value.map((r) => ({
+      name: r.name.trim(),
+      type: r.type || null,
+      quantity: r.quantity,
+      unit: r.unit,
+    }))
     await addPurchaseRequestItems(purchaseRequestId, newItems)
     newItemRows.value = [{ name: '', type: null, quantity: '', unit: null }]
     showAddItemsForm.value = false
@@ -686,8 +672,14 @@ onMounted(load)
           </div>
         </div>
 
-        <div v-if="showFornecedorPicker" class="mb-5">
-          <FornecedorPicker :site-id="detail.purchaseRequest.constructionSiteId" @confirm="onConvertConfirmed" @cancel="showFornecedorPicker = false" />
+        <div
+          v-if="showFornecedorPicker"
+          class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+          @click.self="showFornecedorPicker = false"
+        >
+          <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto">
+            <FornecedorPicker :site-id="detail.purchaseRequest.constructionSiteId" @confirm="onConvertConfirmed" @cancel="showFornecedorPicker = false" />
+          </div>
         </div>
         <p v-if="convertError" class="mb-3 text-sm text-safety-600 dark:text-safety-500">{{ convertError }}</p>
 
@@ -850,7 +842,7 @@ onMounted(load)
           <div class="space-y-2 text-xs">
             <div class="flex justify-between gap-2">
               <span class="text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.createdBy') }}</span>
-              <span class="font-bold text-steel-800 dark:text-steel-100">{{ memberNames[detail.purchaseRequest.createdBy] ?? '—' }}</span>
+              <span class="font-bold text-steel-800 dark:text-steel-100">{{ detail.purchaseRequest.createdByName ?? '—' }}</span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.sidebar.createdAt') }}</span>
@@ -903,38 +895,77 @@ onMounted(load)
 
     <!-- Add items modal -->
     <div v-if="showAddItemsForm" class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" @click.self="showAddItemsForm = false">
-      <form class="modal-panel card-pad max-h-[85vh] w-full max-w-2xl space-y-3 overflow-y-auto" @submit.prevent="onAddItems">
-        <h3 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.addItemsButton') }}</h3>
-        <div v-for="(row, index) in newItemRows" :key="index" class="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:items-end">
-          <div class="sm:col-span-2">
-            <label class="field-label">{{ t('purchaseRequests.form.name') }}</label>
-            <input v-model="row.name" type="text" required class="field-input" />
-          </div>
+      <form class="modal-panel card-pad flex max-h-[85vh] w-full max-w-2xl flex-col" @submit.prevent="onAddItems">
+        <div class="flex items-start justify-between gap-4">
           <div>
-            <label class="field-label">{{ t('purchaseRequests.form.type') }}</label>
-            <input v-model="row.type" type="text" class="field-input" />
+            <h3 class="text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('purchaseRequests.addItemsButton') }}</h3>
+            <p class="mt-0.5 text-sm text-steel-500 dark:text-steel-400">{{ t('purchaseRequests.addItemsSubtitle') }}</p>
           </div>
-          <div>
-            <label class="field-label">{{ t('purchaseRequests.form.quantity') }}</label>
-            <input v-model="row.quantity" type="number" step="0.001" min="0" required class="field-input" />
-          </div>
-          <div class="flex items-end gap-2">
-            <div class="flex-1">
-              <label class="field-label">{{ t('purchaseRequests.form.unit') }}</label>
-              <input v-model="row.unit" type="text" class="field-input" />
+          <button type="button" class="btn-ghost shrink-0 p-1.5" @click="showAddItemsForm = false">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          <div
+            v-for="(row, index) in newItemRows"
+            :key="index"
+            class="rounded-xl border border-steel-200 bg-steel-50/60 p-3.5 dark:border-steel-700 dark:bg-steel-800/40"
+          >
+            <div class="mb-2.5 flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wide text-steel-400 dark:text-steel-500">
+                {{ t('purchaseRequests.table.product') }} {{ index + 1 }}
+              </span>
+              <button
+                v-if="newItemRows.length > 1"
+                type="button"
+                :title="t('purchaseRequests.removeRowButton')"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-md text-safety-600 transition hover:bg-safety-50 dark:text-safety-500 dark:hover:bg-safety-900/30"
+                @click="removeItemRow(index)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16zM10 11v6M14 11v6" />
+                </svg>
+              </button>
             </div>
-            <button v-if="newItemRows.length > 1" type="button" class="btn-ghost px-2 py-1.5 text-xs" @click="removeItemRow(index)">
-              {{ t('purchaseRequests.removeRowButton') }}
-            </button>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div class="sm:col-span-2">
+                <label class="field-label">{{ t('purchaseRequests.form.name') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
+                <input v-model="row.name" type="text" required class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">{{ t('purchaseRequests.form.type') }}</label>
+                <input v-model="row.type" type="text" class="field-input" />
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label class="field-label">{{ t('purchaseRequests.form.quantity') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
+                <input v-model="row.quantity" type="number" step="0.001" min="0" required class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">{{ t('purchaseRequests.form.unit') }} <span class="text-safety-600 dark:text-safety-500">*</span></label>
+                <input v-model="row.unit" type="text" required class="field-input" />
+              </div>
+            </div>
           </div>
         </div>
-        <button type="button" class="text-sm font-medium text-blueprint-600 hover:underline dark:text-blueprint-400" @click="addItemRow">
+
+        <button
+          type="button"
+          class="mt-3 self-start text-sm font-medium text-blueprint-600 hover:underline dark:text-blueprint-400"
+          @click="addItemRow"
+        >
           {{ t('purchaseRequests.addRowButton') }}
         </button>
-        <p v-if="addItemsError" class="text-sm text-safety-600 dark:text-safety-500">{{ addItemsError }}</p>
-        <div class="flex gap-2">
-          <button type="submit" :disabled="addingItems" class="btn-primary">{{ t('purchaseRequests.addItemsSubmit') }}</button>
+
+        <p v-if="addItemsError" class="mt-3 text-sm text-safety-600 dark:text-safety-500">{{ addItemsError }}</p>
+
+        <div class="mt-4 flex justify-end gap-2 border-t border-steel-200 pt-4 dark:border-steel-700">
           <button type="button" class="btn-secondary" @click="showAddItemsForm = false">{{ t('purchaseRequests.form.cancel') }}</button>
+          <button type="submit" :disabled="addingItems" class="btn-primary">{{ t('purchaseRequests.addItemsSubmit') }}</button>
         </div>
       </form>
     </div>

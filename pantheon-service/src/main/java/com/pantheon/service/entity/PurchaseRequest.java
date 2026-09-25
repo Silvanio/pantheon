@@ -74,7 +74,14 @@ public class PurchaseRequest {
         this.status = PurchaseRequestStatus.ORCADO;
     }
 
-    /** Undoes {@link #markOrcado}, called when the header's last remaining linked Orcamento is deleted. */
+    /**
+     * Forces the header back to INICIADO from any status. Called when the header's last remaining
+     * linked Orcamento is deleted (undoing {@link #markOrcado}); when a new item is added to the
+     * header regardless of its current status (a fresh, unquoted item means it's no longer fully
+     * quoted); and as the reset step before immediately re-advancing to ORCADO when a brand new
+     * Orcamento is added to a header that was already ORCADO/CONFERIDO/CONCLUIDO, discarding any
+     * stale approval/conclusion state — see {@code purchase-request-workflow}'s reopening rule.
+     */
     public void revertToIniciado() {
         this.status = PurchaseRequestStatus.INICIADO;
     }

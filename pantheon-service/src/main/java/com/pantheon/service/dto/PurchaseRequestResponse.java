@@ -13,6 +13,7 @@ public record PurchaseRequestResponse(
         String name,
         PurchaseRequestStatus status,
         UUID createdBy,
+        String createdByName,
         Instant createdAt,
         Instant submittedAt,
         Instant approvedAt,
@@ -27,14 +28,15 @@ public record PurchaseRequestResponse(
         }
     }
 
-    public static PurchaseRequestResponse from(PurchaseRequest purchaseRequest) {
-        return from(purchaseRequest, List.of());
+    public static PurchaseRequestResponse from(PurchaseRequest purchaseRequest, String createdByName) {
+        return from(purchaseRequest, List.of(), createdByName);
     }
 
-    public static PurchaseRequestResponse from(PurchaseRequest purchaseRequest, List<Orcamento> linkedOrcamentos) {
+    public static PurchaseRequestResponse from(
+            PurchaseRequest purchaseRequest, List<Orcamento> linkedOrcamentos, String createdByName) {
         return new PurchaseRequestResponse(
                 purchaseRequest.getId(), purchaseRequest.getConstructionSiteId(), purchaseRequest.getName(),
-                purchaseRequest.getStatus(), purchaseRequest.getCreatedBy(), purchaseRequest.getCreatedAt(),
+                purchaseRequest.getStatus(), purchaseRequest.getCreatedBy(), createdByName, purchaseRequest.getCreatedAt(),
                 purchaseRequest.getSubmittedAt(), purchaseRequest.getApprovedAt(), purchaseRequest.getCompletedAt(),
                 purchaseRequest.getLastRejectionReason(),
                 linkedOrcamentos.stream().map(LinkedOrcamentoSummary::from).toList());

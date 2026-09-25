@@ -2,6 +2,7 @@ package com.pantheon.service.service;
 
 import com.pantheon.service.dto.FornecedorRequest;
 import com.pantheon.service.dto.OrcamentoLineItemRequest;
+import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.Fornecedor;
 import com.pantheon.service.entity.Orcamento;
@@ -15,6 +16,7 @@ import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.OrcamentoNotDeletableException;
 import com.pantheon.service.exception.OrcamentoNotDraftException;
 import com.pantheon.service.exception.OrcamentoNotFoundException;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.OrcamentoLineItemRepository;
 import com.pantheon.service.repository.OrcamentoRepository;
@@ -25,11 +27,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +59,7 @@ public class OrcamentoService {
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
     private final FornecedorService fornecedorService;
+    private final AppUserRepository userRepository;
 
     public OrcamentoService(
             OrcamentoRepository orcamentoRepository,
@@ -64,7 +69,8 @@ public class OrcamentoService {
             PurchaseRequestItemRepository purchaseRequestItemRepository,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
-            FornecedorService fornecedorService) {
+            FornecedorService fornecedorService,
+            AppUserRepository userRepository) {
         this.orcamentoRepository = orcamentoRepository;
         this.lineItemRepository = lineItemRepository;
         this.siteRepository = siteRepository;
@@ -73,6 +79,18 @@ public class OrcamentoService {
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
         this.fornecedorService = fornecedorService;
+        this.userRepository = userRepository;
+    }
+
+    /** Resolves {@code createdBy}'s display name (falling back to email) for a response — see {@code PurchaseRequestService.resolveDisplayName}'s doc for why this can't rely on site-membership lookups. */
+    public String resolveDisplayName(UUID userId) {
+        return userRepository.findById(userId).map(u -> u.getDisplayName() != null ? u.getDisplayName() : u.getEmail()).orElse(null);
+    }
+
+    /** Batch form of {@link #resolveDisplayName(UUID)} for a page of Orcamentos. */
+    public Map<UUID, String> resolveDisplayNames(Collection<UUID> userIds) {
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(AppUser::getId, u -> u.getDisplayName() != null ? u.getDisplayName() : u.getEmail()));
     }
 
     @Transactional
@@ -88,7 +106,16 @@ public class OrcamentoService {
         return orcamento;
     }
 
-    /** Called only from {@link PurchaseRequestItemService#convertToOrcamento} — already authorized there. */
+    /**
+     * Called only from {@link PurchaseRequestItemService#convertToOrcamento} — already authorized
+     * there. Regardless of the header's current status, a brand new Orcamento always resets it
+     * back to INICIADO first ({@link PurchaseRequest#revertToIniciado}, discarding any stale
+     * ORCADO/CONFERIDO/CONCLUIDO state) and then immediately re-advances it to ORCADO
+     * ({@link PurchaseRequest#markOrcado}) — since "at least one Orcamento exists" is exactly
+     * ORCADO's own invariant. Net effect: a header that was already INICIADO simply becomes ORCADO
+     * (unchanged from before), while one that was ORCADO/CONFERIDO/CONCLUIDO is reopened for a
+     * fresh quote-comparison and resubmission cycle.
+     */
     @Transactional
     Orcamento createFromPurchaseRequestItems(
             UUID siteId, UUID actingUserId, List<PurchaseRequestItem> items, UUID purchaseRequestId,
@@ -101,10 +128,9 @@ public class OrcamentoService {
         }
 
         purchaseRequestRepository.findById(purchaseRequestId).ifPresent(purchaseRequest -> {
-            if (purchaseRequest.getStatus() == PurchaseRequestStatus.INICIADO) {
-                purchaseRequest.markOrcado();
-                purchaseRequestRepository.save(purchaseRequest);
-            }
+            purchaseRequest.revertToIniciado();
+            purchaseRequest.markOrcado();
+            purchaseRequestRepository.save(purchaseRequest);
         });
         return orcamento;
     }

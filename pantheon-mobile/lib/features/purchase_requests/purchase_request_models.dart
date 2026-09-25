@@ -17,8 +17,10 @@ class PurchaseRequest {
     required this.name,
     required this.status,
     required this.createdBy,
+    this.createdByName,
     required this.createdAt,
     required this.submittedAt,
+    this.lastRejectionReason,
     required this.linkedOrcamentos,
   });
 
@@ -28,8 +30,10 @@ class PurchaseRequest {
         name: json['name'] as String,
         status: json['status'] as String,
         createdBy: json['createdBy'] as String,
+        createdByName: json['createdByName'] as String?,
         createdAt: json['createdAt'] as String,
         submittedAt: json['submittedAt'] as String?,
+        lastRejectionReason: json['lastRejectionReason'] as String?,
         linkedOrcamentos: (json['linkedOrcamentos'] as List)
             .map((e) => LinkedOrcamentoSummary.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -40,8 +44,12 @@ class PurchaseRequest {
   final String name;
   final String status;
   final String createdBy;
+  // Resolved server-side (see PurchaseRequestResponse.createdByName) — no need to
+  // cross-reference site members client-side to show who created this.
+  final String? createdByName;
   final String createdAt;
   final String? submittedAt;
+  final String? lastRejectionReason;
   final List<LinkedOrcamentoSummary> linkedOrcamentos;
 }
 
@@ -54,6 +62,7 @@ class PurchaseRequestItem {
     required this.unit,
     required this.status,
     required this.selectedOrcamentoLineItemId,
+    this.convertedToOrcamentoId,
   });
 
   factory PurchaseRequestItem.fromJson(Map<String, dynamic> json) => PurchaseRequestItem(
@@ -64,6 +73,7 @@ class PurchaseRequestItem {
         unit: json['unit'] as String?,
         status: json['status'] as String,
         selectedOrcamentoLineItemId: json['selectedOrcamentoLineItemId'] as String?,
+        convertedToOrcamentoId: json['convertedToOrcamentoId'] as String?,
       );
 
   final String id;
@@ -73,6 +83,7 @@ class PurchaseRequestItem {
   final String? unit;
   final String status;
   final String? selectedOrcamentoLineItemId;
+  final String? convertedToOrcamentoId;
 }
 
 class PurchaseRequestApproval {

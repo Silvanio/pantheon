@@ -10,6 +10,10 @@ data:
   PANTHEON_STORAGE_ENDPOINT: "http://minio:9000"
   PANTHEON_STORAGE_REGION: "us-east-1"
   PANTHEON_STORAGE_BUCKET: "pantheon"
+  # Path is fixed by the volumeMount below; the file itself comes from the
+  # Secret further down. Leave unset (or omit this key) if push notifications
+  # aren't enabled in this environment — PushNotificationService no-ops then.
+  PANTHEON_FIREBASE_CREDENTIALS_PATH: "/etc/secrets/firebase/firebase-adminsdk.json"
 ---
 # Baseline only: real deployments must populate this Secret via a secret manager
 # (Vault, cloud KMS, sealed-secrets, ...), never commit real values to git.
@@ -29,6 +33,19 @@ stringData:
   GOOGLE_CLIENT_SECRET: "CHANGE_ME"
   PANTHEON_STORAGE_ACCESS_KEY: "CHANGE_ME"
   PANTHEON_STORAGE_SECRET_KEY: "CHANGE_ME"
+---
+# Baseline only, same as above — this is a *file* credential (the Firebase Admin
+# SDK service-account key), so unlike the string secrets above it's mounted as a
+# volume rather than injected via envFrom. Populate via your secret manager; if
+# push notifications aren't enabled in this environment, this Secret and its
+# volume/volumeMount below can simply be omitted from the Deployment.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pantheon-service-firebase-credentials
+type: Opaque
+stringData:
+  firebase-adminsdk.json: "CHANGE_ME"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -62,6 +79,10 @@ spec:
                 name: pantheon-service-config
             - secretRef:
                 name: pantheon-service-secrets
+          volumeMounts:
+            - name: firebase-credentials
+              mountPath: /etc/secrets/firebase
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -74,6 +95,10 @@ spec:
               port: 8081
             initialDelaySeconds: 30
             periodSeconds: 15
+      volumes:
+        - name: firebase-credentials
+          secret:
+            secretName: pantheon-service-firebase-credentials
 ---
 apiVersion: v1
 kind: Service

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "488108503956",
+    "project_id": "pantheon-notification",
+    "storage_bucket": "pantheon-notification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:488108503956:android:6e7501264d406c0de3d581",
+        "android_client_info": {
+          "package_name": "com.pantheon.pantheon_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxw1NvdLnDlhK8dySnLlCRkv91paABe-o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -57,6 +57,44 @@ also build and run the three application services as containers, using the
 Dockerfiles and `infra/k8s/*.yaml` manifests as the basis for Kubernetes
 deployment.
 
+## Credential files (e.g. Firebase Admin SDK)
+
+Some config values are a *file* (a service-account JSON key, a certificate) rather
+than a plain string, referenced by an env var holding its path — e.g.
+`PANTHEON_FIREBASE_CREDENTIALS_PATH` (see `pantheon-mobile/README.md`'s "Activating
+push notifications"). These files are never committed; how each environment
+supplies one differs:
+
+- **Local (IntelliJ/IDE)**: put the file under `pantheon-service/secrets/` (already
+  git-ignored) and set the path env var in your Run/Debug Configuration's
+  "Environment variables" field — not in a global shell profile, so it stays
+  scoped to that run config and doesn't leak into unrelated shells.
+- **Another developer's machine**: nobody shares the same key file. Each developer
+  either generates their own (e.g. their own Firebase service-account key, scoped
+  to a shared dev project) or gets one issued via the team's secret manager, drops
+  it in their own `pantheon-service/secrets/`, and points their own IDE/shell env
+  var at it.
+- **Plain Docker** (running the service container directly, not just `infra/`'s
+  local databases): bind-mount the file as a read-only volume and point the env
+  var at the in-container path — never `COPY` it into the image/Dockerfile, which
+  would bake the secret into every image layer and the registry:
+  ```bash
+  docker run -v $(pwd)/pantheon-service/secrets/firebase-adminsdk.json:/secrets/firebase-adminsdk.json:ro \
+    -e PANTHEON_FIREBASE_CREDENTIALS_PATH=/secrets/firebase-adminsdk.json ...
+  ```
+- **Docker Swarm**: use a Docker secret, which Swarm mounts at
+  `/run/secrets/<name>` automatically:
+  ```bash
+  docker secret create firebase-adminsdk-key pantheon-service/secrets/firebase-adminsdk.json
+  ```
+  then reference it in the service (`secrets: [firebase-adminsdk-key]`) and set
+  `PANTHEON_FIREBASE_CREDENTIALS_PATH=/run/secrets/firebase-adminsdk-key`.
+- **Kubernetes**: a file-based credential needs a `Secret` mounted as a *volume*,
+  not `envFrom`/`secretKeyRef` (those only inject string values as env vars). See
+  the `pantheon-service-firebase-credentials` Secret + volume mount in
+  `infra/k8s/pantheon-service.yaml` for the pattern — populate the real value via
+  your secret manager (Vault, cloud KMS, sealed-secrets), never commit it.
+
 ## Project structure
 
 ```

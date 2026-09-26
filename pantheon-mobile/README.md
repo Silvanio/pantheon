@@ -88,24 +88,45 @@ See `lib/core/offline/` (`OutboxController`, `ApiClient.get`'s `offlineCapable` 
 Push notifications ship **code-complete but inert** until a real Firebase project exists —
 `PushNotificationService` (mobile) and `PushNotificationService` (backend, in
 `pantheon-service`) both detect the missing configuration and no-op (log only), so the rest of
-the app works today without any of this. To light it up end to end:
+the app works today without any of this.
 
-1. **Create a Firebase project** at [console.firebase.google.com](https://console.firebase.google.com)
-   (requires a Google account — this is a one-time manual step only you can do).
-2. **Add an Android app** to it with application id `com.pantheon.pantheon_mobile` (see
-   `android/app/build.gradle.kts`), download the generated `google-services.json`, and place it
-   at `pantheon-mobile/android/app/google-services.json`. Then apply the Google Services Gradle
-   plugin: add `id("com.google.gms.google-services")` to `android/app/build.gradle.kts`'s
-   `plugins {}` block and `classpath("com.google.gms:google-services:4.4.2")` (or current) to the
-   project-level `android/build.gradle.kts`.
-3. **Add an iOS app** to the same project, download `GoogleService-Info.plist`, and add it to
-   `pantheon-mobile/ios/Runner/` via Xcode (drag into the `Runner` target so it's bundled).
-4. **Upload an APNs authentication key** (from your Apple Developer account) to the Firebase
-   project's Cloud Messaging settings — required for iOS push delivery.
-5. **Generate a service-account key** for the Firebase project (Project Settings → Service
-   Accounts → "Generate new private key"), save the JSON file somewhere on the backend host, and
-   point `pantheon-service` at it via the `PANTHEON_FIREBASE_CREDENTIALS_PATH` environment
-   variable (see `pantheon-service/src/main/resources/application.yml`).
+### Status (as of 2026-09-27)
 
-Once all five steps are done, restart both the backend and the mobile app — no code changes are
-needed, since every piece was already wired to activate on the presence of that configuration.
+Firebase project **`pantheon-notification`** exists and is wired in. Progress:
+
+- [x] Firebase project created.
+- [x] Android app registered; `google-services.json` in place at
+      `pantheon-mobile/android/app/google-services.json`; Google Services Gradle plugin applied
+      in `android/settings.gradle.kts` + `android/app/build.gradle.kts`; `./gradlew
+      :app:processDebugGoogleServices` verified BUILD SUCCESSFUL.
+- [x] iOS app registered; `GoogleService-Info.plist` in place at
+      `pantheon-mobile/ios/Runner/GoogleService-Info.plist`, bundled into the `Runner` target.
+- [x] iOS "Push Notifications" + "Background Modes → Remote notifications" capabilities added in
+      Xcode (`Runner.entitlements` has `aps-environment`; `Info.plist` has `UIBackgroundModes:
+      [remote-notification]`).
+- [x] Firebase Admin SDK service-account key generated, stored at
+      `pantheon-service/secrets/firebase-adminsdk.json` (git-ignored), `PANTHEON_FIREBASE_
+      CREDENTIALS_PATH` set in the local IntelliJ run config for `pantheon-service`.
+- [ ] **End-to-end test on Android** — not yet done. Should work as-is: run `pantheon-service`
+      (check the startup log for "Push notifications enabled"), run the mobile app on an
+      emulator/device with **Google Play/Google APIs system image** (bare AOSP can't receive
+      FCM), log in (grants the notification permission prompt, registers the device token), then
+      trigger a real push (e.g. approve a Pedido de Compra) and confirm it arrives.
+- [ ] **iOS push — deliberately paused, by user choice**: an APNs auth key (`.p8`) still needs to
+      be uploaded to the Firebase project's Cloud Messaging settings, and testing on a real
+      device needs an Apple Developer Program membership. The user's personal Apple ID is
+      already a member of their employer's team; they don't want to pay the $99/year fee yet.
+      Two unblocking paths were discussed, to revisit later:
+      1. Enroll that same personal Apple ID independently as an **Individual/Sole Proprietor**
+         (a second, unrelated Team under the same Apple ID — doesn't touch the employer's team).
+      2. Or use a completely separate personal Apple ID.
+      Either way, no further *code* changes are needed once the account exists — just the APNs
+      key upload + selecting the right Team in Xcode's Signing & Capabilities.
+      In the meantime, the notification-handling code path (not real delivery) can be exercised
+      for free on the Simulator with `xcrun simctl push booted com.pantheon.pantheonMobile
+      payload.apns` and a hand-crafted APNs JSON payload — no Apple Developer account needed for
+      that, since it injects the notification locally rather than routing through real APNs.
+
+Once the two `[ ]` items above are done, restart both the backend and the mobile app — no code
+changes are needed, since every piece was already wired to activate on the presence of that
+configuration.

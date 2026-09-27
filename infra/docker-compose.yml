@@ -144,6 +144,11 @@ services:
       PANTHEON_STORAGE_BUCKET: ${PANTHEON_STORAGE_BUCKET:-pantheon}
       PANTHEON_STORAGE_ACCESS_KEY: ${PANTHEON_STORAGE_ACCESS_KEY:-pantheon}
       PANTHEON_STORAGE_SECRET_KEY: ${PANTHEON_STORAGE_SECRET_KEY:-pantheon-secret}
+      # See the root README's "Environment profiles (Local / Dev / PRD) and Sentry" section.
+      # Defaults to "dev" here (not "local") since this is a containerized run, not the everyday
+      # `mvn spring-boot:run` workflow. The Sentry DSN itself is hardcoded per-profile in
+      # application-dev.yml/application-prd.yml, not an env var — nothing to set here for that.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
     depends_on:
       service-db:
         condition: service_healthy

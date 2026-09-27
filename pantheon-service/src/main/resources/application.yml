@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: pantheon-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/pantheon_service}
     username: ${SPRING_DATASOURCE_USERNAME:pantheon}
@@ -73,3 +75,17 @@ pantheon:
 
 spring.servlet.multipart.max-file-size: 100MB
 spring.servlet.multipart.max-request-size: 100MB
+
+# Sentry error tracking (error-tracking capability). Settings shared across profiles live here;
+# `sentry.dsn`/`sentry.environment` are profile-specific (see application-local/dev/prd.yml) —
+# `local` hardcodes an empty DSN to force Sentry off regardless of any stray SENTRY_DSN env var,
+# while `dev`/`prd` read it from SENTRY_DSN. Only ERROR-level logs become Sentry events (never
+# WARN/INFO, e.g. PushNotificationService's per-token delivery failures) to protect the free
+# plan's 5,000-events/month budget. `sentry.release` is filled in from the Maven build version by
+# resource filtering (inherited from spring-boot-starter-parent, "@"-delimited so it never
+# collides with the ${VAR:default} placeholders used throughout this file).
+sentry:
+  logging:
+    minimum-event-level: error
+  send-default-pii: false
+  release: '@project.version@'

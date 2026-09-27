@@ -1,0 +1,7 @@
+# Production profile — DSN is hardcoded directly (not ${SENTRY_DSN:}): a Sentry DSN is a
+# semi-public identifier, not a real secret (it can only be used to send events, not read
+# existing data), same reasoning already applied to pantheon-web's .env.dev/.env.production and
+# pantheon-mobile's env/prod.json. See error-tracking capability / design.md Decision 4/7.
+sentry:
+  dsn: "https://7b0844fed985a53fbf872ec70155f424@o4512155484422144.ingest.us.sentry.io/4512155494055936"
+  environment: prd

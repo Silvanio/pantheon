@@ -1,0 +1,7 @@
+# Local profile (default when SPRING_PROFILES_ACTIVE is unset — the everyday `mvn spring-boot:run`
+# workflow). Sentry's DSN is a hardcoded empty string here, NOT ${SENTRY_DSN:} — this ignores any
+# SENTRY_DSN value a developer might have exported in their shell, so local development can never
+# leak events into the shared free-tier quota. See error-tracking capability / design.md Decision 4.
+sentry:
+  dsn: ""
+  environment: local

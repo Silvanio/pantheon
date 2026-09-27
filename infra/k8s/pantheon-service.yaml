@@ -14,6 +14,12 @@ data:
   # Secret further down. Leave unset (or omit this key) if push notifications
   # aren't enabled in this environment — PushNotificationService no-ops then.
   PANTHEON_FIREBASE_CREDENTIALS_PATH: "/etc/secrets/firebase/firebase-adminsdk.json"
+  # This baseline manifest targets the "prd" Spring profile — see
+  # application-{local,dev,prd}.yml and the root README's "Environment profiles" section.
+  # Use a separate manifest/overlay with SPRING_PROFILES_ACTIVE: "dev" for a dev deployment.
+  # The Sentry DSN itself is hardcoded per-profile in application-dev.yml/application-prd.yml,
+  # not an env var — nothing to set here for that.
+  SPRING_PROFILES_ACTIVE: "prd"
 ---
 # Baseline only: real deployments must populate this Secret via a secret manager
 # (Vault, cloud KMS, sealed-secrets, ...), never commit real values to git.

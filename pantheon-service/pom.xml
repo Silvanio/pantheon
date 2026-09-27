@@ -59,6 +59,16 @@
 			<artifactId>firebase-admin</artifactId>
 			<version>9.4.3</version>
 		</dependency>
+		<!-- Error tracking (error-tracking capability). Spring Boot 4.x requires the
+		     "sentry-spring-boot-4" module (not the older "sentry-spring-boot-starter-jakarta",
+		     which targets Spring Boot 3's Jakarta namespace) - see
+		     https://docs.sentry.io/platforms/java/guides/spring-boot/. Auto-configures and
+		     no-ops unless sentry.dsn resolves to a non-blank value (see application-*.yml). -->
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-spring-boot-4</artifactId>
+			<version>8.58.0</version>
+		</dependency>
 		<!-- Server-side HTML-to-PDF rendering for daily report and purchase-request exports -->
 		<dependency>
 			<groupId>com.openhtmltopdf</groupId>

@@ -1,0 +1,4 @@
+{
+  "PANTHEON_SERVICE_URL": "https://api.pantheon.example",
+  "SENTRY_DSN": "https://e912817955e3473f2e502303fc8a9c81@o4512155484422144.ingest.us.sentry.io/4512155504279552"
+}

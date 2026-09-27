@@ -95,6 +95,36 @@ supplies one differs:
   `infra/k8s/pantheon-service.yaml` for the pattern — populate the real value via
   your secret manager (Vault, cloud KMS, sealed-secrets), never commit it.
 
+## Environment profiles (Local / Dev / PRD) and Sentry
+
+`pantheon-service` and `pantheon-web` both use a formal Local/Dev/PRD environment split (see
+`openspec/specs/error-tracking/spec.md`), with Sentry error tracking as the first thing gated by
+it — Local never sends anything to Sentry, by construction, not just by default.
+
+- **`pantheon-service`** (Spring profiles): `application-local.yml` / `application-dev.yml` /
+  `application-prd.yml` alongside the shared `application.yml`. `SPRING_PROFILES_ACTIVE` defaults
+  to `local` when unset, so a bare `mvn spring-boot:run` is always Local. The `local` profile
+  hardcodes `sentry.dsn: ""`. The `dev`/`prd` profiles hardcode the real DSN directly (not an env
+  var) — a Sentry DSN is a semi-public identifier (like a Firebase Web API key), not a real
+  secret, so unlike the Firebase credentials above it needs no env var, no IDE run-config setup,
+  and only a plain `ConfigMap` entry for `SPRING_PROFILES_ACTIVE` in Kubernetes (see
+  `infra/k8s/pantheon-service.yaml`) — never a `Secret`+volume. To test the `dev`/`prd` profiles
+  locally, just set `SPRING_PROFILES_ACTIVE=dev` (or `prd`) in your IntelliJ Run/Debug
+  Configuration; nothing else is needed to also enable Sentry.
+- **`pantheon-web`** (Vite modes): `.env.development` (Local — Vite's own default `npm run dev`
+  mode), `.env.dev` (a custom mode, `npm run build:dev` / `--mode dev`), `.env.production` (PRD
+  — Vite's own default `npm run build` mode). Because `VITE_`-prefixed vars are always compiled
+  into the client bundle at build time, `.env.dev`/`.env.production` carry the real
+  `VITE_SENTRY_DSN` value directly (see `pantheon-web/.env.example`) rather than deferring to a
+  runtime env var — there's no meaningful way to keep a client-bundled value "secret" regardless,
+  and it isn't one. **Never create a file named `.env.local`** for the Local tier — Vite treats
+  that filename specially (always loaded, in every mode, meant for personal gitignored
+  overrides), not as a mode-specific file; naming it that would leak `VITE_SENTRY_DSN` into
+  Dev/PRD builds too.
+- **`pantheon-mobile`**: already had an equivalent (`env/local-simulator.json`,
+  `env/local-device.json`, `env/prod.json`, see `pantheon-mobile/README.md`) — `SENTRY_DSN` is
+  blank in the two local files and set to the real value in `env/prod.json`.
+
 ## Project structure
 
 ```

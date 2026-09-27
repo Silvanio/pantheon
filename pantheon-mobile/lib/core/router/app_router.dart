@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/splash_screen.dart';
@@ -26,6 +27,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     refreshListenable: _AuthRefreshNotifier(ref),
+    // Records screen navigation as Sentry breadcrumbs (route name/path + go_router's own
+    // path/query parameters only — never `extra`, which go_router doesn't forward into
+    // RouteSettings.arguments in the first place). A no-op when Sentry isn't initialized
+    // (SENTRY_DSN unset), same as every other Sentry call site in this app.
+    observers: [SentryNavigatorObserver()],
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final loggingIn = state.matchedLocation == '/login';

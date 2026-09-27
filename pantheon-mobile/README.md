@@ -30,11 +30,38 @@ flutter run
 
 The backend base URL defaults per-platform to reach a local `pantheon-service`
 (`http://10.0.2.2:8081` for the Android emulator, `http://localhost:8081` for iOS
-Simulator/web), matching `pantheon-web`'s dev default. Override it for a real server:
+Simulator/web), matching `pantheon-web`'s dev default. Override it with `--dart-define`, or —
+preferred, since it scales to more than one variable without an unwieldy command line — with
+`--dart-define-from-file` and one of the JSON files under `env/`:
+
+```bash
+# Simulator/emulator — same as running with no flags at all; the per-platform default above
+# already reaches a local pantheon-service. This file exists only so every environment uses
+# the same command shape.
+flutter run --dart-define-from-file=env/local-simulator.json
+
+# Physical device on the same LAN as your dev machine — a real device can't resolve
+# "localhost"/"10.0.2.2" back to your computer, so this points at its LAN IP instead. Update
+# env/local-device.json if your machine's IP changes (DHCP).
+flutter run --dart-define-from-file=env/local-device.json
+
+# Production backend — update env/prod.json with the real deployed URL once one exists.
+flutter run --dart-define-from-file=env/prod.json
+```
+
+A one-off different host still works too:
 
 ```bash
 flutter run --dart-define=PANTHEON_SERVICE_URL=https://your-host:8081
 ```
+
+Each `env/*.json` file also carries a `SENTRY_DSN` key alongside `PANTHEON_SERVICE_URL`, for
+[Sentry](https://sentry.io) error tracking and screen-navigation breadcrumbs (see
+`openspec/specs/error-tracking/spec.md`). `env/local-simulator.json` and `env/local-device.json`
+keep it blank on purpose — Sentry stays fully disabled (no init, no network calls) for local
+runs regardless of any stray `SENTRY_DSN` in your shell — while `env/prod.json` sets the real
+project DSN. An optional `SENTRY_ENVIRONMENT` dart-define tags events with which tier sent them
+(defaults to `local` when unset).
 
 ## What's implemented
 

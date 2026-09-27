@@ -14,8 +14,11 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20] as const
 const materials = ref<Material[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
-const photosByMaterial = ref<Record<string, File[]>>({})
 const markingId = ref<string | null>(null)
+
+const checkingMaterialId = ref<string | null>(null)
+const checkingPhotos = ref<File[]>([])
+const confirmingCheck = ref(false)
 
 const page = ref(0)
 const pageSize = ref<number>(10)
@@ -48,13 +51,21 @@ function onPageSizeChange() {
   page.value = 0
 }
 
-function photoCount(materialId: string): number {
-  return photosByMaterial.value[materialId]?.length ?? 0
+function openCheckModal(materialId: string) {
+  checkingMaterialId.value = materialId
+  checkingPhotos.value = []
 }
 
-function onPhotosSelected(materialId: string, event: Event) {
+function closeCheckModal() {
+  checkingMaterialId.value = null
+  checkingPhotos.value = []
+}
+
+function onCheckPhotosSelected(event: Event) {
   const files = (event.target as HTMLInputElement).files
-  photosByMaterial.value[materialId] = files ? Array.from(files) : []
+  if (files) {
+    checkingPhotos.value = [...checkingPhotos.value, ...Array.from(files)]
+  }
 }
 
 async function onMarkDelivered(materialId: string) {
@@ -70,16 +81,19 @@ async function onMarkDelivered(materialId: string) {
   }
 }
 
-async function onMarkChecked(materialId: string) {
+async function onConfirmCheck() {
+  const materialId = checkingMaterialId.value
+  if (!materialId) return
   errorMessage.value = ''
-  markingId.value = materialId
+  confirmingCheck.value = true
   try {
-    await markChecked(materialId, photosByMaterial.value[materialId] ?? [])
+    await markChecked(materialId, checkingPhotos.value)
     await load()
+    closeCheckModal()
   } catch {
     errorMessage.value = t('materialDelivery.error')
   } finally {
-    markingId.value = null
+    confirmingCheck.value = false
   }
 }
 
@@ -140,43 +154,22 @@ onMounted(load)
                     v-if="material.status === 'AWAITING_DELIVERY'"
                     type="button"
                     :disabled="markingId === material.id"
-                    :title="t('materialDelivery.markDeliveredButton')"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-blueprint-600 transition hover:bg-blueprint-50 disabled:opacity-50 dark:text-blueprint-400 dark:hover:bg-blueprint-900/30"
+                    class="btn-primary px-3 py-1.5 text-xs"
                     @click="onMarkDelivered(material.id)"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h11v8H3V7zM14 10h4l3 3v2h-7v-5zM6.5 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17.5 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                    </svg>
+                    {{ t('materialDelivery.markDeliveredButton') }}
                   </button>
-                  <template v-else-if="material.status === 'DELIVERED'">
-                    <label
-                      class="relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-steel-500 transition hover:bg-steel-100 dark:text-steel-400 dark:hover:bg-steel-800"
-                      :title="t('materialDelivery.uploadPhotoLabel')"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h3l2-2h6l2 2h3a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z" />
-                        <circle cx="12" cy="13" r="3.5" />
-                      </svg>
-                      <span
-                        v-if="photoCount(material.id) > 0"
-                        class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blueprint-600 text-[9px] font-bold text-white"
-                      >
-                        {{ photoCount(material.id) }}
-                      </span>
-                      <input type="file" accept="image/*" multiple class="hidden" @change="onPhotosSelected(material.id, $event)" />
-                    </label>
-                    <button
-                      type="button"
-                      :disabled="markingId === material.id"
-                      :title="t('materialDelivery.markCheckedButton')"
-                      class="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-                      @click="onMarkChecked(material.id)"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </button>
-                  </template>
+                  <button
+                    v-else-if="material.status === 'DELIVERED'"
+                    type="button"
+                    class="btn-success px-3 py-1.5 text-xs"
+                    @click="openCheckModal(material.id)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {{ t('materialDelivery.markCheckedButton') }}
+                  </button>
                   <span v-else class="text-steel-300 dark:text-steel-600">—</span>
                 </div>
               </td>
@@ -207,5 +200,45 @@ onMounted(load)
         </div>
       </div>
     </template>
+
+    <div
+      v-if="checkingMaterialId"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+      @click.self="closeCheckModal"
+    >
+      <div class="modal-panel card-pad w-full max-w-md">
+        <h3 class="text-base font-semibold text-steel-800 dark:text-steel-50">{{ t('materialDelivery.checkModal.title') }}</h3>
+        <p class="mt-1 text-sm text-steel-500 dark:text-steel-400">{{ t('materialDelivery.checkModal.description') }}</p>
+
+        <label
+          class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-steel-300 px-4 py-6 text-sm font-medium text-steel-600 transition hover:border-blueprint-400 hover:text-blueprint-600 dark:border-steel-600 dark:text-steel-300 dark:hover:border-blueprint-500 dark:hover:text-blueprint-400"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h3l2-2h6l2 2h3a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+          {{ t('materialDelivery.checkModal.addPhotos') }}
+          <input type="file" accept="image/*" multiple class="hidden" @change="onCheckPhotosSelected" />
+        </label>
+
+        <p v-if="checkingPhotos.length > 0" class="mt-2 text-xs text-steel-500 dark:text-steel-400">
+          {{ t('materialDelivery.checkModal.photoCount', { count: checkingPhotos.length }) }}
+        </p>
+
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="closeCheckModal">
+            {{ t('materialDelivery.checkModal.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="btn-success px-3 py-1.5 text-xs"
+            :disabled="confirmingCheck"
+            @click="onConfirmCheck"
+          >
+            {{ t('materialDelivery.checkModal.confirm') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

@@ -827,6 +827,14 @@
     "markCheckedButton": "Marcar como conferido",
     "uploadPhotoLabel": "Anexar foto(s) da conferência",
     "error": "Não foi possível atualizar o status do material.",
+    "checkModal": {
+      "title": "Conferência de material",
+      "description": "Anexe as fotos da conferência antes de confirmar.",
+      "addPhotos": "Adicionar fotos",
+      "photoCount": "{count} foto(s) selecionada(s)",
+      "cancel": "Cancelar",
+      "confirm": "Confirmar"
+    },
     "status": {
       "AWAITING_DELIVERY": "Aguardando entrega",
       "DELIVERED": "Entregue",

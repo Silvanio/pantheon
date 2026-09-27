@@ -16,6 +16,9 @@ public interface SiteDocumentProjectRepository extends JpaRepository<SiteDocumen
 
     List<SiteDocumentProject> findByParentId(UUID parentId);
 
+    /** The construction site's entire folder tree, fetched once for in-memory ancestor-chain walks. */
+    List<SiteDocumentProject> findByConstructionSiteId(UUID constructionSiteId);
+
     long countByConstructionSiteId(UUID constructionSiteId);
 
     List<SiteDocumentProject> findTop5ByConstructionSiteIdOrderByCreatedAtDesc(UUID constructionSiteId);

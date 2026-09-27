@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -245,19 +246,17 @@ public class OrcamentoService {
     /** Called from {@code PurchaseRequestService.approveStep} when a cycle's final step is approved. */
     @Transactional
     public void lockAllForPurchaseRequest(UUID purchaseRequestId) {
-        for (Orcamento orcamento : orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId)) {
-            orcamento.lock();
-            orcamentoRepository.save(orcamento);
-        }
+        List<Orcamento> orcamentos = orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
+        orcamentos.forEach(Orcamento::lock);
+        orcamentoRepository.saveAll(orcamentos);
     }
 
     /** Called from {@code PurchaseRequestService.rejectStep}. */
     @Transactional
     public void unlockAllForPurchaseRequest(UUID purchaseRequestId) {
-        for (Orcamento orcamento : orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId)) {
-            orcamento.unlock();
-            orcamentoRepository.save(orcamento);
-        }
+        List<Orcamento> orcamentos = orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
+        orcamentos.forEach(Orcamento::unlock);
+        orcamentoRepository.saveAll(orcamentos);
     }
 
     public Page<Orcamento> list(
@@ -318,11 +317,28 @@ public class OrcamentoService {
                 .orElse(false);
     }
 
-    /** Batch form of {@link #isSelected(OrcamentoLineItem)}, keyed by line item id, for detail/listing assembly. */
+    /**
+     * Batch form of {@link #isSelected(OrcamentoLineItem)}, keyed by line item id, for detail/listing
+     * assembly. Loads every referenced source Pedido-de-Compra item in a single {@code findAllById}
+     * query instead of one {@code findById} per line item, then applies the same selection check
+     * ({@code lineItem.getId().equals(item.getSelectedOrcamentoLineItemId())}) as the single-item
+     * method, preserving its {@code false} result for a null/absent source item.
+     */
     public Map<UUID, Boolean> selectedFlags(List<OrcamentoLineItem> lineItems) {
+        List<UUID> sourceItemIds = lineItems.stream()
+                .map(OrcamentoLineItem::getSourcePurchaseRequestItemId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, PurchaseRequestItem> itemsById = purchaseRequestItemRepository.findAllById(sourceItemIds).stream()
+                .collect(Collectors.toMap(PurchaseRequestItem::getId, item -> item));
+
         Map<UUID, Boolean> flags = new HashMap<>();
         for (OrcamentoLineItem lineItem : lineItems) {
-            flags.put(lineItem.getId(), isSelected(lineItem));
+            UUID sourceItemId = lineItem.getSourcePurchaseRequestItemId();
+            PurchaseRequestItem sourceItem = sourceItemId == null ? null : itemsById.get(sourceItemId);
+            boolean selected = sourceItem != null && lineItem.getId().equals(sourceItem.getSelectedOrcamentoLineItemId());
+            flags.put(lineItem.getId(), selected);
         }
         return flags;
     }

@@ -295,9 +295,9 @@ class PurchaseRequestPdfServiceTest {
         step.approve(membershipId, null, Instant.now());
         when(approvalRepository.findByPurchaseRequestIdOrderByCycleNumberAscStepOrderAsc(purchaseRequest.getId()))
                 .thenReturn(List.of(step));
-        when(siteMembershipRepository.findById(membershipId)).thenReturn(Optional.of(
+        when(siteMembershipRepository.findAllById(List.of(membershipId))).thenReturn(List.of(
                 SiteMembership.invited(membershipId, siteId, approverUserId, ConstructionFunction.ENGINEER, null, null, Instant.now())));
-        when(userRepository.findById(approverUserId)).thenReturn(Optional.of(
+        when(userRepository.findAllById(List.of(approverUserId))).thenReturn(List.of(
                 new AppUser(approverUserId, "engenheira@example.com", "Engenheira Um", "hash", null, Instant.now(), Instant.now())));
         when(userRepository.findById(purchaseRequest.getCreatedBy())).thenReturn(Optional.empty());
 

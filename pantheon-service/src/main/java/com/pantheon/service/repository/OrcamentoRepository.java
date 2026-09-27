@@ -12,5 +12,8 @@ public interface OrcamentoRepository extends JpaRepository<Orcamento, UUID>, Jpa
     /** Every Orcamento converted from a given Pedido de Compra — used to lock/unlock them together. */
     List<Orcamento> findBySourcePurchaseRequestId(UUID sourcePurchaseRequestId);
 
+    /** Batch form of {@link #findBySourcePurchaseRequestId(UUID)} across a page of headers — avoids one query per row. */
+    List<Orcamento> findBySourcePurchaseRequestIdIn(List<UUID> sourcePurchaseRequestIds);
+
     long countByConstructionSiteIdAndStatus(UUID constructionSiteId, OrcamentoStatus status);
 }

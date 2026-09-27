@@ -20,9 +20,12 @@ import com.pantheon.service.repository.OrcamentoRepository;
 import com.pantheon.service.repository.PurchaseRequestItemRepository;
 import com.pantheon.service.repository.PurchaseRequestRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,7 +77,7 @@ public class PurchaseRequestItemService {
         UUID siteId = purchaseRequest.getConstructionSiteId();
         requireManage(siteId, actingUserId);
 
-        List<PurchaseRequestItem> items = itemIds.stream().map(this::requireItem).toList();
+        List<PurchaseRequestItem> items = requireItems(itemIds);
         for (PurchaseRequestItem item : items) {
             if (!item.getPurchaseRequestId().equals(purchaseRequestId)) {
                 throw new ItemsSpanMultiplePurchaseRequestsException();
@@ -85,12 +88,14 @@ public class PurchaseRequestItemService {
                 orcamentoService.createFromPurchaseRequestItems(siteId, actingUserId, items, purchaseRequestId, fornecedor);
 
         Instant now = Instant.now();
+        List<PurchaseRequestItem> toSave = new ArrayList<>();
         for (PurchaseRequestItem item : items) {
             if (item.getStatus() == PurchaseRequestItemStatus.PENDING) {
                 item.convertTo(orcamento.getId(), now);
-                itemRepository.save(item);
+                toSave.add(item);
             }
         }
+        itemRepository.saveAll(toSave);
         return orcamento;
     }
 
@@ -143,6 +148,26 @@ public class PurchaseRequestItemService {
 
     private PurchaseRequestItem requireItem(UUID itemId) {
         return itemRepository.findById(itemId).orElseThrow(() -> new PurchaseRequestItemNotFoundException(itemId));
+    }
+
+    /**
+     * Batch form of {@link #requireItem(UUID)} for a list of ids — fetches all of them in one
+     * query instead of one {@code findById} per id, preserving {@code itemIds}' order and still
+     * throwing {@link PurchaseRequestItemNotFoundException} for the first id (in that order) that
+     * isn't found.
+     */
+    private List<PurchaseRequestItem> requireItems(List<UUID> itemIds) {
+        Map<UUID, PurchaseRequestItem> itemsById = itemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(PurchaseRequestItem::getId, item -> item));
+        List<PurchaseRequestItem> items = new ArrayList<>();
+        for (UUID itemId : itemIds) {
+            PurchaseRequestItem item = itemsById.get(itemId);
+            if (item == null) {
+                throw new PurchaseRequestItemNotFoundException(itemId);
+            }
+            items.add(item);
+        }
+        return items;
     }
 
     private PurchaseRequest requirePurchaseRequest(UUID purchaseRequestId) {

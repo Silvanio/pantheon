@@ -15,6 +15,13 @@ public interface PurchaseRequestApprovalRepository extends JpaRepository<Purchas
     List<PurchaseRequestApproval> findByPurchaseRequestIdAndCycleNumberOrderByStepOrderAsc(
             UUID purchaseRequestId, int cycleNumber);
 
+    /**
+     * Every approval row (any cycle) across a set of Pedidos de Compra — batched form used to
+     * evaluate {@code isVisibleToViewAndApprove} for a whole page of headers in one query instead
+     * of two per row.
+     */
+    List<PurchaseRequestApproval> findByPurchaseRequestIdIn(List<UUID> purchaseRequestIds);
+
     Optional<PurchaseRequestApproval> findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
             UUID purchaseRequestId, int cycleNumber, PurchaseRequestApprovalStatus status);
 

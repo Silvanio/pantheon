@@ -258,9 +258,10 @@ public class PurchaseRequestPdfService {
                 .filter(a -> a.getCycleNumber() == purchaseRequest.getCurrentApprovalCycle())
                 .filter(a -> a.getStatus() != PurchaseRequestApprovalStatus.PENDING)
                 .toList();
+        Map<UUID, String> approverNamesByMembershipId = resolveMembershipNames(decidedSteps);
         for (PurchaseRequestApproval step : decidedSteps) {
             String approverName = step.getDecidedBySiteMembershipId() != null
-                    ? resolveMembershipName(step.getDecidedBySiteMembershipId())
+                    ? approverNamesByMembershipId.getOrDefault(step.getDecidedBySiteMembershipId(), "—")
                     : "Equipe da empresa";
             String verb = step.getStatus() == PurchaseRequestApprovalStatus.APPROVED ? "Aprovado" : "Rejeitado";
             html.append("<div class=\"meta-row\"><span class=\"label\">")
@@ -300,9 +301,43 @@ public class PurchaseRequestPdfService {
                 + DATETIME_FORMAT.format(Instant.now().atZone(ZoneOffset.UTC)) + "</p>";
     }
 
+    /**
+     * Batch-resolves every decided step's approver {@code SiteMembership} display name in at most
+     * two queries total ({@code findAllById} for memberships, then for their linked users) instead
+     * of a {@code findById} pair per step — bounded by the number of approval levels (typically
+     * 2-5), but still wasteful one row at a time.
+     */
+    private Map<UUID, String> resolveMembershipNames(List<PurchaseRequestApproval> decidedSteps) {
+        List<UUID> membershipIds = decidedSteps.stream()
+                .map(PurchaseRequestApproval::getDecidedBySiteMembershipId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (membershipIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<UUID, SiteMembership> membershipsById = siteMembershipRepository.findAllById(membershipIds).stream()
+                .collect(Collectors.toMap(SiteMembership::getId, m -> m));
+
+        List<UUID> userIds = membershipsById.values().stream()
+                .map(SiteMembership::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, AppUser> usersById = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream().collect(Collectors.toMap(AppUser::getId, u -> u));
+
+        Map<UUID, String> namesByMembershipId = new LinkedHashMap<>();
+        for (UUID membershipId : membershipIds) {
+            namesByMembershipId.put(membershipId, displayNameForMembership(membershipsById.get(membershipId), usersById));
+        }
+        return namesByMembershipId;
+    }
+
     /** A {@code SiteMembership}'s displayable name: its own {@code displayName} when set (accountless members), otherwise its linked {@code AppUser}'s. */
-    private String resolveMembershipName(UUID siteMembershipId) {
-        SiteMembership membership = siteMembershipRepository.findById(siteMembershipId).orElse(null);
+    private String displayNameForMembership(SiteMembership membership, Map<UUID, AppUser> usersById) {
         if (membership == null) {
             return "—";
         }
@@ -310,7 +345,8 @@ public class PurchaseRequestPdfService {
             return membership.getDisplayName();
         }
         if (membership.getUserId() != null) {
-            return userRepository.findById(membership.getUserId()).map(this::displayNameOrEmail).orElse("—");
+            AppUser user = usersById.get(membership.getUserId());
+            return user != null ? displayNameOrEmail(user) : "—";
         }
         return "—";
     }

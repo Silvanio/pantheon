@@ -30,6 +30,7 @@ import com.pantheon.service.repository.ScheduleTaskRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import com.pantheon.service.repository.TaskColumnRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -264,6 +265,41 @@ public class ScheduleService {
         }
         double average = tasks.stream().mapToInt(ScheduleTask::getPercentComplete).average().orElse(0);
         return (int) Math.round(average);
+    }
+
+    /**
+     * Batched equivalent of {@link #computeProgress(UUID)} for a whole list of sites (e.g. the "My
+     * Sites" dashboard) — one stages query and one tasks query total, instead of two per site. Same
+     * formula per site: average {@code percent_complete} across every task on that site's stages,
+     * rounded; a site with no stages or no tasks simply has no entry in the returned map (equivalent
+     * to {@code computeProgress}'s {@code null}).
+     */
+    public Map<UUID, Integer> computeProgressForSites(List<UUID> siteIds) {
+        if (siteIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<UUID, List<ScheduleStage>> stagesBySite = stageRepository.findByConstructionSiteIdIn(siteIds).stream()
+                .collect(Collectors.groupingBy(ScheduleStage::getConstructionSiteId));
+        List<UUID> stageIds = stagesBySite.values().stream()
+                .flatMap(List::stream)
+                .map(ScheduleStage::getId)
+                .toList();
+        Map<UUID, List<ScheduleTask>> tasksByStage = taskRepository.findByStageIdIn(stageIds).stream()
+                .collect(Collectors.groupingBy(ScheduleTask::getStageId));
+
+        Map<UUID, Integer> progressBySite = new HashMap<>();
+        for (Map.Entry<UUID, List<ScheduleStage>> entry : stagesBySite.entrySet()) {
+            List<ScheduleTask> tasks = entry.getValue().stream()
+                    .flatMap(stage -> tasksByStage.getOrDefault(stage.getId(), List.of()).stream())
+                    .toList();
+            if (tasks.isEmpty()) {
+                continue;
+            }
+            double average = tasks.stream().mapToInt(ScheduleTask::getPercentComplete).average().orElse(0);
+            progressBySite.put(entry.getKey(), (int) Math.round(average));
+        }
+        return progressBySite;
     }
 
     private ScheduleStageResponse toStageResponse(ScheduleStage stage) {

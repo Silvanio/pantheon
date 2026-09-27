@@ -7,6 +7,7 @@ import com.pantheon.service.dto.OrcamentoSummaryResponse;
 import com.pantheon.service.dto.PurchaseRequestSummaryResponse;
 import com.pantheon.service.dto.RecentItemResponse;
 import com.pantheon.service.dto.SiteSummaryResponse;
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.Equipment;
 import com.pantheon.service.entity.EquipmentStatus;
@@ -25,6 +26,7 @@ import com.pantheon.service.repository.SiteDocumentProjectRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,8 +39,12 @@ import org.springframework.stereotype.Service;
  * (throwing {@link ForbiddenCapabilityException} on {@code HIDDEN}), caught here and mapped to
  * "omit this section" rather than letting the whole request fail. Daily reports/Purchase
  * requests/Orçamentos/Equipment reuse their already-paginated, createdAt-sorted service {@code
- * list} methods; Tasks/Projetos/Team have no comparable lightweight read path, so this service
- * does its own visibility check for those three and queries their repositories directly.
+ * list} methods; Schedule/Tasks/Projetos/Team have no comparable lightweight read path, so this
+ * service does its own visibility check for those four and queries their repositories directly.
+ * {@link #build} resolves the caller's {@link SiteAccessContext} and every capability's {@link
+ * AccessLevel} (via {@link SitePermissionService#resolveAll}) exactly once and hands the
+ * resulting map down to those four sections, instead of each of them independently re-resolving
+ * site access and re-querying {@code site_permission_override} for its own capability.
  */
 @Service
 public class SiteSummaryService {
@@ -91,24 +97,24 @@ public class SiteSummaryService {
 
     public SiteSummaryResponse build(UUID siteId, UUID actingUserId) {
         requireSite(siteId);
+        SiteAccessContext access = siteAccessService.requireAccess(siteId, actingUserId);
+        Map<PermissionCapability, AccessLevel> permissions = permissionService.resolveAll(siteId, access);
         return new SiteSummaryResponse(
-                scheduleSummary(siteId, actingUserId),
+                scheduleSummary(siteId, permissions),
                 dailyReportsSummary(siteId, actingUserId),
                 purchaseRequestsSummary(siteId, actingUserId),
                 orcamentosSummary(siteId, actingUserId),
                 equipmentSummary(siteId, actingUserId),
-                projectsSummary(siteId, actingUserId),
-                tasksSummary(siteId, actingUserId),
-                teamSummary(siteId, actingUserId));
+                projectsSummary(siteId, permissions),
+                tasksSummary(siteId, permissions),
+                teamSummary(siteId, permissions));
     }
 
-    private Integer scheduleSummary(UUID siteId, UUID actingUserId) {
-        try {
-            requireVisible(siteId, actingUserId, PermissionCapability.SCHEDULE);
-            return scheduleService.computeProgress(siteId);
-        } catch (ForbiddenCapabilityException e) {
+    private Integer scheduleSummary(UUID siteId, Map<PermissionCapability, AccessLevel> permissions) {
+        if (isHidden(permissions, PermissionCapability.SCHEDULE)) {
             return null;
         }
+        return scheduleService.computeProgress(siteId);
     }
 
     private DailyReportSummaryResponse dailyReportsSummary(UUID siteId, UUID actingUserId) {
@@ -158,50 +164,44 @@ public class SiteSummaryService {
         }
     }
 
-    private CountStatResponse projectsSummary(UUID siteId, UUID actingUserId) {
-        try {
-            requireVisible(siteId, actingUserId, PermissionCapability.DOCUMENT_PROJECTS);
-            long total = siteDocumentProjectRepository.countByConstructionSiteId(siteId);
-            List<RecentItemResponse> recent = siteDocumentProjectRepository
-                    .findTop5ByConstructionSiteIdOrderByCreatedAtDesc(siteId)
-                    .stream()
-                    .limit(3)
-                    .map(p -> new RecentItemResponse(p.getId(), p.getName(), p.getCreatedAt()))
-                    .toList();
-            return new CountStatResponse(total, recent);
-        } catch (ForbiddenCapabilityException e) {
+    private CountStatResponse projectsSummary(UUID siteId, Map<PermissionCapability, AccessLevel> permissions) {
+        if (isHidden(permissions, PermissionCapability.DOCUMENT_PROJECTS)) {
             return null;
         }
+        long total = siteDocumentProjectRepository.countByConstructionSiteId(siteId);
+        List<RecentItemResponse> recent = siteDocumentProjectRepository
+                .findTop5ByConstructionSiteIdOrderByCreatedAtDesc(siteId)
+                .stream()
+                .limit(3)
+                .map(p -> new RecentItemResponse(p.getId(), p.getName(), p.getCreatedAt()))
+                .toList();
+        return new CountStatResponse(total, recent);
     }
 
-    private CountStatResponse tasksSummary(UUID siteId, UUID actingUserId) {
-        try {
-            requireVisible(siteId, actingUserId, PermissionCapability.TASKS);
-            long total = taskCardRepository.countByConstructionSiteId(siteId);
-            List<RecentItemResponse> recent = taskCardRepository
-                    .findTop5ByConstructionSiteIdOrderByCreatedAtDesc(siteId)
-                    .stream()
-                    .limit(3)
-                    .map(c -> new RecentItemResponse(c.getId(), c.getTitle(), c.getCreatedAt()))
-                    .toList();
-            return new CountStatResponse(total, recent);
-        } catch (ForbiddenCapabilityException e) {
+    private CountStatResponse tasksSummary(UUID siteId, Map<PermissionCapability, AccessLevel> permissions) {
+        if (isHidden(permissions, PermissionCapability.TASKS)) {
             return null;
         }
+        long total = taskCardRepository.countByConstructionSiteId(siteId);
+        List<RecentItemResponse> recent = taskCardRepository
+                .findTop5ByConstructionSiteIdOrderByCreatedAtDesc(siteId)
+                .stream()
+                .limit(3)
+                .map(c -> new RecentItemResponse(c.getId(), c.getTitle(), c.getCreatedAt()))
+                .toList();
+        return new CountStatResponse(total, recent);
     }
 
-    private Long teamSummary(UUID siteId, UUID actingUserId) {
-        try {
-            requireVisible(siteId, actingUserId, PermissionCapability.TEAM_MANAGE);
-            return siteMembershipRepository.countByConstructionSiteId(siteId);
-        } catch (ForbiddenCapabilityException e) {
+    private Long teamSummary(UUID siteId, Map<PermissionCapability, AccessLevel> permissions) {
+        if (isHidden(permissions, PermissionCapability.TEAM_MANAGE)) {
             return null;
         }
+        return siteMembershipRepository.countByConstructionSiteId(siteId);
     }
 
-    private void requireVisible(UUID siteId, UUID actingUserId, PermissionCapability capability) {
-        var access = siteAccessService.requireAccess(siteId, actingUserId);
-        permissionService.requireVisible(siteId, access, capability);
+    /** Whether {@code capability}'s already-resolved access (from {@link #build}'s single {@code resolveAll} call) is {@code HIDDEN}. */
+    private boolean isHidden(Map<PermissionCapability, AccessLevel> permissions, PermissionCapability capability) {
+        return permissions.get(capability) == AccessLevel.HIDDEN;
     }
 
     private void requireSite(UUID siteId) {

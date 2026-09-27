@@ -292,20 +292,16 @@ class PurchaseRequestServiceTest {
         PurchaseRequest notYetRelevant = purchaseRequest();
         notYetRelevant.markOrcado();
         notYetRelevant.submitForApproval(Instant.now());
-        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
-                notYetRelevant.getId(), notYetRelevant.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING))
-                .thenReturn(Optional.of(new PurchaseRequestApproval(
-                        UUID.randomUUID(), notYetRelevant.getId(), notYetRelevant.getCurrentApprovalCycle(), 1,
-                        ConstructionFunction.ENGINEER, Instant.now())));
+        PurchaseRequestApproval notYetRelevantStep = new PurchaseRequestApproval(
+                UUID.randomUUID(), notYetRelevant.getId(), notYetRelevant.getCurrentApprovalCycle(), 1,
+                ConstructionFunction.ENGINEER, Instant.now());
 
         PurchaseRequest pendingForMe = purchaseRequest();
         pendingForMe.markOrcado();
         pendingForMe.submitForApproval(Instant.now());
-        when(approvalRepository.findFirstByPurchaseRequestIdAndCycleNumberAndStatusOrderByStepOrderAsc(
-                pendingForMe.getId(), pendingForMe.getCurrentApprovalCycle(), PurchaseRequestApprovalStatus.PENDING))
-                .thenReturn(Optional.of(new PurchaseRequestApproval(
-                        UUID.randomUUID(), pendingForMe.getId(), pendingForMe.getCurrentApprovalCycle(), 2,
-                        ConstructionFunction.CLIENT, Instant.now())));
+        PurchaseRequestApproval pendingForMeStep = new PurchaseRequestApproval(
+                UUID.randomUUID(), pendingForMe.getId(), pendingForMe.getCurrentApprovalCycle(), 2,
+                ConstructionFunction.CLIENT, Instant.now());
 
         PurchaseRequest concluded = purchaseRequest();
         concluded.markOrcado();
@@ -314,6 +310,11 @@ class PurchaseRequestServiceTest {
         concluded.complete(Instant.now());
         Page<PurchaseRequest> page = new PageImpl<>(List.of(notYetRelevant, pendingForMe, concluded));
         when(purchaseRequestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        // list() batches every non-concluded header's approval rows in a single query (see
+        // filterVisibleToViewAndApprove) instead of querying per row.
+        when(approvalRepository.findByPurchaseRequestIdIn(List.of(notYetRelevant.getId(), pendingForMe.getId())))
+                .thenReturn(List.of(notYetRelevantStep, pendingForMeStep));
 
         UUID clientUserId = UUID.randomUUID();
         SiteMembership clientMembership = activeMember(clientUserId, ConstructionFunction.CLIENT);
@@ -447,7 +448,7 @@ class PurchaseRequestServiceTest {
         UUID engineerUserId = UUID.randomUUID();
         when(siteMembershipRepository.findByConstructionSiteIdAndFunction(siteId, ConstructionFunction.ENGINEER))
                 .thenReturn(List.of(activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
-        when(userRepository.findById(engineerUserId)).thenReturn(Optional.of(
+        when(userRepository.findAllById(List.of(engineerUserId))).thenReturn(List.of(
                 new AppUser(engineerUserId, "eng@example.com", "Eng", "hash", null, Instant.now(), Instant.now())));
 
         PurchaseRequest result = service.submitForApproval(purchaseRequest.getId(), UUID.randomUUID());
@@ -760,8 +761,7 @@ class PurchaseRequestServiceTest {
         OrcamentoLineItem quoteB = new OrcamentoLineItem(
                 UUID.randomUUID(), orcamentoB.getId(), "Cimento", "Saco", new BigDecimal("10"), new BigDecimal("35"),
                 prItem.getId());
-        when(orcamentoLineItemRepository.findByOrcamentoIdInAndSourcePurchaseRequestItemId(
-                List.of(orcamentoA.getId(), orcamentoB.getId()), prItem.getId()))
+        when(orcamentoLineItemRepository.findByOrcamentoIdIn(List.of(orcamentoA.getId(), orcamentoB.getId())))
                 .thenReturn(List.of(quoteA, quoteB));
 
         PurchaseRequestComparisonResponse comparison = service.getComparison(purchaseRequest.getId(), UUID.randomUUID());
@@ -797,8 +797,7 @@ class PurchaseRequestServiceTest {
                 UUID.randomUUID(), siteId, UUID.randomUUID(), Instant.now(), "111", "Fornecedor A", null, null, null,
                 null, null, null, purchaseRequest.getId());
         when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of(orcamentoA));
-        when(orcamentoLineItemRepository.findByOrcamentoIdInAndSourcePurchaseRequestItemId(
-                List.of(orcamentoA.getId()), prItem.getId())).thenReturn(List.of());
+        when(orcamentoLineItemRepository.findByOrcamentoIdIn(List.of(orcamentoA.getId()))).thenReturn(List.of());
 
         PurchaseRequestComparisonResponse comparison = service.getComparison(purchaseRequest.getId(), UUID.randomUUID());
 
@@ -844,7 +843,7 @@ class PurchaseRequestServiceTest {
         when(orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequest.getId())).thenReturn(List.of(orcamento));
         OrcamentoLineItem lineItem = new OrcamentoLineItem(
                 UUID.randomUUID(), orcamento.getId(), "Cimento", "Saco", BigDecimal.TEN, BigDecimal.ONE, UUID.randomUUID());
-        when(orcamentoLineItemRepository.findByOrcamentoId(orcamento.getId())).thenReturn(List.of(lineItem));
+        when(orcamentoLineItemRepository.findByOrcamentoIdIn(List.of(orcamento.getId()))).thenReturn(List.of(lineItem));
 
         PurchaseRequestItem item = item(purchaseRequest.getId());
         item.convertTo(orcamento.getId(), Instant.now());

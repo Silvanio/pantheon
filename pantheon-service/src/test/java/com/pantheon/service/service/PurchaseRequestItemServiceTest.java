@@ -122,7 +122,7 @@ class PurchaseRequestItemServiceTest {
     void convertToOrcamentoMarksItemsConvertedAndCreatesOrcamento() {
         UUID actingUserId = UUID.randomUUID();
         PurchaseRequestItem pending = item(PurchaseRequestItemStatus.PENDING);
-        when(itemRepository.findById(pending.getId())).thenReturn(Optional.of(pending));
+        when(itemRepository.findAllById(List.of(pending.getId()))).thenReturn(List.of(pending));
 
         Orcamento orcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor Teste", null,
@@ -145,7 +145,7 @@ class PurchaseRequestItemServiceTest {
         UUID actingUserId = UUID.randomUUID();
         PurchaseRequestItem converted = item(PurchaseRequestItemStatus.CONVERTED);
         UUID firstOrcamentoId = converted.getConvertedToOrcamentoId();
-        when(itemRepository.findById(converted.getId())).thenReturn(Optional.of(converted));
+        when(itemRepository.findAllById(List.of(converted.getId()))).thenReturn(List.of(converted));
 
         Orcamento secondOrcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor B", null,
@@ -168,8 +168,8 @@ class PurchaseRequestItemServiceTest {
         UUID actingUserId = UUID.randomUUID();
         PurchaseRequestItem fromThisHeader = item(purchaseRequestId, PurchaseRequestItemStatus.PENDING);
         PurchaseRequestItem fromOtherHeader = item(UUID.randomUUID(), PurchaseRequestItemStatus.PENDING);
-        when(itemRepository.findById(fromThisHeader.getId())).thenReturn(Optional.of(fromThisHeader));
-        when(itemRepository.findById(fromOtherHeader.getId())).thenReturn(Optional.of(fromOtherHeader));
+        when(itemRepository.findAllById(List.of(fromThisHeader.getId(), fromOtherHeader.getId())))
+                .thenReturn(List.of(fromThisHeader, fromOtherHeader));
 
         assertThatThrownBy(() -> service.convertToOrcamento(
                 purchaseRequestId, actingUserId, List.of(fromThisHeader.getId(), fromOtherHeader.getId()),
@@ -181,7 +181,7 @@ class PurchaseRequestItemServiceTest {
     void sameHeaderCanSpawnASecondOrcamentoFromRemainingItems() {
         UUID actingUserId = UUID.randomUUID();
         PurchaseRequestItem firstBatch = item(PurchaseRequestItemStatus.PENDING);
-        when(itemRepository.findById(firstBatch.getId())).thenReturn(Optional.of(firstBatch));
+        when(itemRepository.findAllById(List.of(firstBatch.getId()))).thenReturn(List.of(firstBatch));
         Orcamento firstOrcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor Teste", null,
                 null, null, null, null, null, purchaseRequestId);
@@ -192,7 +192,7 @@ class PurchaseRequestItemServiceTest {
         service.convertToOrcamento(purchaseRequestId, actingUserId, List.of(firstBatch.getId()), fornecedorRequest());
 
         PurchaseRequestItem secondBatch = item(PurchaseRequestItemStatus.PENDING);
-        when(itemRepository.findById(secondBatch.getId())).thenReturn(Optional.of(secondBatch));
+        when(itemRepository.findAllById(List.of(secondBatch.getId()))).thenReturn(List.of(secondBatch));
         Orcamento secondOrcamento = new Orcamento(
                 UUID.randomUUID(), siteId, actingUserId, Instant.now(), "12345678000199", "Fornecedor Teste", null,
                 null, null, null, null, null, purchaseRequestId);

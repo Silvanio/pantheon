@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -264,7 +263,7 @@ class OrcamentoServiceTest {
 
         assertThat(a.getStatus()).isEqualTo(OrcamentoStatus.LOCKED);
         assertThat(b.getStatus()).isEqualTo(OrcamentoStatus.LOCKED);
-        verify(orcamentoRepository, times(2)).save(any());
+        verify(orcamentoRepository).saveAll(List.of(a, b));
     }
 
     @Test

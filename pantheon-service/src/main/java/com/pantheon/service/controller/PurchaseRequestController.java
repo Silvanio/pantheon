@@ -12,6 +12,7 @@ import com.pantheon.service.dto.PurchaseRequestResponse;
 import com.pantheon.service.dto.RejectPurchaseRequestRequest;
 import com.pantheon.service.dto.SetItemSelectionRequest;
 import com.pantheon.service.entity.AppUser;
+import com.pantheon.service.entity.Orcamento;
 import com.pantheon.service.entity.PurchaseRequest;
 import com.pantheon.service.entity.PurchaseRequestItemStatus;
 import com.pantheon.service.entity.PurchaseRequestStatus;
@@ -92,8 +93,10 @@ public class PurchaseRequestController {
         Page<PurchaseRequest> resultPage = purchaseRequestService.list(siteId, user.getId(), date, status, PageRequest.of(page, size));
         Map<UUID, String> creatorNames = purchaseRequestService.resolveDisplayNames(
                 resultPage.getContent().stream().map(PurchaseRequest::getCreatedBy).distinct().toList());
+        Map<UUID, List<Orcamento>> orcamentosByPurchaseRequestId = purchaseRequestService.listLinkedOrcamentos(
+                resultPage.getContent().stream().map(PurchaseRequest::getId).toList());
         Page<PurchaseRequestResponse> response = resultPage.map(pr -> PurchaseRequestResponse.from(
-                pr, purchaseRequestService.listLinkedOrcamentos(pr.getId()), creatorNames.get(pr.getCreatedBy())));
+                pr, orcamentosByPurchaseRequestId.getOrDefault(pr.getId(), List.of()), creatorNames.get(pr.getCreatedBy())));
         return ResponseEntity.ok(response);
     }
 

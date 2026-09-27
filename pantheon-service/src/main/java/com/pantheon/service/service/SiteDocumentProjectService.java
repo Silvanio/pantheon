@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -236,6 +237,43 @@ public class SiteDocumentProjectService {
                 .orElse(null);
     }
 
+    /**
+     * Batched {@link #folderPathFor(SiteDocumentProjectAttachment)}: the naive version issues one
+     * query per ancestor level, per attachment (M attachments at folder depth D means M×(1+D)
+     * queries). Instead, this loads each distinct construction site's entire folder tree once via
+     * {@link SiteDocumentProjectRepository#findByConstructionSiteId(UUID)}, then walks every
+     * attachment's ancestor chain purely in memory against that map. Keyed by attachment id.
+     */
+    public Map<UUID, String> folderPathsFor(List<SiteDocumentProjectAttachment> attachments) {
+        List<UUID> siteIds = attachments.stream()
+                .map(SiteDocumentProjectAttachment::getConstructionSiteId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, SiteDocumentProject> foldersById = siteIds.stream()
+                .flatMap(siteId -> projectRepository.findByConstructionSiteId(siteId).stream())
+                .collect(Collectors.toMap(SiteDocumentProject::getId, folder -> folder));
+
+        Map<UUID, String> paths = new HashMap<>();
+        for (SiteDocumentProjectAttachment attachment : attachments) {
+            paths.put(attachment.getId(), folderPathFor(attachment.getSiteDocumentProjectId(), foldersById));
+        }
+        return paths;
+    }
+
+    private String folderPathFor(UUID folderId, Map<UUID, SiteDocumentProject> foldersById) {
+        if (folderId == null) {
+            return null;
+        }
+        SiteDocumentProject folder = foldersById.get(folderId);
+        if (folder == null) {
+            return null;
+        }
+        return ancestorChainInclusive(folder, foldersById).stream()
+                .map(SiteDocumentProject::getName)
+                .collect(Collectors.joining(" / "));
+    }
+
     /** Same "display name, fallback to email" resolution {@code TaskCommentService} uses for comment authors. */
     public Map<UUID, String> displayNamesFor(List<UUID> userIds) {
         List<UUID> distinct = userIds.stream().filter(Objects::nonNull).distinct().toList();
@@ -309,6 +347,18 @@ public class SiteDocumentProjectService {
         while (current != null) {
             chain.add(current);
             current = current.getParentId() != null ? requireFolder(current.getParentId()) : null;
+        }
+        java.util.Collections.reverse(chain);
+        return chain;
+    }
+
+    /** In-memory equivalent of {@link #ancestorChainInclusive(SiteDocumentProject)} — no DB calls. */
+    private List<SiteDocumentProject> ancestorChainInclusive(SiteDocumentProject folder, Map<UUID, SiteDocumentProject> foldersById) {
+        List<SiteDocumentProject> chain = new ArrayList<>();
+        SiteDocumentProject current = folder;
+        while (current != null) {
+            chain.add(current);
+            current = current.getParentId() != null ? foldersById.get(current.getParentId()) : null;
         }
         java.util.Collections.reverse(chain);
         return chain;

@@ -137,9 +137,12 @@ public class ConstructionSiteService {
         Map<UUID, String> companyNamesById = companyRepository.findAllById(companyIds).stream()
                 .collect(Collectors.toMap(Company::getId, Company::getName));
 
+        List<UUID> siteIdsForProgress = sites.stream().map(ConstructionSite::getId).toList();
+        Map<UUID, Integer> progressBySite = scheduleService.computeProgressForSites(siteIdsForProgress);
+
         return sites.stream()
                 .map(site -> MySiteResponse.from(
-                        site, companyNamesById.get(site.getCompanyId()), scheduleService.computeProgress(site.getId())))
+                        site, companyNamesById.get(site.getCompanyId()), progressBySite.get(site.getId())))
                 .toList();
     }
 

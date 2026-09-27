@@ -48,6 +48,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -203,10 +204,31 @@ public class PurchaseRequestService {
             SiteMembership membership = resolveSiteMembership(siteId, actingUserId, access);
             List<PurchaseRequest> visible = membership == null
                     ? List.of()
-                    : page.getContent().stream().filter(pr -> isVisibleToViewAndApprove(pr, membership)).toList();
+                    : filterVisibleToViewAndApprove(page.getContent(), membership);
             return new PageImpl<>(visible, pageable, visible.size());
         }
         return page;
+    }
+
+    /**
+     * Batched form of {@link #isVisibleToViewAndApprove(PurchaseRequest, SiteMembership)} for a
+     * whole page of headers: pre-fetches every relevant {@link PurchaseRequestApproval} in a
+     * single query (instead of the 2 extra queries per row the single-header check needs) and
+     * evaluates the exact same rule in memory.
+     */
+    private List<PurchaseRequest> filterVisibleToViewAndApprove(List<PurchaseRequest> purchaseRequests, SiteMembership membership) {
+        List<UUID> nonConcludedIds = purchaseRequests.stream()
+                .filter(pr -> pr.getStatus() != PurchaseRequestStatus.CONCLUIDO)
+                .map(PurchaseRequest::getId)
+                .toList();
+        Map<UUID, List<PurchaseRequestApproval>> approvalsByPurchaseRequestId = nonConcludedIds.isEmpty()
+                ? Map.of()
+                : approvalRepository.findByPurchaseRequestIdIn(nonConcludedIds).stream()
+                        .collect(Collectors.groupingBy(PurchaseRequestApproval::getPurchaseRequestId));
+        return purchaseRequests.stream()
+                .filter(pr -> isVisibleToViewAndApprove(
+                        pr, membership, approvalsByPurchaseRequestId.getOrDefault(pr.getId(), List.of())))
+                .toList();
     }
 
     public PurchaseRequest get(UUID purchaseRequestId, UUID actingUserId) {
@@ -252,6 +274,32 @@ public class PurchaseRequestService {
                 .orElse(false);
     }
 
+    /**
+     * Same rule as {@link #isVisibleToViewAndApprove(PurchaseRequest, SiteMembership)}, evaluated
+     * against a pre-fetched batch of this header's approval rows (any cycle, unordered) instead of
+     * issuing its own queries — see {@link #filterVisibleToViewAndApprove}.
+     */
+    private boolean isVisibleToViewAndApprove(
+            PurchaseRequest purchaseRequest, SiteMembership membership, List<PurchaseRequestApproval> approvals) {
+        if (purchaseRequest.getStatus() == PurchaseRequestStatus.CONCLUIDO) {
+            return true;
+        }
+        List<PurchaseRequestApproval> cycleSteps = approvals.stream()
+                .filter(a -> a.getCycleNumber() == purchaseRequest.getCurrentApprovalCycle())
+                .toList();
+        boolean alreadyDecided = cycleSteps.stream()
+                .anyMatch(a -> a.getApproverFunction() == membership.getFunction()
+                        && a.getStatus() != PurchaseRequestApprovalStatus.PENDING);
+        if (alreadyDecided) {
+            return true;
+        }
+        return cycleSteps.stream()
+                .filter(a -> a.getStatus() == PurchaseRequestApprovalStatus.PENDING)
+                .min(Comparator.comparingInt(PurchaseRequestApproval::getStepOrder))
+                .map(step -> step.getApproverFunction() == membership.getFunction())
+                .orElse(false);
+    }
+
     /** No-op unless the resolved access is {@code VIEW_AND_APPROVE}, in which case an irrelevant Pedido de Compra behaves as if it doesn't exist. */
     private void requireViewAndApproveVisibility(PurchaseRequest purchaseRequest, UUID actingUserId, SiteAccessContext access) {
         UUID siteId = purchaseRequest.getConstructionSiteId();
@@ -267,6 +315,16 @@ public class PurchaseRequestService {
     /** Every Orcamento converted from this header — used to populate the response's linked-Orcamento summaries. */
     public List<Orcamento> listLinkedOrcamentos(UUID purchaseRequestId) {
         return orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
+    }
+
+    /** Batch form of {@link #listLinkedOrcamentos(UUID)} for a page of headers — avoids one query per row. */
+    public Map<UUID, List<Orcamento>> listLinkedOrcamentos(Collection<UUID> purchaseRequestIds) {
+        List<UUID> distinctIds = purchaseRequestIds.stream().distinct().toList();
+        if (distinctIds.isEmpty()) {
+            return Map.of();
+        }
+        return orcamentoRepository.findBySourcePurchaseRequestIdIn(distinctIds).stream()
+                .collect(Collectors.groupingBy(Orcamento::getSourcePurchaseRequestId));
     }
 
     /**
@@ -426,8 +484,9 @@ public class PurchaseRequestService {
         itemRepository.saveAll(items);
 
         List<Orcamento> orcamentos = orcamentoRepository.findBySourcePurchaseRequestId(purchaseRequestId);
-        for (Orcamento orcamento : orcamentos) {
-            orcamentoLineItemRepository.deleteAll(orcamentoLineItemRepository.findByOrcamentoId(orcamento.getId()));
+        List<UUID> orcamentoIds = orcamentos.stream().map(Orcamento::getId).toList();
+        if (!orcamentoIds.isEmpty()) {
+            orcamentoLineItemRepository.deleteAll(orcamentoLineItemRepository.findByOrcamentoIdIn(orcamentoIds));
         }
         orcamentoRepository.deleteAll(orcamentos);
 
@@ -537,11 +596,17 @@ public class PurchaseRequestService {
                 .map(o -> new PurchaseRequestComparisonResponse.ColumnResponse(o.getId(), o.getFornecedorNome()))
                 .toList();
 
+        // Fetch every line item across all linked Orcamentos once, then group by the PR item it
+        // quotes, instead of querying per row below — avoids an N+1 across the header's items.
+        Map<UUID, List<OrcamentoLineItem>> matchesByItemId = orcamentoIds.isEmpty()
+                ? Map.of()
+                : orcamentoLineItemRepository.findByOrcamentoIdIn(orcamentoIds).stream()
+                        .filter(li -> li.getSourcePurchaseRequestItemId() != null)
+                        .collect(Collectors.groupingBy(OrcamentoLineItem::getSourcePurchaseRequestItemId));
+
         List<PurchaseRequestComparisonResponse.RowResponse> rows = new ArrayList<>();
         for (PurchaseRequestItem item : items) {
-            List<OrcamentoLineItem> matches = orcamentoIds.isEmpty()
-                    ? List.of()
-                    : orcamentoLineItemRepository.findByOrcamentoIdInAndSourcePurchaseRequestItemId(orcamentoIds, item.getId());
+            List<OrcamentoLineItem> matches = matchesByItemId.getOrDefault(item.getId(), List.of());
             List<PurchaseRequestComparisonResponse.CellResponse> cells = matches.stream()
                     .map(lineItem -> new PurchaseRequestComparisonResponse.CellResponse(
                             lineItem.getOrcamentoId(), lineItem.getId(), lineItem.getUnitPrice(), lineItem.getQuantity(),
@@ -596,10 +661,16 @@ public class PurchaseRequestService {
                 .filter(m -> m.isActive() && m.getUserId() != null)
                 .toList();
 
+        Map<UUID, AppUser> usersById = userRepository.findAllById(approvers.stream().map(SiteMembership::getUserId).toList())
+                .stream()
+                .collect(Collectors.toMap(AppUser::getId, u -> u));
+
         for (SiteMembership approver : approvers) {
-            userRepository.findById(approver.getUserId()).map(AppUser::getEmail).ifPresent(email ->
-                    eventPublisher.publish(PurchaseRequestApprovalStepPendingEvent.TYPE, new PurchaseRequestApprovalStepPendingEvent(
-                            purchaseRequest.getId(), siteId, site.getName(), step.getApproverFunction().name(), email)));
+            AppUser user = usersById.get(approver.getUserId());
+            if (user != null && user.getEmail() != null) {
+                eventPublisher.publish(PurchaseRequestApprovalStepPendingEvent.TYPE, new PurchaseRequestApprovalStepPendingEvent(
+                        purchaseRequest.getId(), siteId, site.getName(), step.getApproverFunction().name(), user.getEmail()));
+            }
             pushNotificationService.sendToUser(
                     approver.getUserId(),
                     "Pedido de compra aguardando aprovação",

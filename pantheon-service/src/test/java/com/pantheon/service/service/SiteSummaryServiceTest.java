@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.Equipment;
@@ -29,7 +29,9 @@ import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.repository.TaskCardRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,6 +103,7 @@ class SiteSummaryServiceTest {
         siteId = UUID.randomUUID();
         lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
+        lenient().when(permissionService.resolveAll(eq(siteId), any())).thenReturn(fullAccessPermissions());
         lenient()
                 .when(purchaseRequestRepository.countByConstructionSiteIdAndStatusAndSubmittedAtIsNotNull(
                         eq(siteId), eq(PurchaseRequestStatus.ORCADO)))
@@ -108,6 +111,14 @@ class SiteSummaryServiceTest {
         lenient()
                 .when(orcamentoRepository.countByConstructionSiteIdAndStatus(eq(siteId), eq(OrcamentoStatus.DRAFT)))
                 .thenReturn(0L);
+    }
+
+    private Map<PermissionCapability, AccessLevel> fullAccessPermissions() {
+        Map<PermissionCapability, AccessLevel> permissions = new EnumMap<>(PermissionCapability.class);
+        for (PermissionCapability capability : PermissionCapability.values()) {
+            permissions.put(capability, AccessLevel.MANAGE);
+        }
+        return permissions;
     }
 
     private ConstructionSite site(UUID id) {
@@ -226,10 +237,9 @@ class SiteSummaryServiceTest {
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1), 0));
         when(siteDocumentProjectRepository.countByConstructionSiteId(siteId)).thenReturn(0L);
         when(siteDocumentProjectRepository.findTop5ByConstructionSiteIdOrderByCreatedAtDesc(siteId)).thenReturn(List.of());
-        lenient()
-                .doThrow(new ForbiddenCapabilityException(siteId, PermissionCapability.TASKS))
-                .when(permissionService)
-                .requireVisible(eq(siteId), any(), eq(PermissionCapability.TASKS));
+        Map<PermissionCapability, AccessLevel> permissions = fullAccessPermissions();
+        permissions.put(PermissionCapability.TASKS, AccessLevel.HIDDEN);
+        when(permissionService.resolveAll(eq(siteId), any())).thenReturn(permissions);
         when(siteMembershipRepository.countByConstructionSiteId(siteId)).thenReturn(1L);
 
         var result = service.build(siteId, UUID.randomUUID());

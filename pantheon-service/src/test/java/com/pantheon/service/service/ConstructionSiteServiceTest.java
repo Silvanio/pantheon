@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -77,6 +78,7 @@ class ConstructionSiteServiceTest {
         companyId = UUID.randomUUID();
         adminUserId = UUID.randomUUID();
         lenient().when(scheduleService.computeProgress(any())).thenReturn(null);
+        lenient().when(scheduleService.computeProgressForSites(any())).thenReturn(java.util.Map.of());
         lenient().when(platformAdminService.isSuperAdmin(any())).thenReturn(false);
 
         lenient().when(membershipRepository.findByCompanyIdAndUserId(companyId, adminUserId)).thenReturn(
@@ -128,6 +130,41 @@ class ConstructionSiteServiceTest {
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting("companyName").containsExactlyInAnyOrder("Empresa A", "Empresa B");
+    }
+
+    @Test
+    void listMineBatchesScheduleProgressInASingleCallInsteadOfOnePerSite() {
+        UUID userId = UUID.randomUUID();
+        UUID companyA = UUID.randomUUID();
+        UUID companyB = UUID.randomUUID();
+        UUID siteA = UUID.randomUUID();
+        UUID siteB = UUID.randomUUID();
+
+        SiteMembership activeOnA = com.pantheon.service.entity.SiteMembership.invited(
+                UUID.randomUUID(), siteA, userId, ConstructionFunction.CLIENT, null, null, Instant.now());
+        activeOnA.accept();
+        SiteMembership activeOnB = com.pantheon.service.entity.SiteMembership.invited(
+                UUID.randomUUID(), siteB, userId, ConstructionFunction.ENGINEER, null, null, Instant.now());
+        activeOnB.accept();
+
+        when(siteMembershipRepository.findByUserId(userId)).thenReturn(java.util.List.of(activeOnA, activeOnB));
+        when(siteRepository.findAllById(java.util.List.of(siteA, siteB))).thenReturn(java.util.List.of(
+                new ConstructionSite(siteA, companyA, "Obra A", "Endereco A", LocalDate.now(), null, userId, Instant.now()),
+                new ConstructionSite(siteB, companyB, "Obra B", "Endereco B", LocalDate.now(), null, userId, Instant.now())));
+        when(companyRepository.findAllById(any())).thenReturn(java.util.List.of(
+                newCompany(companyA, "Empresa A"), newCompany(companyB, "Empresa B")));
+        when(scheduleService.computeProgressForSites(any()))
+                .thenReturn(java.util.Map.of(siteA, 35, siteB, 50));
+
+        var result = service.listMine(userId);
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting("id", "schedulePercentComplete")
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(siteA, 35),
+                        org.assertj.core.groups.Tuple.tuple(siteB, 50));
+        verify(scheduleService, times(1)).computeProgressForSites(any());
+        verify(scheduleService, never()).computeProgress(any());
     }
 
     @Test

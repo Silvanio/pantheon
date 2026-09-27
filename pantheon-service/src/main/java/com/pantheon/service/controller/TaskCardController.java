@@ -123,9 +123,10 @@ public class TaskCardController {
                 documentProjectService.listAttachmentsForTaskCard(cardId, user.getId());
         Map<UUID, String> uploaderNames = documentProjectService.displayNamesFor(
                 attachments.stream().map(SiteDocumentProjectAttachment::getUploadedBy).toList());
+        Map<UUID, String> folderPaths = documentProjectService.folderPathsFor(attachments);
         List<SiteDocumentProjectAttachmentResponse> response = attachments.stream()
                 .map(attachment -> SiteDocumentProjectAttachmentResponse.from(
-                        attachment, uploaderNames.get(attachment.getUploadedBy()), documentProjectService.folderPathFor(attachment)))
+                        attachment, uploaderNames.get(attachment.getUploadedBy()), folderPaths.get(attachment.getId())))
                 .toList();
         return ResponseEntity.ok(response);
     }

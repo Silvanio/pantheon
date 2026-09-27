@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.ScheduleDependencyRequest;
@@ -39,6 +40,7 @@ import com.pantheon.service.repository.TaskColumnRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -404,5 +406,51 @@ class ScheduleServiceTest {
                 .thenReturn(List.of(task(stage.getId(), 20), task(stage.getId(), 50)));
 
         assertThat(service.computeProgress(siteId)).isEqualTo(35);
+    }
+
+    @Test
+    void computeProgressForSitesReturnsEmptyMapForEmptyInput() {
+        assertThat(service.computeProgressForSites(List.of())).isEmpty();
+        verifyNoInteractions(stageRepository, taskRepository);
+    }
+
+    @Test
+    void computeProgressForSitesOmitsSitesWithNoStagesOrNoTasks() {
+        UUID siteWithNoStages = UUID.randomUUID();
+        UUID siteWithNoTasks = UUID.randomUUID();
+        ScheduleStage emptyStage = new ScheduleStage(
+                UUID.randomUUID(), siteWithNoTasks, "Fundação", "blueprint", LocalDate.now(),
+                LocalDate.now().plusDays(10), 0, Instant.now());
+        when(stageRepository.findByConstructionSiteIdIn(List.of(siteWithNoStages, siteWithNoTasks)))
+                .thenReturn(List.of(emptyStage));
+        when(taskRepository.findByStageIdIn(List.of(emptyStage.getId()))).thenReturn(List.of());
+
+        Map<UUID, Integer> result = service.computeProgressForSites(List.of(siteWithNoStages, siteWithNoTasks));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void computeProgressForSitesMatchesPerSiteComputeProgressForEachSiteBatched() {
+        UUID siteA = UUID.randomUUID();
+        UUID siteB = UUID.randomUUID();
+        ScheduleStage stageA = new ScheduleStage(
+                UUID.randomUUID(), siteA, "Fundação", "blueprint", LocalDate.now(), LocalDate.now().plusDays(10), 0,
+                Instant.now());
+        ScheduleStage stageB = new ScheduleStage(
+                UUID.randomUUID(), siteB, "Alvenaria", "blueprint", LocalDate.now(), LocalDate.now().plusDays(10), 0,
+                Instant.now());
+        ScheduleTask taskA1 = task(stageA.getId(), 20);
+        ScheduleTask taskA2 = task(stageA.getId(), 50);
+        ScheduleTask taskB1 = task(stageB.getId(), 10);
+        ScheduleTask taskB2 = task(stageB.getId(), 90);
+        when(stageRepository.findByConstructionSiteIdIn(List.of(siteA, siteB))).thenReturn(List.of(stageA, stageB));
+        when(taskRepository.findByStageIdIn(any())).thenReturn(List.of(taskA1, taskA2, taskB1, taskB2));
+
+        Map<UUID, Integer> result = service.computeProgressForSites(List.of(siteA, siteB));
+
+        // Same formula/result as the per-site computeProgress (average percentComplete, rounded).
+        assertThat(result).containsEntry(siteA, 35);
+        assertThat(result).containsEntry(siteB, 50);
     }
 }

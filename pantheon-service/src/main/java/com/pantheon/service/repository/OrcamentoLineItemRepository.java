@@ -9,6 +9,9 @@ public interface OrcamentoLineItemRepository extends JpaRepository<OrcamentoLine
 
     List<OrcamentoLineItem> findByOrcamentoId(UUID orcamentoId);
 
+    /** Every line item across a given set of Orcamentos — batched form of {@link #findByOrcamentoId(UUID)}. */
+    List<OrcamentoLineItem> findByOrcamentoIdIn(List<UUID> orcamentoIds);
+
     /**
      * Every line item, across a given set of Orcamentos, quoted against a given Pedido-de-Compra
      * item — at most one is expected per Orcamento. Backs the comparison table (one query per

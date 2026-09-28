@@ -4,7 +4,17 @@ import '../../theme/app_colors.dart';
 /// Mirrors `pantheon-web`'s `StatusBadge.vue`: same kinds, same color-per-status mapping,
 /// same pt-BR labels — kept as a single source of truth here rather than per-screen ad hoc
 /// colors, so a future status/color change stays a one-file edit.
-enum StatusBadgeKind { purchaseRequest, purchaseRequestItem, orcamento, approval, constructionSite, material, dailyReport }
+enum StatusBadgeKind {
+  purchaseRequest,
+  purchaseRequestItem,
+  orcamento,
+  approval,
+  constructionSite,
+  material,
+  dailyReport,
+  equipment,
+  dailyReportActivity,
+}
 
 class _Style {
   const _Style(this.background, this.foreground);
@@ -55,6 +65,20 @@ final Map<StatusBadgeKind, Map<String, _Style>> _classMap = {
     'PENDING_APPROVAL': _amberStyle,
     'APPROVED': _emeraldStyle,
   },
+  // `redesign-daily-report-experience` (task group 9): equipment-usage rows resolved against the
+  // registry's own `Equipment.status`, same four values as `equipment_repository.dart`'s
+  // `equipmentStatusLabels` (kept separate from that map rather than imported from it, matching
+  // this file's existing per-kind self-containment).
+  StatusBadgeKind.equipment: {
+    'AVAILABLE': _emeraldStyle,
+    'IN_USE': _blueprintStyle,
+    'MAINTENANCE': _amberStyle,
+    'UNAVAILABLE': _steelStyle,
+  },
+  StatusBadgeKind.dailyReportActivity: {
+    'IN_PROGRESS': _steelStyle,
+    'COMPLETED': _emeraldStyle,
+  },
 };
 
 final Map<StatusBadgeKind, Map<String, String>> _labelMap = {
@@ -82,6 +106,16 @@ final Map<StatusBadgeKind, Map<String, String>> _labelMap = {
     'DRAFT': 'Rascunho',
     'PENDING_APPROVAL': 'Em aprovação',
     'APPROVED': 'Aprovado',
+  },
+  StatusBadgeKind.equipment: {
+    'AVAILABLE': 'Disponível',
+    'IN_USE': 'Em uso',
+    'MAINTENANCE': 'Manutenção',
+    'UNAVAILABLE': 'Indisponível',
+  },
+  StatusBadgeKind.dailyReportActivity: {
+    'IN_PROGRESS': 'Em andamento',
+    'COMPLETED': 'Concluída',
   },
 };
 

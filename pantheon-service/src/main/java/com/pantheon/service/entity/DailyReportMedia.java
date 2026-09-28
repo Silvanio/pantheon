@@ -55,6 +55,10 @@ public class DailyReportMedia {
         this.createdAt = createdAt;
     }
 
+    public void updateCaption(String caption) {
+        this.caption = caption;
+    }
+
     public UUID getId() {
         return id;
     }

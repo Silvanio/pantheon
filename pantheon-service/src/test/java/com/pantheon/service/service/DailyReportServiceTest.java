@@ -12,24 +12,35 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.DailyReportCoreUpdateRequest;
+import com.pantheon.service.dto.EquipmentUsageRequest;
 import com.pantheon.service.entity.AccessLevel;
+import com.pantheon.service.entity.ActivityStatus;
+import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.DailyReport;
+import com.pantheon.service.entity.DailyReportActivity;
 import com.pantheon.service.entity.DailyReportApproval;
 import com.pantheon.service.entity.DailyReportApprovalStatus;
 import com.pantheon.service.entity.DailyReportAttachment;
+import com.pantheon.service.entity.DailyReportEquipmentUsage;
 import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.entity.DailyReportStatus;
 import com.pantheon.service.entity.DailyReportWorkforceEntry;
+import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.MediaType;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.PurchaseRequest;
+import com.pantheon.service.entity.PurchaseRequestInvoice;
 import com.pantheon.service.entity.SiteDailyReportApprovalLevel;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.DailyReportCoreFieldsRequiredException;
 import com.pantheon.service.exception.DailyReportNotDeletableException;
+import com.pantheon.service.exception.DailyReportNotEditableException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
+import com.pantheon.service.exception.EquipmentReferenceRequiredException;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
 import com.pantheon.service.exception.NotCurrentDailyReportApprovalStepException;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
 import com.pantheon.service.repository.DailyReportApprovalRepository;
@@ -40,12 +51,18 @@ import com.pantheon.service.repository.DailyReportMediaRepository;
 import com.pantheon.service.repository.DailyReportOccurrenceRepository;
 import com.pantheon.service.repository.DailyReportRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
+import com.pantheon.service.repository.MaterialRepository;
+import com.pantheon.service.repository.PurchaseRequestInvoiceRepository;
+import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.storage.StorageService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,6 +114,21 @@ class DailyReportServiceTest {
     private SiteMembershipRepository siteMembershipRepository;
 
     @Mock
+    private AppUserRepository userRepository;
+
+    @Mock
+    private MaterialRepository materialRepository;
+
+    @Mock
+    private MaterialService materialService;
+
+    @Mock
+    private PurchaseRequestRepository purchaseRequestRepository;
+
+    @Mock
+    private PurchaseRequestInvoiceRepository purchaseRequestInvoiceRepository;
+
+    @Mock
     private SiteAccessService siteAccessService;
 
     @Mock
@@ -117,8 +149,9 @@ class DailyReportServiceTest {
         service = new DailyReportService(
                 dailyReportRepository, workforceEntryRepository, equipmentUsageRepository, activityRepository,
                 occurrenceRepository, materialReceivedRepository, mediaRepository, attachmentRepository,
-                approvalRepository, siteRepository, siteMembershipRepository, siteAccessService, permissionService,
-                approvalLevelService, storageService);
+                approvalRepository, siteRepository, siteMembershipRepository, userRepository, materialRepository,
+                materialService, purchaseRequestRepository, purchaseRequestInvoiceRepository, siteAccessService,
+                permissionService, approvalLevelService, storageService);
 
         siteId = UUID.randomUUID();
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
@@ -150,19 +183,31 @@ class DailyReportServiceTest {
         lenient().when(dailyReportRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DailyReport result = service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
-                "SUNNY", true, LocalTime.of(8, 0), LocalTime.of(17, 0), null));
+                "SUNNY", "CLOUDY", true, LocalTime.of(8, 0), LocalTime.of(17, 0), null));
 
-        assertThat(result.getWeatherCondition()).isEqualTo("SUNNY");
+        assertThat(result.getWeatherConditionMorning()).isEqualTo("SUNNY");
+        assertThat(result.getWeatherConditionAfternoon()).isEqualTo("CLOUDY");
         verify(dailyReportRepository).save(report);
     }
 
     @Test
-    void updateCoreRejectsWhenWeatherConditionMissing() {
+    void updateCoreRejectsWhenMorningWeatherMissing() {
         DailyReport report = draftReport();
         when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
-                null, true, LocalTime.of(8, 0), LocalTime.of(17, 0), null)))
+                null, "SUNNY", true, LocalTime.of(8, 0), LocalTime.of(17, 0), null)))
+                .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
+        verify(dailyReportRepository, never()).save(any());
+    }
+
+    @Test
+    void updateCoreRejectsWhenAfternoonWeatherMissing() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
+                "SUNNY", null, true, LocalTime.of(8, 0), LocalTime.of(17, 0), null)))
                 .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
         verify(dailyReportRepository, never()).save(any());
     }
@@ -173,7 +218,7 @@ class DailyReportServiceTest {
         when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
-                "SUNNY", true, null, null, null)))
+                "SUNNY", "CLOUDY", true, null, null, null)))
                 .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
         verify(dailyReportRepository, never()).save(any());
     }
@@ -184,7 +229,7 @@ class DailyReportServiceTest {
         when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> service.updateCore(report.getId(), UUID.randomUUID(), new DailyReportCoreUpdateRequest(
-                null, null, null, null, "Sem intercorrências")))
+                null, null, null, null, null, "Sem intercorrências")))
                 .isInstanceOf(DailyReportCoreFieldsRequiredException.class);
         verify(dailyReportRepository, never()).save(any());
     }
@@ -543,5 +588,265 @@ class DailyReportServiceTest {
         assertThat(result.getStatus()).isEqualTo(DailyReportStatus.DRAFT);
         assertThat(step.getStatus()).isEqualTo(DailyReportApprovalStatus.REJECTED);
         assertThat(step.getComment()).isEqualTo("Faltou assinatura do responsável");
+    }
+
+    @Test
+    void addEquipmentUsageRejectsWhenNeitherEquipmentIdNorCustomNameGiven() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        assertThatThrownBy(() -> service.addEquipmentUsage(
+                report.getId(), UUID.randomUUID(), new EquipmentUsageRequest(null, "  ", "nota")))
+                .isInstanceOf(EquipmentReferenceRequiredException.class);
+        verify(equipmentUsageRepository, never()).save(any());
+    }
+
+    @Test
+    void addEquipmentUsageAcceptsCustomNameWithoutEquipmentId() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(equipmentUsageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DailyReportEquipmentUsage usage = service.addEquipmentUsage(
+                report.getId(), UUID.randomUUID(), new EquipmentUsageRequest(null, "Gerador alugado 15kVA", null));
+
+        assertThat(usage.getEquipmentId()).isNull();
+        assertThat(usage.getCustomName()).isEqualTo("Gerador alugado 15kVA");
+    }
+
+    @Test
+    void addEquipmentUsageAcceptsRegisteredEquipmentIdWithoutCustomName() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(equipmentUsageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        UUID equipmentId = UUID.randomUUID();
+
+        DailyReportEquipmentUsage usage = service.addEquipmentUsage(
+                report.getId(), UUID.randomUUID(), new EquipmentUsageRequest(equipmentId, null, null));
+
+        assertThat(usage.getEquipmentId()).isEqualTo(equipmentId);
+        assertThat(usage.getCustomName()).isNull();
+    }
+
+    @Test
+    void deleteWorkforceEntryRemovesRowWhenReportIsDraft() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportWorkforceEntry entry = new DailyReportWorkforceEntry(
+                UUID.randomUUID(), report.getId(), null, "Pedreiro", 2, Instant.now());
+        when(workforceEntryRepository.findById(entry.getId())).thenReturn(Optional.of(entry));
+
+        service.deleteWorkforceEntry(report.getId(), UUID.randomUUID(), entry.getId());
+
+        verify(workforceEntryRepository).delete(entry);
+    }
+
+    @Test
+    void deleteWorkforceEntryRejectsWhenReportNotDraft() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        assertThatThrownBy(() -> service.deleteWorkforceEntry(report.getId(), UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(DailyReportNotEditableException.class);
+        verify(workforceEntryRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteWorkforceEntryRejectsWhenEntryBelongsToAnotherReport() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportWorkforceEntry entry = new DailyReportWorkforceEntry(
+                UUID.randomUUID(), UUID.randomUUID(), null, "Pedreiro", 2, Instant.now());
+        when(workforceEntryRepository.findById(entry.getId())).thenReturn(Optional.of(entry));
+
+        assertThatThrownBy(() -> service.deleteWorkforceEntry(report.getId(), UUID.randomUUID(), entry.getId()))
+                .isInstanceOf(DailyReportNotFoundException.class);
+        verify(workforceEntryRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteEquipmentUsageRemovesRowWhenReportIsDraft() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportEquipmentUsage usage = new DailyReportEquipmentUsage(
+                UUID.randomUUID(), report.getId(), UUID.randomUUID(), null, null, Instant.now());
+        when(equipmentUsageRepository.findById(usage.getId())).thenReturn(Optional.of(usage));
+
+        service.deleteEquipmentUsage(report.getId(), UUID.randomUUID(), usage.getId());
+
+        verify(equipmentUsageRepository).delete(usage);
+    }
+
+    @Test
+    void deleteActivityRemovesRowWhenReportIsDraft() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportActivity activity = new DailyReportActivity(
+                UUID.randomUUID(), report.getId(), "Alvenaria", "50%", ActivityStatus.IN_PROGRESS, Instant.now());
+        when(activityRepository.findById(activity.getId())).thenReturn(Optional.of(activity));
+
+        service.deleteActivity(report.getId(), UUID.randomUUID(), activity.getId());
+
+        verify(activityRepository).delete(activity);
+    }
+
+    @Test
+    void deleteMediaAlsoDeletesStorageObject() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportMedia media = new DailyReportMedia(
+                UUID.randomUUID(), report.getId(), MediaType.PHOTO, "media/key.jpg", "image/jpeg", null,
+                UUID.randomUUID(), Instant.now());
+        when(mediaRepository.findById(media.getId())).thenReturn(Optional.of(media));
+
+        service.deleteMedia(report.getId(), UUID.randomUUID(), media.getId());
+
+        verify(storageService).deleteObject("media/key.jpg");
+        verify(mediaRepository).delete(media);
+    }
+
+    @Test
+    void updateMediaCaptionSavesNewCaption() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportMedia media = new DailyReportMedia(
+                UUID.randomUUID(), report.getId(), MediaType.PHOTO, "media/key.jpg", "image/jpeg", "old",
+                UUID.randomUUID(), Instant.now());
+        when(mediaRepository.findById(media.getId())).thenReturn(Optional.of(media));
+        when(mediaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DailyReportMedia result = service.updateMediaCaption(report.getId(), UUID.randomUUID(), media.getId(), "novo");
+
+        assertThat(result.getCaption()).isEqualTo("novo");
+    }
+
+    @Test
+    void deleteAttachmentAlsoDeletesStorageObject() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportAttachment attachment = new DailyReportAttachment(
+                UUID.randomUUID(), report.getId(), "attachment/key.pdf", "application/pdf", "arquivo.pdf",
+                UUID.randomUUID(), Instant.now());
+        when(attachmentRepository.findById(attachment.getId())).thenReturn(Optional.of(attachment));
+
+        service.deleteAttachment(report.getId(), UUID.randomUUID(), attachment.getId());
+
+        verify(storageService).deleteObject("attachment/key.pdf");
+        verify(attachmentRepository).delete(attachment);
+    }
+
+    @Test
+    void listDeliveredMaterialsQueriesDayRangeAndResolvesSource() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        Material material = new Material(
+                UUID.randomUUID(), siteId, UUID.randomUUID(), "Cimento CP-II 50kg", "Saco", new BigDecimal("120"),
+                Instant.now());
+        ZoneId zone = ZoneId.systemDefault();
+        Instant start = report.getReportDate().atStartOfDay(zone).toInstant();
+        Instant end = report.getReportDate().plusDays(1).atStartOfDay(zone).toInstant();
+        when(materialRepository.findByConstructionSiteIdAndDeliveredAtBetween(siteId, start, end))
+                .thenReturn(List.of(material));
+        UUID purchaseRequestId = UUID.randomUUID();
+        when(materialService.resolveSourcePurchaseRequests(List.of(material)))
+                .thenReturn(Map.of(material.getId(), new MaterialService.SourcePurchaseRequestRef(purchaseRequestId, "Pedido 15/03 #231")));
+
+        var result = service.listDeliveredMaterials(report.getId(), UUID.randomUUID());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).sourcePurchaseRequestId()).isEqualTo(purchaseRequestId);
+        assertThat(result.get(0).sourcePurchaseRequestName()).isEqualTo("Pedido 15/03 #231");
+    }
+
+    @Test
+    void listImportedInvoicesFiltersToSiteAndDayRange() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        PurchaseRequest purchaseRequest =
+                new PurchaseRequest(UUID.randomUUID(), siteId, "Pedido 15/03 #231", UUID.randomUUID(), Instant.now());
+        when(purchaseRequestRepository.findByConstructionSiteId(siteId)).thenReturn(List.of(purchaseRequest));
+        ZoneId zone = ZoneId.systemDefault();
+        Instant start = report.getReportDate().atStartOfDay(zone).toInstant();
+        Instant end = report.getReportDate().plusDays(1).atStartOfDay(zone).toInstant();
+        PurchaseRequestInvoice invoice = new PurchaseRequestInvoice(
+                UUID.randomUUID(), purchaseRequest.getId(), "invoices/key.pdf", "application/pdf",
+                "NF-e 000.231.pdf", UUID.randomUUID(), Instant.now());
+        when(purchaseRequestInvoiceRepository.findByPurchaseRequestIdInAndCreatedAtBetween(
+                        List.of(purchaseRequest.getId()), start, end))
+                .thenReturn(List.of(invoice));
+        when(purchaseRequestRepository.findAllById(List.of(purchaseRequest.getId()))).thenReturn(List.of(purchaseRequest));
+
+        var result = service.listImportedInvoices(report.getId(), UUID.randomUUID());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).purchaseRequestId()).isEqualTo(purchaseRequest.getId());
+        assertThat(result.get(0).purchaseRequestName()).isEqualTo("Pedido 15/03 #231");
+        assertThat(result.get(0).originalName()).isEqualTo("NF-e 000.231.pdf");
+    }
+
+    @Test
+    void listImportedInvoicesReturnsEmptyWhenSiteHasNoPurchaseRequests() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(purchaseRequestRepository.findByConstructionSiteId(siteId)).thenReturn(List.of());
+
+        var result = service.listImportedInvoices(report.getId(), UUID.randomUUID());
+
+        assertThat(result).isEmpty();
+        verify(purchaseRequestInvoiceRepository, never())
+                .findByPurchaseRequestIdInAndCreatedAtBetween(any(), any(), any());
+    }
+
+    @Test
+    void listApprovalResponsesResolvesAccountlessMembershipDisplayName() {
+        DailyReport report = draftReport();
+        SiteMembership accountless = SiteMembership.accountless(
+                UUID.randomUUID(), siteId, "Eletricista", "Rafael Martins", "rafael@example.com", null, null,
+                Instant.now());
+        DailyReportApproval approval = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.SITE_FOREMAN, Instant.now());
+        approval.approve(accountless.getId(), "ok", Instant.now());
+        when(approvalRepository.findByDailyReportIdOrderByCycleNumberAscStepOrderAsc(report.getId()))
+                .thenReturn(List.of(approval));
+        when(siteMembershipRepository.findAllById(List.of(accountless.getId()))).thenReturn(List.of(accountless));
+
+        var result = service.listApprovalResponses(report.getId());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).decidedByName()).isEqualTo("Rafael Martins");
+    }
+
+    @Test
+    void listApprovalResponsesResolvesAccountLinkedMembershipViaAppUser() {
+        DailyReport report = draftReport();
+        UUID userId = UUID.randomUUID();
+        SiteMembership membership = activeMember(userId, ConstructionFunction.ENGINEER);
+        AppUser user = new AppUser(userId, "carla@example.com", "Carla Souza", null, null, Instant.now(), Instant.now());
+        DailyReportApproval approval = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        approval.approve(membership.getId(), "ok", Instant.now());
+        when(approvalRepository.findByDailyReportIdOrderByCycleNumberAscStepOrderAsc(report.getId()))
+                .thenReturn(List.of(approval));
+        when(siteMembershipRepository.findAllById(List.of(membership.getId()))).thenReturn(List.of(membership));
+        when(userRepository.findAllById(List.of(userId))).thenReturn(List.of(user));
+
+        var result = service.listApprovalResponses(report.getId());
+
+        assertThat(result.get(0).decidedByName()).isEqualTo("Carla Souza");
+    }
+
+    @Test
+    void listApprovalResponsesLeavesNameNullForPendingStep() {
+        DailyReport report = draftReport();
+        DailyReportApproval pending = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findByDailyReportIdOrderByCycleNumberAscStepOrderAsc(report.getId()))
+                .thenReturn(List.of(pending));
+
+        var result = service.listApprovalResponses(report.getId());
+
+        assertThat(result.get(0).decidedByName()).isNull();
+        assertThat(result.get(0).status()).isEqualTo(DailyReportApprovalStatus.PENDING);
     }
 }

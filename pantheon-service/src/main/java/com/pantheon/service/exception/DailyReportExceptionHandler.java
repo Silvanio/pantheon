@@ -52,4 +52,9 @@ public class DailyReportExceptionHandler {
     public ResponseEntity<String> handleNotCurrentDailyReportApprovalStep(NotCurrentDailyReportApprovalStepException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
     }
+
+    @ExceptionHandler(EquipmentReferenceRequiredException.class)
+    public ResponseEntity<String> handleEquipmentReferenceRequired(EquipmentReferenceRequiredException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
 }

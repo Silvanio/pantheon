@@ -22,11 +22,15 @@ import com.pantheon.service.dto.ActivityResponse;
 import com.pantheon.service.dto.DailyReportCoreUpdateRequest;
 import com.pantheon.service.dto.DailyReportCreationRequest;
 import com.pantheon.service.dto.DailyReportDetailResponse;
+import com.pantheon.service.dto.DailyReportImportedInvoiceResponse;
+import com.pantheon.service.dto.DailyReportMediaResponse;
 import com.pantheon.service.dto.DailyReportResponse;
 import com.pantheon.service.dto.EquipmentUsageRequest;
 import com.pantheon.service.dto.EquipmentUsageResponse;
 import com.pantheon.service.dto.MaterialReceivedRequest;
 import com.pantheon.service.dto.MaterialReceivedResponse;
+import com.pantheon.service.dto.MaterialResponse;
+import com.pantheon.service.dto.MediaCaptionUpdateRequest;
 import com.pantheon.service.dto.OccurrenceRequest;
 import com.pantheon.service.dto.OccurrenceResponse;
 import com.pantheon.service.dto.RejectDailyReportRequest;
@@ -187,5 +191,62 @@ public class DailyReportController {
                 .map(MaterialReceivedResponse::from)
                 .toList();
         return ResponseEntity.ok(received);
+    }
+
+    @DeleteMapping("/api/daily-reports/{id}/workforce-entries/{entryId}")
+    public ResponseEntity<Void> deleteWorkforceEntry(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID entryId) {
+        dailyReportService.deleteWorkforceEntry(id, user.getId(), entryId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/api/daily-reports/{id}/equipment-usage/{usageId}")
+    public ResponseEntity<Void> deleteEquipmentUsage(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID usageId) {
+        dailyReportService.deleteEquipmentUsage(id, user.getId(), usageId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/api/daily-reports/{id}/activities/{activityId}")
+    public ResponseEntity<Void> deleteActivity(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID activityId) {
+        dailyReportService.deleteActivity(id, user.getId(), activityId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/api/daily-reports/{id}/media/{mediaId}")
+    public ResponseEntity<Void> deleteMedia(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID mediaId) {
+        dailyReportService.deleteMedia(id, user.getId(), mediaId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/api/daily-reports/{id}/media/{mediaId}")
+    public ResponseEntity<DailyReportMediaResponse> updateMediaCaption(
+            @AuthenticationPrincipal AppUser user,
+            @PathVariable UUID id,
+            @PathVariable UUID mediaId,
+            @RequestBody MediaCaptionUpdateRequest request) {
+        var media = dailyReportService.updateMediaCaption(id, user.getId(), mediaId, request.caption());
+        return ResponseEntity.ok(DailyReportMediaResponse.from(media));
+    }
+
+    @DeleteMapping("/api/daily-reports/{id}/attachments/{attachmentId}")
+    public ResponseEntity<Void> deleteAttachment(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID attachmentId) {
+        dailyReportService.deleteAttachment(id, user.getId(), attachmentId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/daily-reports/{id}/delivered-materials")
+    public ResponseEntity<List<MaterialResponse>> listDeliveredMaterials(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        return ResponseEntity.ok(dailyReportService.listDeliveredMaterials(id, user.getId()));
+    }
+
+    @GetMapping("/api/daily-reports/{id}/imported-invoices")
+    public ResponseEntity<List<DailyReportImportedInvoiceResponse>> listImportedInvoices(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
+        return ResponseEntity.ok(dailyReportService.listImportedInvoices(id, user.getId()));
     }
 }

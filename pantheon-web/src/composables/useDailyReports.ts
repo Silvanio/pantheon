@@ -1,7 +1,8 @@
 import { SERVICE_BASE_URL } from '../lib/config'
-import { useAuth } from './useAuth'
+import { HttpError, useAuth } from './useAuth'
 import type { PageResponse } from './usePurchaseRequests'
 import type { DailyReportApproverFunction } from './useDailyReportApprovalLevels'
+import type { Material } from './useMaterialDeliveries'
 
 export type DailyReportStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED'
 export type ActivityStatus = 'IN_PROGRESS' | 'COMPLETED'
@@ -13,7 +14,8 @@ export interface DailyReport {
   reportDate: string
   sequenceNo: number
   status: DailyReportStatus
-  weatherCondition: string | null
+  weatherConditionMorning: string | null
+  weatherConditionAfternoon: string | null
   weatherBlockedTasks: boolean | null
   workHoursStart: string | null
   workHoursEnd: string | null
@@ -22,7 +24,8 @@ export interface DailyReport {
 }
 
 export interface DailyReportCoreUpdate {
-  weatherCondition: string | null
+  weatherConditionMorning: string | null
+  weatherConditionAfternoon: string | null
   weatherBlockedTasks: boolean | null
   workHoursStart: string | null
   workHoursEnd: string | null
@@ -38,7 +41,8 @@ export interface WorkforceEntry {
 
 export interface EquipmentUsage {
   id: string
-  equipmentId: string
+  equipmentId: string | null
+  customName: string | null
   statusNote: string | null
 }
 
@@ -69,6 +73,7 @@ export interface DailyReportApproval {
   approverFunction: DailyReportApproverFunction
   status: DailyReportApprovalStatus
   decidedBySiteMembershipId: string | null
+  decidedByName: string | null
   decidedAt: string | null
   comment: string | null
   createdAt: string
@@ -91,19 +96,26 @@ export interface ReportMedia {
   type: MediaKind
   caption: string | null
   contentType: string
+  uploadedAt: string
 }
 
 export interface ReportAttachment {
   id: string
   originalName: string
   contentType: string
+  uploadedAt: string
 }
 
-export interface ReportSignature {
+/** A Pedido de Compra "nota fiscal" surfaced read-only in this report's Anexos list because it was
+ * uploaded on the same calendar date as the report — see `daily-report-media-and-signoff` spec's
+ * "Same-day Pedido de Compra invoice surfaced" scenario. Never copied, only referenced. */
+export interface DailyReportImportedInvoice {
   id: string
-  membershipId: string
-  function: string | null
-  signedAt: string
+  purchaseRequestId: string
+  purchaseRequestName: string | null
+  originalName: string
+  contentType: string
+  uploadedAt: string
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -117,7 +129,7 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
     },
   })
   if (!response.ok) {
-    throw new Error(`Request to ${path} failed with status ${response.status}`)
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
   }
   if (response.status === 204) {
     return undefined as T
@@ -131,7 +143,7 @@ async function authFetchBlob(path: string): Promise<Blob> {
     headers: { Authorization: `Bearer ${token.value}` },
   })
   if (!response.ok) {
-    throw new Error(`Request to ${path} failed with status ${response.status}`)
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
   }
   return response.blob()
 }
@@ -144,7 +156,7 @@ async function authUpload<T>(path: string, formData: FormData): Promise<T> {
     body: formData,
   })
   if (!response.ok) {
-    throw new Error(`Request to ${path} failed with status ${response.status}`)
+    throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)
   }
   return (await response.json()) as T
 }
@@ -202,9 +214,13 @@ export function useDailyReports() {
     })
   }
 
+  function deleteWorkforceEntry(reportId: string, entryId: string): Promise<void> {
+    return authFetch(`/api/daily-reports/${reportId}/workforce-entries/${entryId}`, { method: 'DELETE' })
+  }
+
   function addEquipmentUsage(
     reportId: string,
-    data: { equipmentId: string; statusNote: string | null },
+    data: { equipmentId: string | null; customName: string | null; statusNote: string | null },
   ): Promise<EquipmentUsage> {
     return authFetch(`/api/daily-reports/${reportId}/equipment-usage`, {
       method: 'POST',
@@ -212,11 +228,19 @@ export function useDailyReports() {
     })
   }
 
+  function deleteEquipmentUsage(reportId: string, usageId: string): Promise<void> {
+    return authFetch(`/api/daily-reports/${reportId}/equipment-usage/${usageId}`, { method: 'DELETE' })
+  }
+
   function addActivity(
     reportId: string,
     data: { description: string; progressNote: string; status: ActivityStatus },
   ): Promise<Activity> {
     return authFetch(`/api/daily-reports/${reportId}/activities`, { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  function deleteActivity(reportId: string, activityId: string): Promise<void> {
+    return authFetch(`/api/daily-reports/${reportId}/activities/${activityId}`, { method: 'DELETE' })
   }
 
   function addOccurrence(reportId: string, description: string): Promise<Occurrence> {
@@ -253,6 +277,17 @@ export function useDailyReports() {
     return authUpload(`/api/daily-reports/${reportId}/media?${params.toString()}`, formData)
   }
 
+  function updateMediaCaption(reportId: string, mediaId: string, caption: string | null): Promise<ReportMedia> {
+    return authFetch(`/api/daily-reports/${reportId}/media/${mediaId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ caption }),
+    })
+  }
+
+  function deleteMedia(reportId: string, mediaId: string): Promise<void> {
+    return authFetch(`/api/daily-reports/${reportId}/media/${mediaId}`, { method: 'DELETE' })
+  }
+
   function getMediaContentUrl(reportId: string, mediaId: string): Promise<Blob> {
     return authFetchBlob(`/api/daily-reports/${reportId}/media/${mediaId}/content`)
   }
@@ -267,16 +302,20 @@ export function useDailyReports() {
     return authUpload(`/api/daily-reports/${reportId}/attachments`, formData)
   }
 
+  function deleteAttachment(reportId: string, attachmentId: string): Promise<void> {
+    return authFetch(`/api/daily-reports/${reportId}/attachments/${attachmentId}`, { method: 'DELETE' })
+  }
+
   function getAttachmentContentUrl(reportId: string, attachmentId: string): Promise<Blob> {
     return authFetchBlob(`/api/daily-reports/${reportId}/attachments/${attachmentId}/content`)
   }
 
-  function listSignatures(reportId: string): Promise<ReportSignature[]> {
-    return authFetch(`/api/daily-reports/${reportId}/signatures`)
+  function listDeliveredMaterials(reportId: string): Promise<Material[]> {
+    return authFetch(`/api/daily-reports/${reportId}/delivered-materials`)
   }
 
-  function signReport(reportId: string): Promise<ReportSignature> {
-    return authFetch(`/api/daily-reports/${reportId}/signatures`, { method: 'POST' })
+  function listImportedInvoices(reportId: string): Promise<DailyReportImportedInvoice[]> {
+    return authFetch(`/api/daily-reports/${reportId}/imported-invoices`)
   }
 
   function getPdf(reportId: string): Promise<Blob> {
@@ -293,18 +332,24 @@ export function useDailyReports() {
     rejectStep,
     deleteReport,
     addWorkforceEntry,
+    deleteWorkforceEntry,
     addEquipmentUsage,
+    deleteEquipmentUsage,
     addActivity,
+    deleteActivity,
     addOccurrence,
     addMaterialReceived,
     listMedia,
     uploadMedia,
+    updateMediaCaption,
+    deleteMedia,
     getMediaContentUrl,
     listAttachments,
     uploadAttachment,
+    deleteAttachment,
     getAttachmentContentUrl,
-    listSignatures,
-    signReport,
+    listDeliveredMaterials,
+    listImportedInvoices,
     getPdf,
   }
 }

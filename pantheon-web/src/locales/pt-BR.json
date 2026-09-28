@@ -502,15 +502,23 @@
       "deleteButton": "Excluir",
       "deleteConfirm": "Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.",
       "deleteCancel": "Cancelar",
-      "deleteError": "Não foi possível excluir o relatório."
+      "deleteError": "Não foi possível excluir o relatório.",
+      "saveButton": "Salvar alterações",
+      "saving": "Salvando...",
+      "allSaved": "Tudo salvo",
+      "unsaved": "Alterações não salvas",
+      "saveError": "Não foi possível salvar todas as alterações. Tente novamente."
     },
     "approveStepButton": "Aprovar",
     "rejectStepButton": "Rejeitar",
     "rejectReasonPlaceholder": "Motivo da rejeição",
     "confirmReject": "Confirmar rejeição",
     "approvalError": "Não foi possível concluir a ação. Tente novamente.",
-    "approvalHistoryTitle": "Histórico de aprovação",
+    "approvalHistoryTitle": "Aprovação",
     "pendingStepSubtitle": "Aguardando decisão",
+    "decidedByApproved": "Aprovado por {name} · {datetime}",
+    "decidedByRejected": "Rejeitado por {name} · {datetime}",
+    "priorCyclesTitle": "Ciclos anteriores",
     "cycleLabel": "Ciclo",
     "stepLabel": "Etapa",
     "approverFunction": {
@@ -532,8 +540,9 @@
       "saved": "Níveis de aprovação salvos."
     },
     "core": {
-      "title": "Clima, horário e comentários",
-      "weatherCondition": "Condição climática",
+      "title": "Clima & Expediente",
+      "weatherConditionMorning": "Manhã",
+      "weatherConditionAfternoon": "Tarde",
       "weatherOptions": {
         "SUNNY": "Ensolarado",
         "PARTLY_CLOUDY": "Parcialmente nublado",
@@ -545,40 +554,39 @@
       "workHoursStart": "Início do expediente",
       "workHoursEnd": "Fim do expediente",
       "comments": "Comentários",
-      "save": "Salvar",
-      "saving": "Salvando...",
-      "edit": "Editar",
-      "error": "Não foi possível salvar. Tente novamente.",
       "requiredError": "Condição climática, início e fim do expediente são obrigatórios."
     },
     "workforce": {
       "title": "Mão de obra",
       "empty": "Nenhuma entrada de mão de obra registrada.",
-      "roleDescription": "Função",
-      "roleDescriptionPlaceholder": "Ex: Pedreiro, Ajudante, Pintor",
-      "noMember": "Mão de obra avulsa (sem vínculo)",
-      "headcount": "Quantidade",
+      "teamSectionLabel": "Equipe do projeto — selecione e informe a quantidade",
+      "noMembers": "Nenhum integrante ativo nesta obra.",
+      "customSectionLabel": "Outra mão de obra — não cadastrada no projeto",
+      "customRolePlaceholder": "Função (ex: eletricista terceirizado)",
+      "peopleUnit": "pessoas",
+      "removeLabel": "Remover",
       "addButton": "Adicionar",
-      "error": "Não foi possível adicionar a entrada."
+      "addCustomButton": "Adicionar outra mão de obra",
+      "customRequiredError": "Informe a função de cada mão de obra não cadastrada antes de salvar."
     },
     "equipmentUsage": {
-      "title": "Equipamentos utilizados",
-      "empty": "Nenhum equipamento registrado no relatório.",
-      "equipment": "Equipamento",
-      "statusNote": "Observação",
-      "statusNotePlaceholder": "Ex: Operando normalmente",
-      "addButton": "Adicionar",
-      "error": "Não foi possível adicionar o equipamento ao relatório."
+      "title": "Equipamentos",
+      "searchPlaceholder": "Buscar equipamento cadastrado por nome ou tipo…",
+      "noResults": "Nenhum equipamento encontrado.",
+      "customSectionLabel": "Outro equipamento — não cadastrado",
+      "customNamePlaceholder": "Nome do equipamento",
+      "customNotePlaceholder": "Observação (opcional)",
+      "addCustomButton": "Adicionar outro equipamento",
+      "customRequiredError": "Informe o nome de cada equipamento não cadastrado antes de salvar."
     },
     "activities": {
       "title": "Atividades",
       "empty": "Nenhuma atividade registrada.",
       "description": "Descrição",
-      "progressNote": "Progresso",
-      "progressNotePlaceholder": "Ex: 60%, Concluída",
-      "status": "Status",
-      "addButton": "Adicionar",
-      "error": "Não foi possível adicionar a atividade.",
+      "descriptionPlaceholder": "Descreva a atividade executada",
+      "addActivityButton": "Adicionar atividade",
+      "removeLabel": "Remover atividade",
+      "descriptionRequiredError": "Preencha a descrição de todas as atividades antes de salvar.",
       "statusOptions": {
         "IN_PROGRESS": "Em execução",
         "COMPLETED": "Finalizada"
@@ -593,6 +601,8 @@
     },
     "materialsReceived": {
       "title": "Materiais recebidos",
+      "manualTitle": "Registro manual",
+      "subtitle": "Itens adicionados manualmente, sem vínculo com um Pedido de Compra.",
       "empty": "Nenhum material recebido registrado.",
       "material": "Material",
       "quantity": "Quantidade",
@@ -600,30 +610,29 @@
       "error": "Não foi possível adicionar o material recebido.",
       "unit": "Unidade (opcional)"
     },
+    "deliveredMaterials": {
+      "subtitle": "Importados automaticamente dos Pedidos de Compra entregues em {date}.",
+      "empty": "Nenhum material entregue nesta data.",
+      "markCheckedButton": "Marcar conferido",
+      "error": "Não foi possível marcar o material como conferido."
+    },
     "media": {
-      "title": "Fotos e vídeos",
-      "empty": "Nenhuma foto ou vídeo enviado ainda.",
-      "caption": "Legenda",
-      "captionPlaceholder": "Descrição opcional",
-      "uploadButton": "Enviar",
-      "photoLabel": "Foto",
-      "videoLabel": "Vídeo",
+      "title": "Mídia & Anexos",
+      "captionPlaceholder": "Adicionar legenda…",
+      "dropzoneTitle": "Arraste fotos ou vídeos aqui",
+      "dropzoneSubtitle": "ou clique para selecionar — vários arquivos de uma vez",
+      "removeLabel": "Remover",
+      "removeError": "Não foi possível remover o arquivo.",
       "error": "Não foi possível enviar o arquivo."
     },
     "attachments": {
       "title": "Anexos",
       "empty": "Nenhum anexo enviado ainda.",
       "uploadButton": "Enviar anexo",
-      "downloadButton": "Baixar",
+      "removeButton": "Remover",
+      "removeError": "Não foi possível remover o anexo.",
+      "importedFrom": "Importado do Pedido de Compra {name}",
       "error": "Não foi possível enviar o anexo."
-    },
-    "signatures": {
-      "title": "Assinaturas",
-      "empty": "Nenhuma assinatura registrada ainda.",
-      "signButton": "Assinar relatório",
-      "signRequiresSubmit": "O relatório precisa estar aprovado para poder ser assinado.",
-      "error": "Não foi possível assinar o relatório.",
-      "signedAt": "Assinado em"
     },
     "pdf": {
       "downloadButton": "Baixar PDF",

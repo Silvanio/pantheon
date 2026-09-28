@@ -14,14 +14,20 @@ public record DailyReportApprovalResponse(
         ConstructionFunction approverFunction,
         DailyReportApprovalStatus status,
         UUID decidedBySiteMembershipId,
+        String decidedByName,
         Instant decidedAt,
         String comment,
         Instant createdAt) {
 
+    /** {@code decidedByName} left {@code null} — use {@link #from(DailyReportApproval, String)} when a resolved name is available (see {@code DailyReportService#listApprovalResponses}). */
     public static DailyReportApprovalResponse from(DailyReportApproval approval) {
+        return from(approval, null);
+    }
+
+    public static DailyReportApprovalResponse from(DailyReportApproval approval, String decidedByName) {
         return new DailyReportApprovalResponse(
                 approval.getId(), approval.getDailyReportId(), approval.getCycleNumber(), approval.getStepOrder(),
                 approval.getApproverFunction(), approval.getStatus(), approval.getDecidedBySiteMembershipId(),
-                approval.getDecidedAt(), approval.getComment(), approval.getCreatedAt());
+                decidedByName, approval.getDecidedAt(), approval.getComment(), approval.getCreatedAt());
     }
 }

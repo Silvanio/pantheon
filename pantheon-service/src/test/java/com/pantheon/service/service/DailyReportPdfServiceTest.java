@@ -15,9 +15,11 @@ import com.pantheon.service.repository.DailyReportMaterialReceivedRepository;
 import com.pantheon.service.repository.DailyReportMediaRepository;
 import com.pantheon.service.repository.DailyReportOccurrenceRepository;
 import com.pantheon.service.repository.DailyReportRepository;
-import com.pantheon.service.repository.DailyReportSignatureRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
 import com.pantheon.service.repository.EquipmentRepository;
+import com.pantheon.service.repository.MaterialRepository;
+import com.pantheon.service.repository.PurchaseRequestInvoiceRepository;
+import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.storage.StorageService;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -61,9 +63,6 @@ class DailyReportPdfServiceTest {
     private DailyReportAttachmentRepository attachmentRepository;
 
     @Mock
-    private DailyReportSignatureRepository signatureRepository;
-
-    @Mock
     private ConstructionSiteRepository siteRepository;
 
     @Mock
@@ -71,6 +70,21 @@ class DailyReportPdfServiceTest {
 
     @Mock
     private EquipmentRepository equipmentRepository;
+
+    @Mock
+    private MaterialRepository materialRepository;
+
+    @Mock
+    private MaterialService materialService;
+
+    @Mock
+    private PurchaseRequestRepository purchaseRequestRepository;
+
+    @Mock
+    private PurchaseRequestInvoiceRepository purchaseRequestInvoiceRepository;
+
+    @Mock
+    private DailyReportService dailyReportService;
 
     @Mock
     private StorageService storageService;
@@ -87,7 +101,8 @@ class DailyReportPdfServiceTest {
         service = new DailyReportPdfService(
                 dailyReportRepository, workforceEntryRepository, equipmentUsageRepository, activityRepository,
                 occurrenceRepository, materialReceivedRepository, mediaRepository, attachmentRepository,
-                signatureRepository, siteRepository, siteAccessService, equipmentRepository, storageService,
+                siteRepository, siteAccessService, equipmentRepository, materialRepository, materialService,
+                purchaseRequestRepository, purchaseRequestInvoiceRepository, dailyReportService, storageService,
                 brandingService);
         siteId = UUID.randomUUID();
     }

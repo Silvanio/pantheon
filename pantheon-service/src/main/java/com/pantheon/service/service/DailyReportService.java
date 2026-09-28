@@ -1,14 +1,18 @@
 package com.pantheon.service.service;
 
 import com.pantheon.service.dto.ActivityRequest;
+import com.pantheon.service.dto.DailyReportApprovalResponse;
 import com.pantheon.service.dto.DailyReportCoreUpdateRequest;
 import com.pantheon.service.dto.DailyReportDetailResponse;
+import com.pantheon.service.dto.DailyReportImportedInvoiceResponse;
 import com.pantheon.service.dto.DailyReportResponse;
 import com.pantheon.service.dto.EquipmentUsageRequest;
 import com.pantheon.service.dto.MaterialReceivedRequest;
+import com.pantheon.service.dto.MaterialResponse;
 import com.pantheon.service.dto.OccurrenceRequest;
 import com.pantheon.service.dto.WorkforceEntryRequest;
 import com.pantheon.service.entity.AccessLevel;
+import com.pantheon.service.entity.AppUser;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportActivity;
@@ -21,7 +25,10 @@ import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.entity.DailyReportOccurrence;
 import com.pantheon.service.entity.DailyReportStatus;
 import com.pantheon.service.entity.DailyReportWorkforceEntry;
+import com.pantheon.service.entity.Material;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.PurchaseRequest;
+import com.pantheon.service.entity.PurchaseRequestInvoice;
 import com.pantheon.service.entity.SiteDailyReportApprovalLevel;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
@@ -30,8 +37,10 @@ import com.pantheon.service.exception.DailyReportNotDeletableException;
 import com.pantheon.service.exception.DailyReportNotEditableException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
 import com.pantheon.service.exception.DuplicateDailyReportException;
+import com.pantheon.service.exception.EquipmentReferenceRequiredException;
 import com.pantheon.service.exception.NoPendingDailyReportApprovalStepException;
 import com.pantheon.service.exception.NotCurrentDailyReportApprovalStepException;
+import com.pantheon.service.repository.AppUserRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
 import com.pantheon.service.repository.DailyReportApprovalRepository;
@@ -42,12 +51,20 @@ import com.pantheon.service.repository.DailyReportMediaRepository;
 import com.pantheon.service.repository.DailyReportOccurrenceRepository;
 import com.pantheon.service.repository.DailyReportRepository;
 import com.pantheon.service.repository.DailyReportWorkforceEntryRepository;
+import com.pantheon.service.repository.MaterialRepository;
+import com.pantheon.service.repository.PurchaseRequestInvoiceRepository;
+import com.pantheon.service.repository.PurchaseRequestRepository;
 import com.pantheon.service.repository.SiteMembershipRepository;
 import com.pantheon.service.storage.StorageService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -69,6 +86,11 @@ public class DailyReportService {
     private final DailyReportApprovalRepository approvalRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteMembershipRepository siteMembershipRepository;
+    private final AppUserRepository userRepository;
+    private final MaterialRepository materialRepository;
+    private final MaterialService materialService;
+    private final PurchaseRequestRepository purchaseRequestRepository;
+    private final PurchaseRequestInvoiceRepository purchaseRequestInvoiceRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
     private final SiteDailyReportApprovalLevelService approvalLevelService;
@@ -86,6 +108,11 @@ public class DailyReportService {
             DailyReportApprovalRepository approvalRepository,
             ConstructionSiteRepository siteRepository,
             SiteMembershipRepository siteMembershipRepository,
+            AppUserRepository userRepository,
+            MaterialRepository materialRepository,
+            MaterialService materialService,
+            PurchaseRequestRepository purchaseRequestRepository,
+            PurchaseRequestInvoiceRepository purchaseRequestInvoiceRepository,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
             SiteDailyReportApprovalLevelService approvalLevelService,
@@ -101,6 +128,11 @@ public class DailyReportService {
         this.approvalRepository = approvalRepository;
         this.siteRepository = siteRepository;
         this.siteMembershipRepository = siteMembershipRepository;
+        this.userRepository = userRepository;
+        this.materialRepository = materialRepository;
+        this.materialService = materialService;
+        this.purchaseRequestRepository = purchaseRequestRepository;
+        this.purchaseRequestInvoiceRepository = purchaseRequestInvoiceRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
         this.approvalLevelService = approvalLevelService;
@@ -126,13 +158,15 @@ public class DailyReportService {
     public DailyReport updateCore(UUID reportId, UUID actingUserId, DailyReportCoreUpdateRequest request) {
         DailyReport report = requireEditableReport(reportId, actingUserId);
         report.updateCore(
-                request.weatherCondition(),
+                request.weatherConditionMorning(),
+                request.weatherConditionAfternoon(),
                 request.weatherBlockedTasks(),
                 request.workHoursStart(),
                 request.workHoursEnd(),
                 request.comments(),
                 Instant.now());
-        if (report.getWeatherCondition() == null || report.getWorkHoursStart() == null || report.getWorkHoursEnd() == null) {
+        if (report.getWeatherConditionMorning() == null || report.getWeatherConditionAfternoon() == null
+                || report.getWorkHoursStart() == null || report.getWorkHoursEnd() == null) {
             throw new DailyReportCoreFieldsRequiredException(reportId);
         }
         return dailyReportRepository.save(report);
@@ -239,11 +273,23 @@ public class DailyReportService {
         return workforceEntryRepository.findByDailyReportId(reportId);
     }
 
+    /**
+     * Either {@code equipmentId} (registered) or {@code customName} ("outro equipamento") must be
+     * given — mirrors {@link #addWorkforceEntry}'s membershipId-or-roleDescription flexibility,
+     * except here neither side is auto-derived, so at least one must be present on the request
+     * itself. See {@code daily-construction-report}'s "Equipment usage logging".
+     */
     @Transactional
     public DailyReportEquipmentUsage addEquipmentUsage(UUID reportId, UUID actingUserId, EquipmentUsageRequest request) {
         DailyReport report = requireEditableReport(reportId, actingUserId);
+        boolean hasEquipmentId = request.equipmentId() != null;
+        boolean hasCustomName = request.customName() != null && !request.customName().isBlank();
+        if (!hasEquipmentId && !hasCustomName) {
+            throw new EquipmentReferenceRequiredException(reportId);
+        }
         DailyReportEquipmentUsage usage = new DailyReportEquipmentUsage(
-                UUID.randomUUID(), report.getId(), request.equipmentId(), request.statusNote(), Instant.now());
+                UUID.randomUUID(), report.getId(), request.equipmentId(),
+                hasCustomName ? request.customName() : null, request.statusNote(), Instant.now());
         return equipmentUsageRepository.save(usage);
     }
 
@@ -292,6 +338,207 @@ public class DailyReportService {
     public List<DailyReportMaterialReceived> listMaterialsReceived(UUID reportId, UUID actingUserId) {
         requireReport(reportId, actingUserId);
         return materialReceivedRepository.findByDailyReportId(reportId);
+    }
+
+    /** DRAFT-only, same gate as {@link #addWorkforceEntry} — see {@code daily-construction-report}'s "Workforce presence logging". */
+    @Transactional
+    public void deleteWorkforceEntry(UUID reportId, UUID actingUserId, UUID entryId) {
+        requireEditableReport(reportId, actingUserId);
+        DailyReportWorkforceEntry entry = workforceEntryRepository
+                .findById(entryId)
+                .filter(e -> e.getDailyReportId().equals(reportId))
+                .orElseThrow(() -> new DailyReportNotFoundException(entryId));
+        workforceEntryRepository.delete(entry);
+    }
+
+    /** DRAFT-only, same gate as {@link #addEquipmentUsage} — see {@code daily-construction-report}'s "Equipment usage logging". */
+    @Transactional
+    public void deleteEquipmentUsage(UUID reportId, UUID actingUserId, UUID usageId) {
+        requireEditableReport(reportId, actingUserId);
+        DailyReportEquipmentUsage usage = equipmentUsageRepository
+                .findById(usageId)
+                .filter(u -> u.getDailyReportId().equals(reportId))
+                .orElseThrow(() -> new DailyReportNotFoundException(usageId));
+        equipmentUsageRepository.delete(usage);
+    }
+
+    /** DRAFT-only, same gate as {@link #addActivity} — see {@code daily-construction-report}'s "Activity tracking". */
+    @Transactional
+    public void deleteActivity(UUID reportId, UUID actingUserId, UUID activityId) {
+        requireEditableReport(reportId, actingUserId);
+        DailyReportActivity activity = activityRepository
+                .findById(activityId)
+                .filter(a -> a.getDailyReportId().equals(reportId))
+                .orElseThrow(() -> new DailyReportNotFoundException(activityId));
+        activityRepository.delete(activity);
+    }
+
+    /** DRAFT-only. Also deletes the stored object, mirroring {@link #delete}'s bulk cleanup. See {@code daily-report-media-and-signoff}'s "Media entry removed". */
+    @Transactional
+    public void deleteMedia(UUID reportId, UUID actingUserId, UUID mediaId) {
+        requireEditableReport(reportId, actingUserId);
+        DailyReportMedia media = mediaRepository
+                .findById(mediaId)
+                .filter(m -> m.getDailyReportId().equals(reportId))
+                .orElseThrow(() -> new DailyReportNotFoundException(mediaId));
+        storageService.deleteObject(media.getStorageKey());
+        mediaRepository.delete(media);
+    }
+
+    /** DRAFT-only — updates the caption only, upload itself is untouched. See {@code daily-report-media-and-signoff}'s "Media caption updated". */
+    @Transactional
+    public DailyReportMedia updateMediaCaption(UUID reportId, UUID actingUserId, UUID mediaId, String caption) {
+        requireEditableReport(reportId, actingUserId);
+        DailyReportMedia media = mediaRepository
+                .findById(mediaId)
+                .filter(m -> m.getDailyReportId().equals(reportId))
+                .orElseThrow(() -> new DailyReportNotFoundException(mediaId));
+        media.updateCaption(caption);
+        return mediaRepository.save(media);
+    }
+
+    /** DRAFT-only. Also deletes the stored object, mirroring {@link #delete}'s bulk cleanup. See {@code daily-report-media-and-signoff}'s "Attachment removed". */
+    @Transactional
+    public void deleteAttachment(UUID reportId, UUID actingUserId, UUID attachmentId) {
+        requireEditableReport(reportId, actingUserId);
+        DailyReportAttachment attachment = attachmentRepository
+                .findById(attachmentId)
+                .filter(a -> a.getDailyReportId().equals(reportId))
+                .orElseThrow(() -> new DailyReportNotFoundException(attachmentId));
+        storageService.deleteObject(attachment.getStorageKey());
+        attachmentRepository.delete(attachment);
+    }
+
+    /**
+     * {@link Material} delivery-tracking records for this report's site whose {@code deliveredAt}
+     * falls on this report's {@code reportDate} — a read-only, computed view, not a new table. See
+     * {@code daily-construction-report}'s "Materials delivered on this report's date" and the
+     * change's design.md Decision 3. Day boundaries use the system default zone, matching how the
+     * rest of the codebase treats {@code LocalDate} vs {@code Instant} (no site-specific timezone
+     * concept exists elsewhere to borrow instead). Reuses {@link MaterialService#resolveSourcePurchaseRequests}
+     * for the source Pedido de Compra reference rather than re-deriving it.
+     */
+    public List<MaterialResponse> listDeliveredMaterials(UUID reportId, UUID actingUserId) {
+        DailyReport report = requireReport(reportId, actingUserId);
+        ZoneId zone = ZoneId.systemDefault();
+        Instant startInclusive = report.getReportDate().atStartOfDay(zone).toInstant();
+        Instant endExclusive = report.getReportDate().plusDays(1).atStartOfDay(zone).toInstant();
+        List<Material> materials = materialRepository.findByConstructionSiteIdAndDeliveredAtBetween(
+                report.getConstructionSiteId(), startInclusive, endExclusive);
+        Map<UUID, MaterialService.SourcePurchaseRequestRef> sources = materialService.resolveSourcePurchaseRequests(materials);
+        return materials.stream()
+                .map(m -> {
+                    var ref = sources.get(m.getId());
+                    return MaterialResponse.from(m, ref != null ? ref.id() : null, ref != null ? ref.name() : null);
+                })
+                .toList();
+    }
+
+    /**
+     * {@link PurchaseRequestInvoice}s for this report's site uploaded on this report's {@code
+     * reportDate} — a read-only, computed view, surfaced in the Anexos list alongside real {@code
+     * DailyReportAttachment} rows (merged client-side), tagged as imported. See {@code
+     * daily-report-media-and-signoff}'s "Same-day Pedido de Compra invoice surfaced" and the
+     * change's design.md Decision 4. Matches by the invoice's own upload date, regardless of the
+     * Pedido de Compra's own date.
+     */
+    public List<DailyReportImportedInvoiceResponse> listImportedInvoices(UUID reportId, UUID actingUserId) {
+        DailyReport report = requireReport(reportId, actingUserId);
+        List<UUID> purchaseRequestIds = purchaseRequestRepository
+                .findByConstructionSiteId(report.getConstructionSiteId())
+                .stream()
+                .map(PurchaseRequest::getId)
+                .toList();
+        if (purchaseRequestIds.isEmpty()) {
+            return List.of();
+        }
+        ZoneId zone = ZoneId.systemDefault();
+        Instant startInclusive = report.getReportDate().atStartOfDay(zone).toInstant();
+        Instant endExclusive = report.getReportDate().plusDays(1).atStartOfDay(zone).toInstant();
+        List<PurchaseRequestInvoice> invoices = purchaseRequestInvoiceRepository
+                .findByPurchaseRequestIdInAndCreatedAtBetween(purchaseRequestIds, startInclusive, endExclusive);
+
+        Map<UUID, String> purchaseRequestNamesById = purchaseRequestRepository
+                .findAllById(invoices.stream().map(PurchaseRequestInvoice::getPurchaseRequestId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(PurchaseRequest::getId, PurchaseRequest::getName));
+
+        return invoices.stream()
+                .map(invoice -> DailyReportImportedInvoiceResponse.from(
+                        invoice, purchaseRequestNamesById.get(invoice.getPurchaseRequestId())))
+                .toList();
+    }
+
+    /**
+     * {@link #listApprovals} with each step's {@code decidedBySiteMembershipId} resolved to a
+     * display name, batched across the whole list — used by both {@link #getDetail} and, since
+     * it's the same package, {@code DailyReportPdfService}'s "Aprovações" section, so the API and
+     * the PDF always agree. See {@code daily-report-approval-workflow}'s "Decided step shows who
+     * decided it" and the change's design.md Decision 6.
+     */
+    public List<DailyReportApprovalResponse> listApprovalResponses(UUID reportId) {
+        List<DailyReportApproval> approvals = listApprovals(reportId);
+        Map<UUID, String> namesByMembershipId = resolveApprovalDeciderNames(approvals);
+        return approvals.stream()
+                .map(a -> DailyReportApprovalResponse.from(a, a.getDecidedBySiteMembershipId() != null
+                        ? namesByMembershipId.get(a.getDecidedBySiteMembershipId())
+                        : null))
+                .toList();
+    }
+
+    /**
+     * Batch-resolves every decided step's approver {@code SiteMembership} display name in at most
+     * two queries total ({@code findAllById} for memberships, then for their linked users) —
+     * mirrors {@code PurchaseRequestPdfService#resolveMembershipNames} (see the change's design.md
+     * Decision 6; extracted here rather than duplicated into {@code DailyReportPdfService} too,
+     * since both live in this same package and the PDF already depends on this service).
+     */
+    private Map<UUID, String> resolveApprovalDeciderNames(List<DailyReportApproval> approvals) {
+        List<UUID> membershipIds = approvals.stream()
+                .map(DailyReportApproval::getDecidedBySiteMembershipId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (membershipIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<UUID, SiteMembership> membershipsById = siteMembershipRepository.findAllById(membershipIds).stream()
+                .collect(Collectors.toMap(SiteMembership::getId, m -> m));
+
+        List<UUID> userIds = membershipsById.values().stream()
+                .map(SiteMembership::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, AppUser> usersById = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream().collect(Collectors.toMap(AppUser::getId, u -> u));
+
+        Map<UUID, String> namesByMembershipId = new LinkedHashMap<>();
+        for (UUID membershipId : membershipIds) {
+            namesByMembershipId.put(membershipId, displayNameForMembership(membershipsById.get(membershipId), usersById));
+        }
+        return namesByMembershipId;
+    }
+
+    /** A {@code SiteMembership}'s displayable name: its own {@code displayName} when set (accountless members), otherwise its linked {@code AppUser}'s. {@code null} if neither resolves. */
+    private String displayNameForMembership(SiteMembership membership, Map<UUID, AppUser> usersById) {
+        if (membership == null) {
+            return null;
+        }
+        if (membership.getDisplayName() != null && !membership.getDisplayName().isBlank()) {
+            return membership.getDisplayName();
+        }
+        if (membership.getUserId() != null) {
+            AppUser user = usersById.get(membership.getUserId());
+            return user != null ? displayNameOrEmail(user) : null;
+        }
+        return null;
+    }
+
+    private String displayNameOrEmail(AppUser user) {
+        return user.getDisplayName() != null && !user.getDisplayName().isBlank() ? user.getDisplayName() : user.getEmail();
     }
 
     /** Only while still DRAFT — a submitted report is part of the site's record and signatures may depend on it. */
@@ -366,9 +613,7 @@ public class DailyReportService {
                 materialReceivedRepository.findByDailyReportId(reportId).stream()
                         .map(com.pantheon.service.dto.MaterialReceivedResponse::from)
                         .toList(),
-                listApprovals(reportId).stream()
-                        .map(com.pantheon.service.dto.DailyReportApprovalResponse::from)
-                        .toList());
+                listApprovalResponses(reportId));
     }
 
     private String describeFunction(SiteMembership membership) {

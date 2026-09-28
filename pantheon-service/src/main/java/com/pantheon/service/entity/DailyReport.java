@@ -31,8 +31,11 @@ public class DailyReport {
     @Column(nullable = false)
     private DailyReportStatus status;
 
-    @Column(name = "weather_condition")
-    private String weatherCondition;
+    @Column(name = "weather_condition_morning")
+    private String weatherConditionMorning;
+
+    @Column(name = "weather_condition_afternoon")
+    private String weatherConditionAfternoon;
 
     @Column(name = "weather_blocked_tasks")
     private Boolean weatherBlockedTasks;
@@ -79,14 +82,18 @@ public class DailyReport {
     }
 
     public void updateCore(
-            String weatherCondition,
+            String weatherConditionMorning,
+            String weatherConditionAfternoon,
             Boolean weatherBlockedTasks,
             LocalTime workHoursStart,
             LocalTime workHoursEnd,
             String comments,
             Instant now) {
-        if (weatherCondition != null) {
-            this.weatherCondition = weatherCondition;
+        if (weatherConditionMorning != null) {
+            this.weatherConditionMorning = weatherConditionMorning;
+        }
+        if (weatherConditionAfternoon != null) {
+            this.weatherConditionAfternoon = weatherConditionAfternoon;
         }
         if (weatherBlockedTasks != null) {
             this.weatherBlockedTasks = weatherBlockedTasks;
@@ -151,8 +158,12 @@ public class DailyReport {
         return status;
     }
 
-    public String getWeatherCondition() {
-        return weatherCondition;
+    public String getWeatherConditionMorning() {
+        return weatherConditionMorning;
+    }
+
+    public String getWeatherConditionAfternoon() {
+        return weatherConditionAfternoon;
     }
 
     public Boolean getWeatherBlockedTasks() {

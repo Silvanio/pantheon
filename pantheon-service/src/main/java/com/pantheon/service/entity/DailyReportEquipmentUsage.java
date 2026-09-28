@@ -17,8 +17,13 @@ public class DailyReportEquipmentUsage {
     @Column(name = "daily_report_id", nullable = false)
     private UUID dailyReportId;
 
-    @Column(name = "equipment_id", nullable = false)
+    /** Nullable — {@link #customName} is used instead when the equipment isn't registered. Exactly one of the two must be non-null, enforced in {@code DailyReportService#addEquipmentUsage}. */
+    @Column(name = "equipment_id")
     private UUID equipmentId;
+
+    /** Free-text equipment name for "outro equipamento" (not in the site's registry). Mirrors {@link DailyReportWorkforceEntry}'s membershipId/roleDescription fallback pattern. */
+    @Column(name = "custom_name")
+    private String customName;
 
     @Column(name = "status_note")
     private String statusNote;
@@ -31,10 +36,11 @@ public class DailyReportEquipmentUsage {
     }
 
     public DailyReportEquipmentUsage(
-            UUID id, UUID dailyReportId, UUID equipmentId, String statusNote, Instant createdAt) {
+            UUID id, UUID dailyReportId, UUID equipmentId, String customName, String statusNote, Instant createdAt) {
         this.id = id;
         this.dailyReportId = dailyReportId;
         this.equipmentId = equipmentId;
+        this.customName = customName;
         this.statusNote = statusNote;
         this.createdAt = createdAt;
     }
@@ -49,6 +55,10 @@ public class DailyReportEquipmentUsage {
 
     public UUID getEquipmentId() {
         return equipmentId;
+    }
+
+    public String getCustomName() {
+        return customName;
     }
 
     public String getStatusNote() {

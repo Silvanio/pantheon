@@ -4,7 +4,7 @@ import '../../theme/app_colors.dart';
 /// Mirrors `pantheon-web`'s `StatusBadge.vue`: same kinds, same color-per-status mapping,
 /// same pt-BR labels — kept as a single source of truth here rather than per-screen ad hoc
 /// colors, so a future status/color change stays a one-file edit.
-enum StatusBadgeKind { purchaseRequest, purchaseRequestItem, orcamento, approval, constructionSite, material }
+enum StatusBadgeKind { purchaseRequest, purchaseRequestItem, orcamento, approval, constructionSite, material, dailyReport }
 
 class _Style {
   const _Style(this.background, this.foreground);
@@ -49,6 +49,12 @@ final Map<StatusBadgeKind, Map<String, _Style>> _classMap = {
     'DELIVERED': _blueprintStyle,
     'DELIVERED_AND_CHECKED': _emeraldStyle,
   },
+  // `daily-report-approval-workflow`: DRAFT -> PENDING_APPROVAL -> APPROVED (SUBMITTED removed).
+  StatusBadgeKind.dailyReport: {
+    'DRAFT': _steelStyle,
+    'PENDING_APPROVAL': _amberStyle,
+    'APPROVED': _emeraldStyle,
+  },
 };
 
 final Map<StatusBadgeKind, Map<String, String>> _labelMap = {
@@ -71,6 +77,11 @@ final Map<StatusBadgeKind, Map<String, String>> _labelMap = {
     'AWAITING_DELIVERY': 'Aguardando entrega',
     'DELIVERED': 'Entregue',
     'DELIVERED_AND_CHECKED': 'Entregue e conferido',
+  },
+  StatusBadgeKind.dailyReport: {
+    'DRAFT': 'Rascunho',
+    'PENDING_APPROVAL': 'Em aprovação',
+    'APPROVED': 'Aprovado',
   },
 };
 

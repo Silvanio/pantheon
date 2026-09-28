@@ -29,6 +29,7 @@ import com.pantheon.service.dto.MaterialReceivedRequest;
 import com.pantheon.service.dto.MaterialReceivedResponse;
 import com.pantheon.service.dto.OccurrenceRequest;
 import com.pantheon.service.dto.OccurrenceResponse;
+import com.pantheon.service.dto.RejectDailyReportRequest;
 import com.pantheon.service.dto.WorkforceEntryRequest;
 import com.pantheon.service.dto.WorkforceEntryResponse;
 import com.pantheon.service.entity.AppUser;
@@ -81,6 +82,20 @@ public class DailyReportController {
     @PostMapping("/api/daily-reports/{id}/submit")
     public ResponseEntity<DailyReportResponse> submit(@AuthenticationPrincipal AppUser user, @PathVariable UUID id) {
         DailyReport report = dailyReportService.submit(id, user.getId());
+        return ResponseEntity.ok(DailyReportResponse.from(report));
+    }
+
+    @PostMapping("/api/daily-reports/{id}/approve-step")
+    public ResponseEntity<DailyReportResponse> approveStep(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @RequestParam(required = false) String comment) {
+        DailyReport report = dailyReportService.approveStep(id, user.getId(), comment);
+        return ResponseEntity.ok(DailyReportResponse.from(report));
+    }
+
+    @PostMapping("/api/daily-reports/{id}/reject-step")
+    public ResponseEntity<DailyReportResponse> rejectStep(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @Valid @RequestBody RejectDailyReportRequest request) {
+        DailyReport report = dailyReportService.rejectStep(id, user.getId(), request.reason());
         return ResponseEntity.ok(DailyReportResponse.from(report));
     }
 

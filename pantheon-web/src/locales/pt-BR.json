@@ -491,18 +491,45 @@
     },
     "status": {
       "DRAFT": "Rascunho",
-      "SUBMITTED": "Enviado"
+      "PENDING_APPROVAL": "Aguardando aprovação",
+      "APPROVED": "Aprovado"
     },
     "detail": {
-      "submitButton": "Enviar relatório",
-      "submitConfirm": "Depois de enviado, o relatório não pode mais ser editado. Confirmar envio?",
-      "submitError": "Não foi possível enviar o relatório.",
+      "submitButton": "Enviar para aprovação",
+      "submitError": "Não foi possível enviar o relatório para aprovação.",
       "submittedNotice": "Este relatório foi enviado e não pode mais ser editado.",
       "loadError": "Não foi possível carregar o relatório.",
       "deleteButton": "Excluir",
       "deleteConfirm": "Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.",
       "deleteCancel": "Cancelar",
       "deleteError": "Não foi possível excluir o relatório."
+    },
+    "approveStepButton": "Aprovar",
+    "rejectStepButton": "Rejeitar",
+    "rejectReasonPlaceholder": "Motivo da rejeição",
+    "confirmReject": "Confirmar rejeição",
+    "approvalError": "Não foi possível concluir a ação. Tente novamente.",
+    "approvalHistoryTitle": "Histórico de aprovação",
+    "pendingStepSubtitle": "Aguardando decisão",
+    "cycleLabel": "Ciclo",
+    "stepLabel": "Etapa",
+    "approverFunction": {
+      "CLIENT": "Cliente",
+      "ARCHITECT": "Arquiteto",
+      "ENGINEER": "Engenheiro",
+      "SITE_FOREMAN": "Mestre de Obra",
+      "SERVICE_PROVIDER": "Prestador de Serviço",
+      "OTHER": "Outro"
+    },
+    "approvalLevels": {
+      "title": "Níveis de aprovação de Diário de Obra",
+      "subtitle": "Defina a sequência de funções que devem aprovar um Diário de Obra nesta obra. Sem configuração, um único nível (Engenheiro) é usado.",
+      "stepLabel": "Etapa",
+      "addLevelButton": "Adicionar nível",
+      "removeLevelButton": "Remover",
+      "saveButton": "Salvar níveis",
+      "error": "Não foi possível salvar os níveis de aprovação.",
+      "saved": "Níveis de aprovação salvos."
     },
     "core": {
       "title": "Clima, horário e comentários",
@@ -594,7 +621,7 @@
       "title": "Assinaturas",
       "empty": "Nenhuma assinatura registrada ainda.",
       "signButton": "Assinar relatório",
-      "signRequiresSubmit": "O relatório precisa ser enviado antes de poder ser assinado.",
+      "signRequiresSubmit": "O relatório precisa estar aprovado para poder ser assinado.",
       "error": "Não foi possível assinar o relatório.",
       "signedAt": "Assinado em"
     },

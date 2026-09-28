@@ -8,5 +8,6 @@ public record DailyReportDetailResponse(
         List<EquipmentUsageResponse> equipmentUsage,
         List<ActivityResponse> activities,
         List<OccurrenceResponse> occurrences,
-        List<MaterialReceivedResponse> materialsReceived) {
+        List<MaterialReceivedResponse> materialsReceived,
+        List<DailyReportApprovalResponse> approvals) {
 }

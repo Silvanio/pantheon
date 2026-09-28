@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDailyReports, type DailyReport } from '../composables/useDailyReports'
 import { vDatePicker } from '../lib/datePicker'
+import StatusBadge from './StatusBadge.vue'
 
 const props = defineProps<{ siteId: string }>()
 
@@ -142,7 +143,7 @@ onMounted(load)
             @click="router.push(`/daily-reports/${report.id}`)"
           >
             <td class="py-3.5 pl-5 text-[13.5px] font-bold text-steel-800 dark:text-steel-50">{{ t('dailyReports.history.reportLabel') }} #{{ report.sequenceNo }}</td>
-            <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ t(`dailyReports.status.${report.status}`) }}</td>
+            <td class="py-3.5"><StatusBadge kind="dailyReport" :status="report.status" /></td>
             <td class="py-3.5 text-[13px] text-steel-600 dark:text-steel-300">{{ report.weatherCondition ? t(`dailyReports.core.weatherOptions.${report.weatherCondition}`) : '—' }}</td>
             <td class="py-3.5 text-[13px] text-steel-500 dark:text-steel-400">{{ formatDate(report.reportDate) }}</td>
             <td class="py-3.5 pr-5 text-right" @click.stop>

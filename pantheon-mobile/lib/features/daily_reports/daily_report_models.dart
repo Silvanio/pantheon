@@ -89,17 +89,56 @@ class ReportMedia {
   final String? caption;
 }
 
+/// Mirrors `pantheon-mobile`'s `PurchaseRequestApproval` (see `purchase_request_models.dart`) —
+/// same shape as the backend's `DailyReportApprovalResponse`, trimmed to the fields the approval
+/// UI actually needs (see `daily-report-approval-workflow`'s design.md Decision 1: parallel,
+/// independently-duplicated entities/DTOs rather than a shared type).
+class DailyReportApproval {
+  DailyReportApproval({
+    required this.id,
+    required this.cycleNumber,
+    required this.stepOrder,
+    required this.approverFunction,
+    required this.status,
+    required this.comment,
+  });
+
+  factory DailyReportApproval.fromJson(Map<String, dynamic> json) => DailyReportApproval(
+        id: json['id'] as String,
+        cycleNumber: json['cycleNumber'] as int,
+        stepOrder: json['stepOrder'] as int,
+        approverFunction: json['approverFunction'] as String,
+        status: json['status'] as String,
+        comment: json['comment'] as String?,
+      );
+
+  final String id;
+  final int cycleNumber;
+  final int stepOrder;
+  final String approverFunction;
+  final String status;
+  final String? comment;
+}
+
 class DailyReportDetail {
-  DailyReportDetail({required this.report, required this.workforceEntries, required this.activities});
+  DailyReportDetail({
+    required this.report,
+    required this.workforceEntries,
+    required this.activities,
+    required this.approvals,
+  });
 
   factory DailyReportDetail.fromJson(Map<String, dynamic> json) => DailyReportDetail(
         report: DailyReport.fromJson(json['report'] as Map<String, dynamic>),
         workforceEntries:
             (json['workforceEntries'] as List).map((e) => WorkforceEntry.fromJson(e as Map<String, dynamic>)).toList(),
         activities: (json['activities'] as List).map((e) => ReportActivity.fromJson(e as Map<String, dynamic>)).toList(),
+        approvals:
+            (json['approvals'] as List).map((e) => DailyReportApproval.fromJson(e as Map<String, dynamic>)).toList(),
       );
 
   final DailyReport report;
   final List<WorkforceEntry> workforceEntries;
   final List<ReportActivity> activities;
+  final List<DailyReportApproval> approvals;
 }

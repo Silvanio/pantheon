@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/offline_dialogs.dart';
+import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import 'daily_report_repository.dart';
 
@@ -71,7 +72,6 @@ class DailyReportListScreen extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final r = list[index];
-                final isDraft = r.status == 'DRAFT';
                 return Material(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -104,21 +104,7 @@ class DailyReportListScreen extends ConsumerWidget {
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isDraft ? AppColors.amber50 : AppColors.emerald50,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              isDraft ? 'Rascunho' : 'Enviado',
-                              style: TextStyle(
-                                color: isDraft ? AppColors.amber700 : AppColors.emerald700,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11.5,
-                              ),
-                            ),
-                          ),
+                          StatusBadge(kind: StatusBadgeKind.dailyReport, status: r.status),
                         ],
                       ),
                     ),

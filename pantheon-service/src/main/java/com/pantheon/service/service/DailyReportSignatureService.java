@@ -5,8 +5,8 @@ import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportSignature;
 import com.pantheon.service.entity.DailyReportStatus;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
+import com.pantheon.service.exception.DailyReportNotApprovedException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
-import com.pantheon.service.exception.DailyReportNotSubmittedException;
 import com.pantheon.service.exception.NotCompanyMemberException;
 import com.pantheon.service.repository.CompanyMembershipRepository;
 import com.pantheon.service.repository.ConstructionSiteRepository;
@@ -46,8 +46,8 @@ public class DailyReportSignatureService {
                 dailyReportRepository.findById(reportId).orElseThrow(() -> new DailyReportNotFoundException(reportId));
         var access = siteAccessService.requireAccess(report.getConstructionSiteId(), actingUserId);
 
-        if (report.getStatus() != DailyReportStatus.SUBMITTED) {
-            throw new DailyReportNotSubmittedException(reportId);
+        if (report.getStatus() != DailyReportStatus.APPROVED) {
+            throw new DailyReportNotApprovedException(reportId);
         }
 
         UUID membershipId = access.siteMembership() != null

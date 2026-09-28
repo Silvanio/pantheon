@@ -3,6 +3,7 @@ package com.pantheon.service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -11,16 +12,27 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pantheon.service.dto.DailyReportCoreUpdateRequest;
+import com.pantheon.service.entity.AccessLevel;
+import com.pantheon.service.entity.ConstructionFunction;
 import com.pantheon.service.entity.DailyReport;
+import com.pantheon.service.entity.DailyReportApproval;
+import com.pantheon.service.entity.DailyReportApprovalStatus;
 import com.pantheon.service.entity.DailyReportAttachment;
 import com.pantheon.service.entity.DailyReportMedia;
+import com.pantheon.service.entity.DailyReportStatus;
+import com.pantheon.service.entity.DailyReportWorkforceEntry;
 import com.pantheon.service.entity.MediaType;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.SiteDailyReportApprovalLevel;
+import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.DailyReportCoreFieldsRequiredException;
 import com.pantheon.service.exception.DailyReportNotDeletableException;
+import com.pantheon.service.exception.DailyReportNotFoundException;
 import com.pantheon.service.exception.ForbiddenCapabilityException;
+import com.pantheon.service.exception.NotCurrentDailyReportApprovalStepException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
+import com.pantheon.service.repository.DailyReportApprovalRepository;
 import com.pantheon.service.repository.DailyReportAttachmentRepository;
 import com.pantheon.service.repository.DailyReportEquipmentUsageRepository;
 import com.pantheon.service.repository.DailyReportMaterialReceivedRepository;
@@ -76,6 +88,9 @@ class DailyReportServiceTest {
     private DailyReportAttachmentRepository attachmentRepository;
 
     @Mock
+    private DailyReportApprovalRepository approvalRepository;
+
+    @Mock
     private ConstructionSiteRepository siteRepository;
 
     @Mock
@@ -88,6 +103,9 @@ class DailyReportServiceTest {
     private SitePermissionService permissionService;
 
     @Mock
+    private SiteDailyReportApprovalLevelService approvalLevelService;
+
+    @Mock
     private StorageService storageService;
 
     private DailyReportService service;
@@ -98,12 +116,22 @@ class DailyReportServiceTest {
     void setUp() {
         service = new DailyReportService(
                 dailyReportRepository, workforceEntryRepository, equipmentUsageRepository, activityRepository,
-                occurrenceRepository, materialReceivedRepository, mediaRepository, attachmentRepository, siteRepository,
-                siteMembershipRepository, siteAccessService, permissionService, storageService);
+                occurrenceRepository, materialReceivedRepository, mediaRepository, attachmentRepository,
+                approvalRepository, siteRepository, siteMembershipRepository, siteAccessService, permissionService,
+                approvalLevelService, storageService);
 
         siteId = UUID.randomUUID();
         lenient().when(siteAccessService.requireAccess(eq(siteId), any())).thenReturn(new SiteAccessContext(true, null));
         lenient().when(siteRepository.findById(siteId)).thenReturn(Optional.of(site(siteId)));
+        lenient().when(dailyReportRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(approvalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private SiteMembership activeMember(UUID userId, ConstructionFunction function) {
+        SiteMembership member =
+                SiteMembership.invited(UUID.randomUUID(), siteId, userId, function, null, null, Instant.now());
+        member.accept();
+        return member;
     }
 
     private com.pantheon.service.entity.ConstructionSite site(UUID id) {
@@ -239,5 +267,281 @@ class DailyReportServiceTest {
 
         assertThatThrownBy(() -> service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20)))
                 .isInstanceOf(ForbiddenCapabilityException.class);
+    }
+
+    @Test
+    void listFiltersToApprovedOnlyForViewOnlyMember() {
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(AccessLevel.VIEW);
+        DailyReport approved = draftReport();
+        when(dailyReportRepository.findByConstructionSiteIdAndStatus(
+                eq(siteId), eq(DailyReportStatus.APPROVED), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(approved), PageRequest.of(0, 20), 1));
+
+        Page<DailyReport> result = service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(approved);
+        verify(dailyReportRepository, never()).findByConstructionSiteId(any(), any());
+    }
+
+    @Test
+    void listReturnsEveryStatusForViewAndApproveMember() {
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findByConstructionSiteId(eq(siteId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(report), PageRequest.of(0, 20), 1));
+
+        Page<DailyReport> result = service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(report);
+        verify(dailyReportRepository, never()).findByConstructionSiteIdAndStatus(any(), any(), any());
+    }
+
+    @Test
+    void listReturnsEveryStatusForManageMember() {
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(AccessLevel.MANAGE);
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findByConstructionSiteId(eq(siteId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(report), PageRequest.of(0, 20), 1));
+
+        Page<DailyReport> result = service.list(siteId, UUID.randomUUID(), PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(report);
+        verify(dailyReportRepository, never()).findByConstructionSiteIdAndStatus(any(), any(), any());
+    }
+
+    @Test
+    void viewOnlyMemberCannotAccessNonApprovedReportDirectly() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(AccessLevel.VIEW);
+
+        assertThatThrownBy(() -> service.listWorkforceEntries(report.getId(), UUID.randomUUID()))
+                .isInstanceOf(DailyReportNotFoundException.class);
+    }
+
+    @Test
+    void viewOnlyMemberCanAccessApprovedReportDirectly() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        report.approve(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(AccessLevel.VIEW);
+        when(workforceEntryRepository.findByDailyReportId(report.getId())).thenReturn(List.of());
+
+        List<DailyReportWorkforceEntry> result = service.listWorkforceEntries(report.getId(), UUID.randomUUID());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void manageOrViewAndApproveMemberCanAccessNonApprovedReportDirectly() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(permissionService.resolve(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT)))
+                .thenReturn(AccessLevel.VIEW_AND_APPROVE);
+        when(workforceEntryRepository.findByDailyReportId(report.getId())).thenReturn(List.of());
+
+        List<DailyReportWorkforceEntry> result = service.listWorkforceEntries(report.getId(), UUID.randomUUID());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void submitTransitionsToPendingApprovalAndCreatesStepsFromDefaultLevel() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        when(approvalLevelService.getEffectiveLevels(siteId)).thenReturn(List.of(new SiteDailyReportApprovalLevel(
+                UUID.randomUUID(), siteId, 1, ConstructionFunction.ENGINEER, Instant.now())));
+
+        DailyReport result = service.submit(report.getId(), UUID.randomUUID());
+
+        assertThat(result.getStatus()).isEqualTo(DailyReportStatus.PENDING_APPROVAL);
+        assertThat(result.getCurrentApprovalCycle()).isEqualTo(1);
+        verify(approvalRepository).save(
+                argThat(a -> a.getStepOrder() == 1 && a.getApproverFunction() == ConstructionFunction.ENGINEER
+                        && a.getCycleNumber() == 1));
+    }
+
+    @Test
+    void approveStepAdvancesToNextStepWithoutFinalizing() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step1 = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        DailyReportApproval step2 = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 2, ConstructionFunction.CLIENT, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING))
+                .thenReturn(Optional.of(step1), Optional.of(step2));
+
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(true);
+
+        DailyReport result = service.approveStep(report.getId(), engineerUserId, null);
+
+        assertThat(result.getStatus()).isEqualTo(DailyReportStatus.PENDING_APPROVAL);
+        assertThat(step1.getStatus()).isEqualTo(DailyReportApprovalStatus.APPROVED);
+    }
+
+    @Test
+    void approveStepFinalizesReportWhenLastStep() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval onlyStep = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING))
+                .thenReturn(Optional.of(onlyStep), Optional.empty());
+
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(true);
+
+        DailyReport result = service.approveStep(report.getId(), engineerUserId, null);
+
+        assertThat(result.getStatus()).isEqualTo(DailyReportStatus.APPROVED);
+    }
+
+    @Test
+    void approveStepBlocksNonMatchingFunction() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING)).thenReturn(Optional.of(step));
+
+        UUID architectUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, architectUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(architectUserId, ConstructionFunction.ARCHITECT)));
+
+        assertThatThrownBy(() -> service.approveStep(report.getId(), architectUserId, null))
+                .isInstanceOf(NotCurrentDailyReportApprovalStepException.class);
+    }
+
+    @Test
+    void companyStaffWithNoSiteMembershipCanAlwaysActOnApprovalStep() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING))
+                .thenReturn(Optional.of(step), Optional.empty());
+
+        UUID staffUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, staffUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, staffUserId)).thenReturn(Optional.empty());
+
+        DailyReport result = service.approveStep(report.getId(), staffUserId, "ok");
+
+        assertThat(result.getStatus()).isEqualTo(DailyReportStatus.APPROVED);
+        assertThat(step.getDecidedBySiteMembershipId()).isNull();
+    }
+
+    @Test
+    void companyStaffWithNonMatchingSiteMembershipIsBlockedDespiteBeingStaff() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING)).thenReturn(Optional.of(step));
+
+        UUID staffClientUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, staffClientUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, staffClientUserId))
+                .thenReturn(Optional.of(activeMember(staffClientUserId, ConstructionFunction.CLIENT)));
+
+        assertThatThrownBy(() -> service.approveStep(report.getId(), staffClientUserId, "ok"))
+                .isInstanceOf(NotCurrentDailyReportApprovalStepException.class);
+    }
+
+    @Test
+    void companyStaffWithMatchingSiteMembershipApprovesAsThatMembership() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.CLIENT, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING))
+                .thenReturn(Optional.of(step), Optional.empty());
+
+        UUID staffClientUserId = UUID.randomUUID();
+        SiteMembership clientMembership = activeMember(staffClientUserId, ConstructionFunction.CLIENT);
+        when(siteAccessService.requireAccess(siteId, staffClientUserId)).thenReturn(new SiteAccessContext(true, null));
+        when(siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, staffClientUserId))
+                .thenReturn(Optional.of(clientMembership));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(true);
+
+        DailyReport result = service.approveStep(report.getId(), staffClientUserId, "ok");
+
+        assertThat(result.getStatus()).isEqualTo(DailyReportStatus.APPROVED);
+        assertThat(step.getDecidedBySiteMembershipId()).isEqualTo(clientMembership.getId());
+    }
+
+    @Test
+    void viewOnlyAccessBlocksApprovalEvenOnFunctionMatch() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING)).thenReturn(Optional.of(step));
+
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(false);
+
+        assertThatThrownBy(() -> service.approveStep(report.getId(), engineerUserId, null))
+                .isInstanceOf(NotCurrentDailyReportApprovalStepException.class);
+    }
+
+    @Test
+    void rejectStepRequiresAReason() {
+        assertThatThrownBy(() -> service.rejectStep(UUID.randomUUID(), UUID.randomUUID(), " "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectStepReturnsReportToDraftAndRecordsReasonOnStep() {
+        DailyReport report = draftReport();
+        report.submit(Instant.now());
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+
+        DailyReportApproval step = new DailyReportApproval(
+                UUID.randomUUID(), report.getId(), 1, 1, ConstructionFunction.ENGINEER, Instant.now());
+        when(approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                report.getId(), 1, DailyReportApprovalStatus.PENDING)).thenReturn(Optional.of(step));
+
+        UUID engineerUserId = UUID.randomUUID();
+        when(siteAccessService.requireAccess(siteId, engineerUserId))
+                .thenReturn(new SiteAccessContext(false, activeMember(engineerUserId, ConstructionFunction.ENGINEER)));
+        when(permissionService.canApprove(eq(siteId), any(), eq(PermissionCapability.DAILY_REPORT))).thenReturn(true);
+
+        DailyReport result = service.rejectStep(report.getId(), engineerUserId, "Faltou assinatura do responsável");
+
+        assertThat(result.getStatus()).isEqualTo(DailyReportStatus.DRAFT);
+        assertThat(step.getStatus()).isEqualTo(DailyReportApprovalStatus.REJECTED);
+        assertThat(step.getComment()).isEqualTo("Faltou assinatura do responsável");
     }
 }

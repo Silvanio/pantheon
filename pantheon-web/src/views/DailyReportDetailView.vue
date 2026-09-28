@@ -12,11 +12,13 @@ import {
   type ReportSignature,
 } from '../composables/useDailyReports'
 import { useEquipment, type Equipment } from '../composables/useEquipment'
-import { useSiteMembers, type SiteMember } from '../composables/useSiteMembers'
+import { useSiteMembers, type ConstructionFunction, type SiteMember } from '../composables/useSiteMembers'
+import { useSitePermissions, type AccessLevel } from '../composables/useSitePermissions'
 import { useConstructionSites } from '../composables/useConstructionSites'
 import AppHeader from '../components/AppHeader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import SiteBreadcrumb from '../components/SiteBreadcrumb.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 import TimeClockPicker from '../components/TimeClockPicker.vue'
 
 const route = useRoute()
@@ -26,6 +28,8 @@ const {
   getDetail,
   updateCore,
   submitReport,
+  approveStep,
+  rejectStep,
   deleteReport,
   addWorkforceEntry,
   addEquipmentUsage,
@@ -43,7 +47,8 @@ const {
   getPdf,
 } = useDailyReports()
 const { listEquipment } = useEquipment()
-const { listMembers } = useSiteMembers()
+const { listMembers, getMyFunction } = useSiteMembers()
+const { getMyPermissions } = useSitePermissions()
 const { getSite } = useConstructionSites()
 
 const reportId = route.params.id as string
@@ -53,8 +58,60 @@ const siteMembers = ref<SiteMember[]>([])
 const siteName = ref<string | null>(null)
 const loading = ref(false)
 const loadError = ref('')
+const myAccessLevel = ref<AccessLevel | null>(null)
+const myFunction = ref<ConstructionFunction | null>(null)
 
 const isDraft = computed(() => detail.value?.report.status === 'DRAFT')
+const isApproved = computed(() => detail.value?.report.status === 'APPROVED')
+
+// Whether this viewer's access level allows approving at all (MANAGE or VIEW_AND_APPROVE) —
+// mirrors SitePermissionService.canApprove on the backend, same as PurchaseRequestDetailView.
+const canApprove = computed(() => myAccessLevel.value === 'MANAGE' || myAccessLevel.value === 'VIEW_AND_APPROVE')
+
+// Only a MANAGE member may submit a draft for approval (see daily-construction-report's "Daily
+// report submission" requirement) — VIEW_AND_APPROVE members can see drafts (to act on pending
+// approvals across the site) but don't author/submit them.
+const canSubmit = computed(() => isDraft.value && myAccessLevel.value === 'MANAGE')
+
+const currentCycle = computed(() => {
+  if (!detail.value || detail.value.approvals.length === 0) return 0
+  return Math.max(...detail.value.approvals.map((a) => a.cycleNumber))
+})
+
+const currentPendingApproval = computed(() => {
+  if (!detail.value) return null
+  return (
+    detail.value.approvals
+      .filter((a) => a.cycleNumber === currentCycle.value && a.status === 'PENDING')
+      .sort((a, b) => a.stepOrder - b.stepOrder)[0] ?? null
+  )
+})
+
+const approvalsByCycle = computed(() => {
+  if (!detail.value) return []
+  const cycles = new Map<number, typeof detail.value.approvals>()
+  for (const approval of detail.value.approvals) {
+    if (!cycles.has(approval.cycleNumber)) cycles.set(approval.cycleNumber, [])
+    cycles.get(approval.cycleNumber)!.push(approval)
+  }
+  return Array.from(cycles.entries())
+    .sort((a, b) => b[0] - a[0])
+    .map(([cycleNumber, approvals]) => ({
+      cycleNumber,
+      approvals: approvals.slice().sort((a, b) => a.stepOrder - b.stepOrder),
+    }))
+})
+
+// Mirrors the backend's requireStepAuthority: a member holding a SiteMembership on this site
+// (even one who is also company staff) may act only when their function matches the current
+// pending step; a company-staff user with NO SiteMembership here at all keeps the admin bypass.
+const canActOnApproval = computed(() => {
+  if (!currentPendingApproval.value) return false
+  if (myFunction.value !== null) {
+    return myFunction.value === currentPendingApproval.value.approverFunction && canApprove.value
+  }
+  return myAccessLevel.value === 'MANAGE'
+})
 
 // core section
 const WEATHER_OPTIONS = ['SUNNY', 'PARTLY_CLOUDY', 'CLOUDY', 'RAINY', 'STORM'] as const
@@ -98,6 +155,10 @@ const materialQuantity = ref('')
 const submitError = ref('')
 const submitting = ref(false)
 
+const approvalActionError = ref('')
+const rejectReason = ref('')
+const showRejectForm = ref(false)
+
 const confirmingDelete = ref(false)
 const deleting = ref(false)
 const deleteError = ref('')
@@ -139,6 +200,9 @@ async function load() {
     const siteId = detail.value.report.constructionSiteId
     equipmentCatalog.value = (await listEquipment(siteId, { size: 200 })).content
     siteMembers.value = await listMembers(siteId)
+    const [permissions, fn] = await Promise.all([getMyPermissions(siteId), getMyFunction(siteId)])
+    myAccessLevel.value = permissions.DAILY_REPORT
+    myFunction.value = fn
     getSite(siteId).then((s) => (siteName.value = s.name)).catch(() => {})
 
     media.value = await listMedia(reportId)
@@ -345,16 +409,37 @@ async function onAddMaterialReceived() {
 }
 
 async function onSubmitReport() {
-  if (!window.confirm(t('dailyReports.detail.submitConfirm'))) return
   submitError.value = ''
   submitting.value = true
   try {
-    const updated = await submitReport(reportId)
-    if (detail.value) detail.value.report = updated
+    await submitReport(reportId)
+    await load()
   } catch {
     submitError.value = t('dailyReports.detail.submitError')
   } finally {
     submitting.value = false
+  }
+}
+
+async function onApproveStep() {
+  approvalActionError.value = ''
+  try {
+    await approveStep(reportId)
+    await load()
+  } catch {
+    approvalActionError.value = t('dailyReports.approvalError')
+  }
+}
+
+async function onRejectStep() {
+  approvalActionError.value = ''
+  try {
+    await rejectStep(reportId, rejectReason.value)
+    showRejectForm.value = false
+    rejectReason.value = ''
+    await load()
+  } catch {
+    approvalActionError.value = t('dailyReports.approvalError')
   }
 }
 
@@ -400,7 +485,9 @@ onMounted(load)
           <h1 class="text-2xl font-semibold text-steel-800 dark:text-steel-50">
             {{ t('dailyReports.history.reportLabel') }} #{{ detail.report.sequenceNo }} — {{ detail.report.reportDate }}
           </h1>
-          <p class="mt-1 text-sm text-steel-500 dark:text-steel-400">{{ t(`dailyReports.status.${detail.report.status}`) }}</p>
+          <div class="mt-1.5">
+            <StatusBadge kind="dailyReport" :status="detail.report.status" />
+          </div>
         </div>
         <div class="flex gap-2">
           <button
@@ -412,10 +499,10 @@ onMounted(load)
             {{ t('dailyReports.pdf.downloadButton') }}
           </button>
           <button
-            v-if="isDraft"
+            v-if="canSubmit"
             type="button"
             :disabled="submitting"
-            class="btn-danger"
+            class="btn-primary"
             @click="onSubmitReport"
           >
             {{ t('dailyReports.detail.submitButton') }}
@@ -440,6 +527,49 @@ onMounted(load)
       <p v-if="submitError" class="text-sm text-safety-600 dark:text-safety-500">{{ submitError }}</p>
       <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
       <p v-if="pdfError" class="text-sm text-safety-600 dark:text-safety-500">{{ pdfError }}</p>
+
+      <!-- Approval -->
+      <section v-if="detail.approvals.length > 0" class="card card-pad">
+        <h2 class="mb-4 text-lg font-semibold text-steel-800 dark:text-steel-50">{{ t('dailyReports.approvalHistoryTitle') }}</h2>
+
+        <div v-if="currentPendingApproval" class="mb-4 flex items-center gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white">
+            {{ currentPendingApproval.stepOrder }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-steel-800 dark:text-steel-50">
+              {{ t('dailyReports.stepLabel') }} {{ currentPendingApproval.stepOrder }} — {{ t(`dailyReports.approverFunction.${currentPendingApproval.approverFunction}`) }}
+            </p>
+            <p class="text-xs text-amber-700 dark:text-amber-400">{{ t('dailyReports.pendingStepSubtitle') }}</p>
+          </div>
+          <div v-if="canActOnApproval" class="flex shrink-0 flex-wrap items-center gap-2">
+            <button type="button" class="btn-danger px-3 py-1.5" @click="showRejectForm = !showRejectForm">{{ t('dailyReports.rejectStepButton') }}</button>
+            <button type="button" class="btn-success px-3 py-1.5" @click="onApproveStep">{{ t('dailyReports.approveStepButton') }}</button>
+          </div>
+        </div>
+        <template v-if="currentPendingApproval && canActOnApproval">
+          <form v-if="showRejectForm" class="mb-4 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
+            <input v-model="rejectReason" type="text" required :placeholder="t('dailyReports.rejectReasonPlaceholder')" class="field-input flex-1" />
+            <button type="submit" class="btn-danger px-3 py-1.5">{{ t('dailyReports.confirmReject') }}</button>
+          </form>
+          <p v-if="approvalActionError" class="mb-4 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
+        </template>
+
+        <div v-for="cycle in approvalsByCycle" :key="cycle.cycleNumber" class="mb-4 last:mb-0">
+          <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-steel-500 dark:text-steel-400">
+            {{ t('dailyReports.cycleLabel') }} {{ cycle.cycleNumber }}
+          </p>
+          <ol class="space-y-1.5 border-l-2 border-steel-200 pl-4 dark:border-steel-700">
+            <li v-for="approval in cycle.approvals" :key="approval.id" class="flex items-center justify-between text-sm">
+              <span class="text-steel-700 dark:text-steel-200">
+                {{ t('dailyReports.stepLabel') }} {{ approval.stepOrder }} — {{ t(`dailyReports.approverFunction.${approval.approverFunction}`) }}
+                <span v-if="approval.status === 'REJECTED' && approval.comment" class="text-safety-600 dark:text-safety-500"> · {{ approval.comment }}</span>
+              </span>
+              <StatusBadge kind="approval" :status="approval.status" />
+            </li>
+          </ol>
+        </div>
+      </section>
 
       <!-- Core: weather, hours, comments -->
       <section class="card card-pad">
@@ -670,7 +800,7 @@ onMounted(load)
           </li>
         </ul>
         <button
-          v-if="isDraft"
+          v-if="!isApproved"
           type="button"
           disabled
           class="rounded-md bg-steel-300 px-4 py-2 text-sm font-medium text-white dark:bg-steel-600"
@@ -686,7 +816,7 @@ onMounted(load)
         >
           {{ t('dailyReports.signatures.signButton') }}
         </button>
-        <p v-if="isDraft" class="mt-1 text-xs text-steel-500 dark:text-steel-400">{{ t('dailyReports.signatures.signRequiresSubmit') }}</p>
+        <p v-if="!isApproved" class="mt-1 text-xs text-steel-500 dark:text-steel-400">{{ t('dailyReports.signatures.signRequiresSubmit') }}</p>
         <p v-if="signError" class="mt-1 text-sm text-safety-600 dark:text-safety-500">{{ signError }}</p>
       </section>
     </main>

@@ -31,7 +31,6 @@ dependencies:
   # Push notifications
   firebase_core: ^3.10.1
   firebase_messaging: ^15.2.1
-  flutter_local_notifications: ^18.0.1
 
   # Error tracking / crash reporting + navigation breadcrumbs (see
   # openspec/changes/add-sentry-error-tracking/). No-op unless SENTRY_DSN is set — see main.dart.

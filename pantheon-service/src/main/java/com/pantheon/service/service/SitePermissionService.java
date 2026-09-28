@@ -18,10 +18,11 @@ import org.springframework.stereotype.Service;
  * below (matching the pre-permission-configuration role rules, so a freshly created obra needs
  * no configuration to behave correctly). {@code ORCAMENTO_MANAGE} only distinguishes
  * {@link AccessLevel#VIEW} (unrestricted read) from {@link AccessLevel#MANAGE} (create/edit).
- * {@code PURCHASE_REQUEST} additionally supports {@link AccessLevel#VIEW_AND_APPROVE}: unlike
- * plain {@code VIEW}, it only sees a Pedido de Compra relevant to the member's approval role and
- * can act on a matching approval step — see {@code PurchaseRequestService} for both the
- * visibility filtering and the (function + access-level) check on approval-step authority.
+ * {@code PURCHASE_REQUEST} and {@code DAILY_REPORT} additionally support
+ * {@link AccessLevel#VIEW_AND_APPROVE}, letting that member act on a matching approval step (see
+ * {@code PurchaseRequestService}/{@code DailyReportService} for the (function + access-level)
+ * check on approval-step authority, shared verbatim between the two). Their plain {@code VIEW}
+ * visibility differs, though — see {@link AccessLevel}'s javadoc for that distinction.
  */
 @Service
 public class SitePermissionService {
@@ -117,7 +118,7 @@ public class SitePermissionService {
         }
     }
 
-    /** Whether {@code capability}'s resolved access allows approving — {@code MANAGE} or {@code VIEW_AND_APPROVE}. Meaningful only for {@code PURCHASE_REQUEST}. */
+    /** Whether {@code capability}'s resolved access allows approving — {@code MANAGE} or {@code VIEW_AND_APPROVE}. Meaningful for {@code PURCHASE_REQUEST} and {@code DAILY_REPORT}. */
     public boolean canApprove(UUID constructionSiteId, SiteAccessContext access, PermissionCapability capability) {
         AccessLevel level = resolve(constructionSiteId, access, capability);
         return level == AccessLevel.MANAGE || level == AccessLevel.VIEW_AND_APPROVE;

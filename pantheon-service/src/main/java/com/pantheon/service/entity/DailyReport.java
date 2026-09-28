@@ -52,6 +52,9 @@ public class DailyReport {
     @Column(name = "submitted_at")
     private Instant submittedAt;
 
+    @Column(name = "current_approval_cycle", nullable = false)
+    private int currentApprovalCycle;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -70,6 +73,7 @@ public class DailyReport {
         this.sequenceNo = sequenceNo;
         this.status = DailyReportStatus.DRAFT;
         this.createdBy = createdBy;
+        this.currentApprovalCycle = 0;
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
     }
@@ -99,9 +103,23 @@ public class DailyReport {
         this.updatedAt = now;
     }
 
+    /** Starts a new approval cycle: DRAFT -> PENDING_APPROVAL. Its approval steps are created by the service. */
     public void submit(Instant now) {
-        this.status = DailyReportStatus.SUBMITTED;
+        this.status = DailyReportStatus.PENDING_APPROVAL;
         this.submittedAt = now;
+        this.currentApprovalCycle += 1;
+        this.updatedAt = now;
+    }
+
+    /** The cycle's final step was approved: PENDING_APPROVAL -> APPROVED. */
+    public void approve(Instant now) {
+        this.status = DailyReportStatus.APPROVED;
+        this.updatedAt = now;
+    }
+
+    /** A rejection at any approval step bounces the report back to DRAFT for revision: PENDING_APPROVAL -> DRAFT. */
+    public void reject(Instant now) {
+        this.status = DailyReportStatus.DRAFT;
         this.updatedAt = now;
     }
 
@@ -159,6 +177,10 @@ public class DailyReport {
 
     public Instant getSubmittedAt() {
         return submittedAt;
+    }
+
+    public int getCurrentApprovalCycle() {
+        return currentApprovalCycle;
     }
 
     public Instant getCreatedAt() {

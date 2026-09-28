@@ -55,11 +55,24 @@ class DailyReportRepository {
     return DailyReport.fromJson(json);
   }
 
-  Future<bool> submit(String reportId) => _client.mutateQueueable(
-        method: 'POST',
-        path: '/api/daily-reports/$reportId/submit',
-        entityLabel: 'Enviar relatório diário',
-      );
+  // Submit/approve/reject are the approval workflow itself (see
+  // `daily-report-approval-workflow`), which requires being online — mirroring
+  // `PurchaseRequestRepository`'s equivalent methods exactly (design.md's offline-support
+  // scoping) — never queued. The screen calls `requireOnline` before invoking these, so a
+  // failure here should be rare (a race where connectivity dropped in between), and just
+  // surfaces as a normal error.
+  Future<void> submit(String reportId) async {
+    await _client.post<dynamic>('/api/daily-reports/$reportId/submit');
+  }
+
+  Future<void> approveStep(String reportId, {String? comment}) async {
+    final query = (comment != null && comment.isNotEmpty) ? '?comment=${Uri.encodeComponent(comment)}' : '';
+    await _client.post<dynamic>('/api/daily-reports/$reportId/approve-step$query');
+  }
+
+  Future<void> rejectStep(String reportId, String reason) async {
+    await _client.post<dynamic>('/api/daily-reports/$reportId/reject-step', body: {'reason': reason});
+  }
 
   /// Deleting is a destructive, irreversible action — like the purchase-request approval
   /// workflow, it's never queued offline. The screen calls `requireOnline` before invoking this.

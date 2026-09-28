@@ -3,12 +3,13 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 /**
- * Shared status pill for the Pedido de Compra (4-state), Orçamento (2-state) and approval-step
- * (3-state) statuses, so coloring stays consistent across cards and detail views. See
+ * Shared status pill for the Pedido de Compra (4-state), Orçamento (2-state), Diário de Obra
+ * (3-state) and approval-step (3-state, shared by both Pedido de Compra's and Diário de Obra's
+ * approval steps) statuses, so coloring stays consistent across cards and detail views. See
  * `redesign-purchase-request-approval-and-comparison`'s design.md decision 9.
  */
 const props = defineProps<{
-  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval' | 'constructionSite' | 'material'
+  kind: 'purchaseRequest' | 'purchaseRequestItem' | 'orcamento' | 'approval' | 'constructionSite' | 'material' | 'dailyReport'
   status: string
 }>()
 
@@ -45,6 +46,11 @@ const CLASS_MAP: Record<string, Record<string, string>> = {
     DELIVERED: 'bg-blueprint-100 text-blueprint-700 dark:bg-blueprint-900/50 dark:text-blueprint-300',
     DELIVERED_AND_CHECKED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
   },
+  dailyReport: {
+    DRAFT: 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200',
+    PENDING_APPROVAL: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+    APPROVED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+  },
 }
 
 const LABEL_KEY: Record<string, string> = {
@@ -54,6 +60,7 @@ const LABEL_KEY: Record<string, string> = {
   approval: 'purchaseRequests.approvalStatus',
   constructionSite: 'constructionSites.status',
   material: 'materialDelivery.status',
+  dailyReport: 'dailyReports.status',
 }
 
 const badgeClass = computed(() => CLASS_MAP[props.kind]?.[props.status] ?? 'bg-steel-100 text-steel-700 dark:bg-steel-700 dark:text-steel-200')

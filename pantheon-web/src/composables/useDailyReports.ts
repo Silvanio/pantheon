@@ -1,9 +1,11 @@
 import { SERVICE_BASE_URL } from '../lib/config'
 import { useAuth } from './useAuth'
 import type { PageResponse } from './usePurchaseRequests'
+import type { DailyReportApproverFunction } from './useDailyReportApprovalLevels'
 
-export type DailyReportStatus = 'DRAFT' | 'SUBMITTED'
+export type DailyReportStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED'
 export type ActivityStatus = 'IN_PROGRESS' | 'COMPLETED'
+export type DailyReportApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
 export interface DailyReport {
   id: string
@@ -59,6 +61,19 @@ export interface MaterialReceived {
   quantity: string
 }
 
+export interface DailyReportApproval {
+  id: string
+  dailyReportId: string
+  cycleNumber: number
+  stepOrder: number
+  approverFunction: DailyReportApproverFunction
+  status: DailyReportApprovalStatus
+  decidedBySiteMembershipId: string | null
+  decidedAt: string | null
+  comment: string | null
+  createdAt: string
+}
+
 export interface DailyReportDetail {
   report: DailyReport
   workforceEntries: WorkforceEntry[]
@@ -66,6 +81,7 @@ export interface DailyReportDetail {
   activities: Activity[]
   occurrences: Occurrence[]
   materialsReceived: MaterialReceived[]
+  approvals: DailyReportApproval[]
 }
 
 export type MediaKind = 'PHOTO' | 'VIDEO'
@@ -158,6 +174,18 @@ export function useDailyReports() {
 
   function submitReport(reportId: string): Promise<DailyReport> {
     return authFetch(`/api/daily-reports/${reportId}/submit`, { method: 'POST' })
+  }
+
+  function approveStep(reportId: string, comment?: string): Promise<DailyReport> {
+    const query = comment ? `?comment=${encodeURIComponent(comment)}` : ''
+    return authFetch(`/api/daily-reports/${reportId}/approve-step${query}`, { method: 'POST' })
+  }
+
+  function rejectStep(reportId: string, reason: string): Promise<DailyReport> {
+    return authFetch(`/api/daily-reports/${reportId}/reject-step`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
   }
 
   function deleteReport(reportId: string): Promise<void> {
@@ -261,6 +289,8 @@ export function useDailyReports() {
     getDetail,
     updateCore,
     submitReport,
+    approveStep,
+    rejectStep,
     deleteReport,
     addWorkforceEntry,
     addEquipmentUsage,

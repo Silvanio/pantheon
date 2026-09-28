@@ -23,8 +23,8 @@ public class DailyReportExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
-    @ExceptionHandler(DailyReportNotSubmittedException.class)
-    public ResponseEntity<String> handleDailyReportNotSubmitted(DailyReportNotSubmittedException e) {
+    @ExceptionHandler(DailyReportNotApprovedException.class)
+    public ResponseEntity<String> handleDailyReportNotApproved(DailyReportNotApprovedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
@@ -41,5 +41,15 @@ public class DailyReportExceptionHandler {
     @ExceptionHandler(DailyReportCoreFieldsRequiredException.class)
     public ResponseEntity<String> handleDailyReportCoreFieldsRequired(DailyReportCoreFieldsRequiredException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(NoPendingDailyReportApprovalStepException.class)
+    public ResponseEntity<String> handleNoPendingDailyReportApprovalStep(NoPendingDailyReportApprovalStepException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(NotCurrentDailyReportApprovalStepException.class)
+    public ResponseEntity<String> handleNotCurrentDailyReportApprovalStep(NotCurrentDailyReportApprovalStepException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
     }
 }

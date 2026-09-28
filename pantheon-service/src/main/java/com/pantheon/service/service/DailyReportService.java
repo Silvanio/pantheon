@@ -8,16 +8,21 @@ import com.pantheon.service.dto.EquipmentUsageRequest;
 import com.pantheon.service.dto.MaterialReceivedRequest;
 import com.pantheon.service.dto.OccurrenceRequest;
 import com.pantheon.service.dto.WorkforceEntryRequest;
+import com.pantheon.service.entity.AccessLevel;
 import com.pantheon.service.entity.ConstructionSite;
 import com.pantheon.service.entity.DailyReport;
 import com.pantheon.service.entity.DailyReportActivity;
+import com.pantheon.service.entity.DailyReportApproval;
+import com.pantheon.service.entity.DailyReportApprovalStatus;
 import com.pantheon.service.entity.DailyReportAttachment;
 import com.pantheon.service.entity.DailyReportEquipmentUsage;
 import com.pantheon.service.entity.DailyReportMaterialReceived;
 import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.entity.DailyReportOccurrence;
+import com.pantheon.service.entity.DailyReportStatus;
 import com.pantheon.service.entity.DailyReportWorkforceEntry;
 import com.pantheon.service.entity.PermissionCapability;
+import com.pantheon.service.entity.SiteDailyReportApprovalLevel;
 import com.pantheon.service.entity.SiteMembership;
 import com.pantheon.service.exception.ConstructionSiteNotFoundException;
 import com.pantheon.service.exception.DailyReportCoreFieldsRequiredException;
@@ -25,8 +30,11 @@ import com.pantheon.service.exception.DailyReportNotDeletableException;
 import com.pantheon.service.exception.DailyReportNotEditableException;
 import com.pantheon.service.exception.DailyReportNotFoundException;
 import com.pantheon.service.exception.DuplicateDailyReportException;
+import com.pantheon.service.exception.NoPendingDailyReportApprovalStepException;
+import com.pantheon.service.exception.NotCurrentDailyReportApprovalStepException;
 import com.pantheon.service.repository.ConstructionSiteRepository;
 import com.pantheon.service.repository.DailyReportActivityRepository;
+import com.pantheon.service.repository.DailyReportApprovalRepository;
 import com.pantheon.service.repository.DailyReportAttachmentRepository;
 import com.pantheon.service.repository.DailyReportEquipmentUsageRepository;
 import com.pantheon.service.repository.DailyReportMaterialReceivedRepository;
@@ -58,10 +66,12 @@ public class DailyReportService {
     private final DailyReportMaterialReceivedRepository materialReceivedRepository;
     private final DailyReportMediaRepository mediaRepository;
     private final DailyReportAttachmentRepository attachmentRepository;
+    private final DailyReportApprovalRepository approvalRepository;
     private final ConstructionSiteRepository siteRepository;
     private final SiteMembershipRepository siteMembershipRepository;
     private final SiteAccessService siteAccessService;
     private final SitePermissionService permissionService;
+    private final SiteDailyReportApprovalLevelService approvalLevelService;
     private final StorageService storageService;
 
     public DailyReportService(
@@ -73,10 +83,12 @@ public class DailyReportService {
             DailyReportMaterialReceivedRepository materialReceivedRepository,
             DailyReportMediaRepository mediaRepository,
             DailyReportAttachmentRepository attachmentRepository,
+            DailyReportApprovalRepository approvalRepository,
             ConstructionSiteRepository siteRepository,
             SiteMembershipRepository siteMembershipRepository,
             SiteAccessService siteAccessService,
             SitePermissionService permissionService,
+            SiteDailyReportApprovalLevelService approvalLevelService,
             StorageService storageService) {
         this.dailyReportRepository = dailyReportRepository;
         this.workforceEntryRepository = workforceEntryRepository;
@@ -86,10 +98,12 @@ public class DailyReportService {
         this.materialReceivedRepository = materialReceivedRepository;
         this.mediaRepository = mediaRepository;
         this.attachmentRepository = attachmentRepository;
+        this.approvalRepository = approvalRepository;
         this.siteRepository = siteRepository;
         this.siteMembershipRepository = siteMembershipRepository;
         this.siteAccessService = siteAccessService;
         this.permissionService = permissionService;
+        this.approvalLevelService = approvalLevelService;
         this.storageService = storageService;
     }
 
@@ -124,11 +138,82 @@ public class DailyReportService {
         return dailyReportRepository.save(report);
     }
 
+    /**
+     * Submits a draft report for approval: transitions {@code DRAFT} -> {@code PENDING_APPROVAL}
+     * and creates one {@link DailyReportApproval} step per the site's effective
+     * {@link SiteDailyReportApprovalLevel}s for a new approval cycle — mirrors
+     * {@code PurchaseRequestService#submitForApproval}'s step-creation loop. No additional gate
+     * beyond the report being {@code DRAFT} with its core fields filled (already enforced by
+     * {@link #updateCore}) — Diário de Obra has no per-line selection gate equivalent to Pedido
+     * de Compra's.
+     */
     @Transactional
     public DailyReport submit(UUID reportId, UUID actingUserId) {
         DailyReport report = requireEditableReport(reportId, actingUserId);
         report.submit(Instant.now());
-        return dailyReportRepository.save(report);
+        dailyReportRepository.save(report);
+
+        List<SiteDailyReportApprovalLevel> levels = approvalLevelService.getEffectiveLevels(report.getConstructionSiteId());
+        Instant now = Instant.now();
+        for (SiteDailyReportApprovalLevel level : levels) {
+            approvalRepository.save(new DailyReportApproval(
+                    UUID.randomUUID(), reportId, report.getCurrentApprovalCycle(), level.getStepOrder(),
+                    level.getApproverFunction(), now));
+        }
+        return report;
+    }
+
+    public List<DailyReportApproval> listApprovals(UUID reportId) {
+        return approvalRepository.findByDailyReportIdOrderByCycleNumberAscStepOrderAsc(reportId);
+    }
+
+    /**
+     * Approves the current cycle's lowest-order {@code PENDING} step. Approving the last
+     * remaining step transitions the report to {@code APPROVED}; otherwise the next step becomes
+     * actionable. Mirrors {@code PurchaseRequestService#approveStep} exactly for the
+     * authorization mechanism (see {@link #requireStepAuthority}).
+     */
+    @Transactional
+    public DailyReport approveStep(UUID reportId, UUID actingUserId, String comment) {
+        DailyReport report = requireExistingReport(reportId);
+        DailyReportApproval step = requirePendingStep(report);
+        SiteAccessContext access = requireStepAuthority(report.getConstructionSiteId(), actingUserId, step);
+
+        UUID decidedBy = access.siteMembership() != null ? access.siteMembership().getId() : null;
+        step.approve(decidedBy, comment, Instant.now());
+        approvalRepository.save(step);
+
+        var nextStep = approvalRepository.findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                reportId, report.getCurrentApprovalCycle(), DailyReportApprovalStatus.PENDING);
+        if (nextStep.isEmpty()) {
+            report.approve(Instant.now());
+            dailyReportRepository.save(report);
+        }
+        return report;
+    }
+
+    /**
+     * Rejects the current cycle's lowest-order {@code PENDING} step, requiring a reason. Returns
+     * the report to {@code DRAFT} for revision; a later resubmission starts a new cycle, this
+     * cycle's steps kept for history. Mirrors {@code PurchaseRequestService#rejectStep} exactly
+     * for the authorization mechanism (see {@link #requireStepAuthority}).
+     */
+    @Transactional
+    public DailyReport rejectStep(UUID reportId, UUID actingUserId, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("A rejection reason is required");
+        }
+        DailyReport report = requireExistingReport(reportId);
+        DailyReportApproval step = requirePendingStep(report);
+        SiteAccessContext access = requireStepAuthority(report.getConstructionSiteId(), actingUserId, step);
+
+        UUID decidedBy = access.siteMembership() != null ? access.siteMembership().getId() : null;
+        step.reject(decidedBy, reason, Instant.now());
+        approvalRepository.save(step);
+
+        report.reject(Instant.now());
+        dailyReportRepository.save(report);
+        return report;
     }
 
     @Transactional
@@ -235,15 +320,30 @@ public class DailyReportService {
         activityRepository.deleteAll(activityRepository.findByDailyReportId(reportId));
         occurrenceRepository.deleteAll(occurrenceRepository.findByDailyReportId(reportId));
         materialReceivedRepository.deleteAll(materialReceivedRepository.findByDailyReportId(reportId));
+        // A DRAFT report may still carry approval history from an earlier rejected cycle (old
+        // cycles are kept for history, not cleared on rejection) — must be cleared before the
+        // report row itself, since daily_report_approval.daily_report_id FKs it.
+        approvalRepository.deleteAll(approvalRepository.findByDailyReportIdOrderByCycleNumberAscStepOrderAsc(reportId));
 
         dailyReportRepository.delete(report);
     }
 
+    /**
+     * A member whose resolved {@code DAILY_REPORT} access is plain {@code VIEW} only ever sees a
+     * report once it is {@code APPROVED}; {@code MANAGE} and {@code VIEW_AND_APPROVE} see every
+     * status — see {@code daily-construction-report}'s "Daily report listing and detail" and this
+     * change's design.md Decision 3. Pushed into the query (a status-filtered finder) rather than
+     * filtered in memory afterwards, so pagination totals stay correct and no extra per-row work
+     * is introduced.
+     */
     public Page<DailyReport> list(UUID siteId, UUID actingUserId, Pageable pageable) {
         requireSite(siteId);
         var access = siteAccessService.requireAccess(siteId, actingUserId);
         permissionService.requireVisible(siteId, access, PermissionCapability.DAILY_REPORT);
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (permissionService.resolve(siteId, access, PermissionCapability.DAILY_REPORT) == AccessLevel.VIEW) {
+            return dailyReportRepository.findByConstructionSiteIdAndStatus(siteId, DailyReportStatus.APPROVED, sorted);
+        }
         return dailyReportRepository.findByConstructionSiteId(siteId, sorted);
     }
 
@@ -265,6 +365,9 @@ public class DailyReportService {
                         .toList(),
                 materialReceivedRepository.findByDailyReportId(reportId).stream()
                         .map(com.pantheon.service.dto.MaterialReceivedResponse::from)
+                        .toList(),
+                listApprovals(reportId).stream()
+                        .map(com.pantheon.service.dto.DailyReportApprovalResponse::from)
                         .toList());
     }
 
@@ -280,7 +383,24 @@ public class DailyReportService {
                 dailyReportRepository.findById(reportId).orElseThrow(() -> new DailyReportNotFoundException(reportId));
         var access = siteAccessService.requireAccess(report.getConstructionSiteId(), actingUserId);
         permissionService.requireVisible(report.getConstructionSiteId(), access, PermissionCapability.DAILY_REPORT);
+        requireApprovedForViewOnly(report, access);
         return report;
+    }
+
+    /**
+     * No-op unless the resolved access is plain {@code VIEW}, in which case a
+     * non-{@code APPROVED} report behaves as if it doesn't exist — same "behaves as if it doesn't
+     * exist" 404 pattern as {@code PurchaseRequestService#requireViewAndApproveVisibility}, just
+     * gating a different access level on a different rule (see design.md Decision 3).
+     */
+    private void requireApprovedForViewOnly(DailyReport report, SiteAccessContext access) {
+        UUID siteId = report.getConstructionSiteId();
+        if (permissionService.resolve(siteId, access, PermissionCapability.DAILY_REPORT) != AccessLevel.VIEW) {
+            return;
+        }
+        if (report.getStatus() != DailyReportStatus.APPROVED) {
+            throw new DailyReportNotFoundException(report.getId());
+        }
     }
 
     private DailyReport requireEditableReport(UUID reportId, UUID actingUserId) {
@@ -290,6 +410,54 @@ public class DailyReportService {
             throw new DailyReportNotEditableException(reportId);
         }
         return report;
+    }
+
+    /** Looks up a report by id with no visibility/permission gate — used by {@link #approveStep}/{@link #rejectStep}, whose own {@link #requireStepAuthority} check is the authorization. */
+    private DailyReport requireExistingReport(UUID reportId) {
+        return dailyReportRepository.findById(reportId).orElseThrow(() -> new DailyReportNotFoundException(reportId));
+    }
+
+    private DailyReportApproval requirePendingStep(DailyReport report) {
+        return approvalRepository
+                .findFirstByDailyReportIdAndCycleNumberAndStatusOrderByStepOrderAsc(
+                        report.getId(), report.getCurrentApprovalCycle(), DailyReportApprovalStatus.PENDING)
+                .orElseThrow(() -> new NoPendingDailyReportApprovalStepException(report.getId()));
+    }
+
+    /**
+     * A user with an active {@link SiteMembership} on this site — company staff or not — must have
+     * a function matching {@code step}'s, with no exception, and a {@code DAILY_REPORT} access
+     * level of {@code MANAGE} or {@code VIEW_AND_APPROVE}. Only a user with no {@link SiteMembership}
+     * at all on this site falls back to the unrestricted company-staff bypass. Copied faithfully
+     * from {@code PurchaseRequestService#requireStepAuthority} — same nuance, same edge cases.
+     */
+    private SiteAccessContext requireStepAuthority(UUID siteId, UUID userId, DailyReportApproval step) {
+        SiteAccessContext access = siteAccessService.requireAccess(siteId, userId);
+        SiteMembership membership = resolveSiteMembership(siteId, userId, access);
+
+        if (membership != null) {
+            boolean authorized = membership.getFunction() == step.getApproverFunction()
+                    && permissionService.canApprove(siteId, access, PermissionCapability.DAILY_REPORT);
+            if (!authorized) {
+                throw new NotCurrentDailyReportApprovalStepException(step.getDailyReportId());
+            }
+            return new SiteAccessContext(access.companyStaff(), membership);
+        }
+
+        if (access.companyStaff()) {
+            return access;
+        }
+        throw new NotCurrentDailyReportApprovalStepException(step.getDailyReportId());
+    }
+
+    /** {@code access.siteMembership()} whenever present, else a direct lookup — needed because {@link SiteAccessContext} never populates a membership for company staff, even when one exists. */
+    private SiteMembership resolveSiteMembership(UUID siteId, UUID userId, SiteAccessContext access) {
+        if (access.siteMembership() != null) {
+            return access.siteMembership();
+        }
+        return siteMembershipRepository.findByConstructionSiteIdAndUserId(siteId, userId)
+                .filter(SiteMembership::isActive)
+                .orElse(null);
     }
 
     private void requireManage(UUID siteId, UUID actingUserId) {

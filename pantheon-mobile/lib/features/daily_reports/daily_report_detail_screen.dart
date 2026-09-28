@@ -5,13 +5,52 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/offline_dialogs.dart';
+import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
+import '../site/site_repository.dart';
 import 'daily_report_list_screen.dart' show dailyReportListProvider;
 import 'daily_report_models.dart';
 import 'daily_report_repository.dart';
 
 final _detailProvider = FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).getDetail(id));
 final _mediaProvider = FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).listMedia(id));
+
+/// Mirrors `purchase_request_detail_screen.dart`'s `_Authority`/`canActOn`: same function-match /
+/// company-staff-with-no-site-role mechanism, reused verbatim for `DAILY_REPORT` per
+/// `daily-report-approval-workflow`'s design.md Decision 4 (the *acting* side is identical to
+/// Pedido de Compra — only the passive view-only visibility rule differs, and that's enforced
+/// entirely server-side, see design.md Decision 3, so nothing extra is needed here for it).
+class _Authority {
+  const _Authority(this.myFunction, this.accessLevel);
+  final String? myFunction;
+  final String? accessLevel;
+
+  bool get canApprove => accessLevel == 'MANAGE' || accessLevel == 'VIEW_AND_APPROVE';
+
+  bool get canManage => accessLevel == 'MANAGE';
+
+  bool canActOn(String approverFunction) {
+    if (myFunction != null) return myFunction == approverFunction && canApprove;
+    return canManage;
+  }
+}
+
+final _authorityProvider = FutureProvider.family((ref, String siteId) async {
+  final repo = ref.watch(siteRepositoryProvider);
+  final results = await Future.wait([repo.getMyFunction(siteId), repo.getMyPermissions(siteId)]);
+  final myFunction = results[0] as String?;
+  final perms = results[1] as Map<String, String>;
+  return _Authority(myFunction, perms['DAILY_REPORT']);
+});
+
+const _approverFunctionLabels = {
+  'ADMIN': 'Administrador',
+  'CLIENT': 'Cliente',
+  'ARCHITECT': 'Arquiteto',
+  'ENGINEER': 'Engenheiro',
+  'SITE_FOREMAN': 'Mestre de obra',
+  'SERVICE_PROVIDER': 'Prestador de serviço',
+};
 
 const _weatherOptions = ['SUNNY', 'PARTLY_CLOUDY', 'CLOUDY', 'RAINY', 'STORM'];
 const _weatherLabels = {
@@ -41,6 +80,7 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
   bool _uploading = false;
   bool _submitting = false;
   bool _deleting = false;
+  bool _acting = false;
 
   bool _editingCore = false;
   bool _coreInitialized = false;
@@ -158,21 +198,67 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
     );
   }
 
+  /// The approval workflow (submit-for-approval/approve/reject) requires being online — mirrors
+  /// `purchase_request_detail_screen.dart`'s `_act`/`requireOnline` pattern exactly, since
+  /// submitting now creates approval steps rather than just flipping a status flag, unlike the
+  /// old plain "submit" this replaces (which was safe to queue offline).
   Future<void> _submitReport() async {
-    if (!await confirmProceedOffline(context, ref)) return;
+    if (!await requireOnline(context, ref)) return;
     setState(() => _submitting = true);
     try {
-      final sentLive = await ref.read(dailyReportRepositoryProvider).submit(widget.id);
+      await ref.read(dailyReportRepositoryProvider).submit(widget.id);
       ref.invalidate(_detailProvider(widget.id));
-      if (!sentLive && mounted) {
-        await showOfflineSavedDialog(context);
-      }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível enviar o relatório.')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Não foi possível enviar o relatório para aprovação.')));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// Mirrors `purchase_request_detail_screen.dart`'s `_act`: approve/reject also require being
+  /// online (see `_submitReport`'s doc comment above).
+  Future<void> _act(Future<void> Function() action) async {
+    if (!await requireOnline(context, ref)) return;
+    setState(() => _acting = true);
+    try {
+      await action();
+      ref.invalidate(_detailProvider(widget.id));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível concluir a ação.')));
+      }
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _approve() async {
+    await _act(() => ref.read(dailyReportRepositoryProvider).approveStep(widget.id));
+  }
+
+  Future<void> _showRejectDialog() async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rejeitar etapa'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Motivo da rejeição'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Rejeitar')),
+        ],
+      ),
+    );
+    if (reason != null && reason.trim().isNotEmpty) {
+      final repo = ref.read(dailyReportRepositoryProvider);
+      await _act(() => repo.rejectStep(widget.id, reason.trim()));
     }
   }
 
@@ -254,24 +340,78 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isDraft ? AppColors.amber50 : AppColors.emerald50,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        isDraft ? 'Rascunho' : 'Enviado',
-                        style: TextStyle(
-                          color: isDraft ? AppColors.amber700 : AppColors.emerald700,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                    ),
+                    StatusBadge(kind: StatusBadgeKind.dailyReport, status: d.report.status),
                   ],
                 ),
               ),
+
+              if (d.approvals.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final authority = ref.watch(_authorityProvider(d.report.constructionSiteId));
+
+                    // Mirrors `purchase_request_detail_screen.dart`'s `currentCycle`/
+                    // `currentCyclePending`: all of a cycle's steps are created PENDING up
+                    // front on submit, so more than one can be PENDING at once — the actionable
+                    // one is the lowest step order within the current (highest) cycle.
+                    final currentCycle =
+                        d.approvals.map((a) => a.cycleNumber).reduce((a, b) => a > b ? a : b);
+                    final currentCyclePending = d.approvals
+                        .where((a) => a.cycleNumber == currentCycle && a.status == 'PENDING')
+                        .toList()
+                      ..sort((a, b) => a.stepOrder.compareTo(b.stepOrder));
+                    final currentPending = currentCyclePending.isEmpty ? null : currentCyclePending.first;
+
+                    return _SectionCard(
+                      icon: Icons.rule_folder_outlined,
+                      title: 'Etapas de aprovação',
+                      child: Column(
+                        children: [
+                          ...d.approvals.where((a) => a.cycleNumber == currentCycle).map(
+                                (a) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _approverFunctionLabels[a.approverFunction] ?? a.approverFunction,
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                                        ),
+                                      ),
+                                      StatusBadge(kind: StatusBadgeKind.approval, status: a.status),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          if (currentPending != null)
+                            authority.when(
+                              data: (auth) {
+                                if (!auth.canActOn(currentPending.approverFunction)) return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: SuccessButton(label: 'Aprovar', loading: _acting, onPressed: _approve),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: DangerButton(label: 'Rejeitar', loading: _acting, onPressed: _showRejectDialog),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              loading: () => const SizedBox.shrink(),
+                              error: (_, _) => const SizedBox.shrink(),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
 
               const SizedBox(height: 16),
               // Core: weather, hours, comments
@@ -379,7 +519,12 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
 
               if (isDraft) ...[
                 const SizedBox(height: 24),
-                SuccessButton(label: 'Enviar relatório', loading: _submitting, onPressed: _submitReport, icon: Icons.send_outlined),
+                SuccessButton(
+                  label: 'Enviar para aprovação',
+                  loading: _submitting,
+                  onPressed: _submitReport,
+                  icon: Icons.send_outlined,
+                ),
                 const SizedBox(height: 10),
                 DangerButton(label: 'Excluir relatório', loading: _deleting, onPressed: _deleteReport, icon: Icons.delete_outline),
               ],

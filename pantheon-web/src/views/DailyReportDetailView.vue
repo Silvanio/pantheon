@@ -1666,6 +1666,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
+            v-if="isDraft"
             class="mb-5 rounded-2xl border-2 border-dashed px-9 py-9 text-center transition"
             :class="isDraggingMedia ? 'border-blueprint-500 bg-blueprint-50 dark:bg-blueprint-500/10' : 'border-steel-300 dark:border-steel-600'"
             @dragover.prevent="onMediaDragOver"

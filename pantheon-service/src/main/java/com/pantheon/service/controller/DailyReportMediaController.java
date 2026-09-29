@@ -2,6 +2,8 @@ package com.pantheon.service.controller;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,10 @@ import com.pantheon.service.entity.DailyReportMedia;
 import com.pantheon.service.service.DailyReportMediaService;
 @RestController
 public class DailyReportMediaController {
+
+    /** A media id's bytes are immutable once uploaded, so both content endpoints can be cached hard. */
+    private static final CacheControl MEDIA_CACHE_CONTROL =
+            CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable();
 
     private final DailyReportMediaService mediaService;
 
@@ -52,7 +58,32 @@ public class DailyReportMediaController {
     public ResponseEntity<byte[]> getMediaContent(
             @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID mediaId) {
         byte[] content = mediaService.getMediaContent(id, mediaId, user.getId());
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(content);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .cacheControl(MEDIA_CACHE_CONTROL)
+                .eTag(mediaId.toString())
+                .body(content);
+    }
+
+    /**
+     * Small re-encoded copy of a photo, used by the media grid instead of {@code /content} — see
+     * {@code DailyReportMediaService#getMediaThumbnail}'s doc comment for why the grid was fetching
+     * full-resolution originals for a ~100px cell. A media id's bytes never change once uploaded,
+     * so this is cached aggressively rather than refetched on every report view.
+     */
+    @GetMapping("/api/daily-reports/{id}/media/{mediaId}/thumbnail")
+    public ResponseEntity<byte[]> getMediaThumbnail(
+            @AuthenticationPrincipal AppUser user, @PathVariable UUID id, @PathVariable UUID mediaId) {
+        // Not always actually JPEG: falls back to the original's own bytes/type (PNG, a video file,
+        // ...) when thumbnail generation isn't possible — see getMediaThumbnail's doc comment.
+        // APPLICATION_OCTET_STREAM, same as /content below, avoids declaring a MIME type that
+        // doesn't match the fallback's real bytes.
+        byte[] content = mediaService.getMediaThumbnail(id, mediaId, user.getId());
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .cacheControl(MEDIA_CACHE_CONTROL)
+                .eTag(mediaId.toString())
+                .body(content);
     }
 
     @PostMapping("/api/daily-reports/{id}/attachments")

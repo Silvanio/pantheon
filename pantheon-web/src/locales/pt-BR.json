@@ -503,7 +503,7 @@
       "deleteConfirm": "Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.",
       "deleteCancel": "Cancelar",
       "deleteError": "Não foi possível excluir o relatório.",
-      "saveButton": "Salvar alterações",
+      "saveButton": "Salvar",
       "saving": "Salvando...",
       "allSaved": "Tudo salvo",
       "unsaved": "Alterações não salvas",
@@ -623,7 +623,10 @@
       "dropzoneSubtitle": "ou clique para selecionar — vários arquivos de uma vez",
       "removeLabel": "Remover",
       "removeError": "Não foi possível remover o arquivo.",
-      "error": "Não foi possível enviar o arquivo."
+      "error": "Não foi possível enviar o arquivo.",
+      "close": "Fechar",
+      "loading": "Carregando...",
+      "previewError": "Não foi possível carregar a foto."
     },
     "attachments": {
       "title": "Anexos",

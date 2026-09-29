@@ -70,25 +70,53 @@ public class DailyReportPdfService {
     private static final DateTimeFormatter REPORT_DATE_FORMAT =
             DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("pt", "BR"));
 
-    /** Supplementary CSS for elements {@link PdfBrandingService#STYLE} doesn't already cover (status pills, meta grid, comments box, photo grid) — appended alongside the shared style, not replacing it. */
+    /**
+     * Supplementary CSS matching {@code DailyReportPDF.dc.html} (the redesign's visual source of
+     * truth) exactly for this PDF's own elements. Deliberately OVERRIDES three rules from the
+     * shared {@link PdfBrandingService#STYLE} rather than extending them — that shared style's
+     * blueprint-tinted section headers (h2) and table headers (table.data th) were designed for
+     * Pedido de Compra's PDF and were never part of the approved Diário de Obra mockup, which
+     * uses plain dark-gray uppercase labels with no colored fill, no underline accent on h2, and
+     * a dark (not light-blue) table header rule. Only this service is affected — the override
+     * selectors below have equal-or-higher CSS specificity than the shared rules and are appended
+     * after them, so Pedido de Compra's own PDF (which still uses {@code PdfBrandingService.STYLE}
+     * directly) is untouched.
+     */
     private static final String EXTRA_STYLE = ""
-            + ".status-pill{display:inline-block;border-radius:999px;padding:4px 12px;font-size:8.5px;font-weight:700;white-space:nowrap;}"
+            + "body{font-family:'Manrope',Helvetica,Arial,sans-serif;}"
+            + "body h2{color:#333a55;text-transform:uppercase;letter-spacing:0.04em;font-size:10.5px;"
+            + "font-weight:800;margin:18px 0 8px;padding-bottom:0;border-bottom:none;}"
+            + "table.data th{background:none;color:#6b7290;font-size:8.5px;font-weight:800;"
+            + "text-transform:uppercase;letter-spacing:0.03em;text-align:left;padding:0 8px 6px 0;"
+            + "border-bottom:1.5px solid #1f2440;}"
+            + "table.data td{padding:7px 8px 7px 0;}"
+            + ".status-pill{display:inline-block;border-radius:999px;padding:4px 12px;font-size:9px;font-weight:800;white-space:nowrap;}"
             + ".status-approved{background:#d1fae5;color:#047857;} .status-pending{background:#fef3c7;color:#92400e;}"
             + ".status-draft{background:#eef0f6;color:#4e546e;} .status-rejected{background:#fde8e8;color:#b42318;}"
-            + ".title-table{width:100%;margin:2px 0 14px;} .title-table td{border:none;padding:0;vertical-align:middle;}"
-            + ".report-title{font-size:14px;font-weight:700;color:#12172e;}"
-            + ".meta-grid{width:100%;border:1px solid #e1e4ee;border-radius:4px;margin:0 0 14px;}"
-            + ".meta-grid td{background:#f9fafc;border-right:1px solid #eef0f6;padding:8px 10px;vertical-align:top;width:25%;}"
+            + ".letterhead{width:100%;padding-bottom:16px;margin-bottom:20px;border-bottom:3px solid #2f53f0;}"
+            + ".letterhead td{border:none;padding:0;vertical-align:middle;}"
+            + ".letterhead-badge{width:34px;height:34px;background:#2f53f0;border-radius:8px;color:#fff;"
+            + "text-align:center;vertical-align:middle;font-size:15px;font-weight:800;}"
+            + ".letterhead-logo{max-width:34px;max-height:34px;border-radius:8px;}"
+            + ".letterhead-company{font-size:12px;font-weight:800;color:#12172e;}"
+            + ".letterhead-site{font-size:9px;color:#6b7290;margin-top:1px;}"
+            + ".letterhead-num-label{font-size:8px;font-weight:800;color:#9298b3;letter-spacing:0.04em;}"
+            + ".letterhead-num{font-size:17px;font-weight:800;color:#2f53f0;}"
+            + ".title-table{width:100%;margin:0 0 18px;} .title-table td{border:none;padding:0;vertical-align:middle;}"
+            + ".report-title{font-size:15.5px;font-weight:800;color:#1f2440;}"
+            + ".meta-grid{width:100%;border:1px solid #e1e4ee;border-radius:8px;margin:0 0 16px;overflow:hidden;}"
+            + ".meta-grid td{background:#f9fafc;border-right:1px solid #eef0f6;padding:9px 12px;vertical-align:top;width:25%;}"
             + ".meta-grid td:last-child{border-right:none;}"
-            + ".meta-label{display:block;font-size:7.5px;font-weight:700;color:#9298b3;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;}"
-            + ".meta-value{font-size:10px;font-weight:700;color:#12172e;}"
-            + ".comments-box{background:#f6f7fb;border-radius:4px;padding:9px 11px;margin:0 0 14px;font-size:9px;color:#4e546e;line-height:1.5;}"
-            + ".tag-note{font-size:7.5px;color:#9298b3;font-weight:700;} .tag-link{font-size:7.5px;color:#2f53f0;font-weight:700;}"
-            + ".photo-grid{width:100%;margin-top:2px;} .photo-grid td{border:none;padding:4px;vertical-align:top;width:25%;}"
-            + ".photo{max-width:100%;max-height:120px;border-radius:4px;border:1px solid #eef0f6;}"
-            + ".video-placeholder{width:100%;height:80px;background:#f4f6ff;border-radius:4px;border:1px solid #eef0f6;"
+            + ".meta-label{display:block;font-size:8px;font-weight:800;color:#9298b3;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;}"
+            + ".meta-value{font-size:10.5px;font-weight:700;color:#1f2440;}"
+            + ".comments-box{background:#f6f7fb;border-radius:8px;padding:11px 13px;margin:0 0 16px;font-size:9.5px;color:#4e546e;line-height:1.5;}"
+            + ".tag-note{font-size:8px;color:#9298b3;font-weight:700;} .tag-link{font-size:8px;color:#2f53f0;font-weight:700;}"
+            + ".photo-grid{width:100%;margin-top:2px;border-collapse:separate;border-spacing:10px 10px;} .photo-grid td{border:none;padding:0;vertical-align:top;width:50%;height:220px;"
+            + "background:#eef0f6;border-radius:6px;text-align:center;}"
+            + ".photo{max-width:100%;max-height:220px;border-radius:6px;}"
+            + ".video-placeholder{width:100%;height:216px;background:#f4f6ff;border-radius:6px;"
             + "display:table-cell;text-align:center;vertical-align:middle;font-size:8px;color:#6b7290;font-weight:700;}"
-            + ".photo-caption{font-size:7.5px;color:#9298b3;margin-top:3px;}";
+            + ".photo-caption{font-size:8px;color:#9298b3;margin-top:4px;}";
 
     private final DailyReportRepository dailyReportRepository;
     private final DailyReportWorkforceEntryRepository workforceEntryRepository;
@@ -187,7 +215,7 @@ public class DailyReportPdfService {
         html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\"/>");
         html.append("<style>").append(PdfBrandingService.STYLE).append(EXTRA_STYLE).append("</style></head><body>");
 
-        html.append(brandingService.renderHeaderHtml(brandingService.resolve(site.getId())));
+        html.append(renderLetterhead(brandingService.resolve(site.getId()), report));
 
         html.append("<table class=\"title-table\"><tr>")
                 .append("<td><span class=\"report-title\">Diário de Obra — ")
@@ -196,8 +224,8 @@ public class DailyReportPdfService {
                 .append("</tr></table>");
 
         html.append("<table class=\"meta-grid\"><tr>");
-        appendMetaCell(html, "Clima manhã", report.getWeatherConditionMorning());
-        appendMetaCell(html, "Clima tarde", report.getWeatherConditionAfternoon());
+        appendMetaCell(html, "Clima manhã", weatherLabel(report.getWeatherConditionMorning()));
+        appendMetaCell(html, "Clima tarde", weatherLabel(report.getWeatherConditionAfternoon()));
         appendMetaCell(html, "Expediente", workHoursLabel(report));
         appendMetaCell(html, "Tarefas bloqueadas", Boolean.TRUE.equals(report.getWeatherBlockedTasks()) ? "Sim" : "Não");
         html.append("</tr></table>");
@@ -260,23 +288,27 @@ public class DailyReportPdfService {
         }
         html.append("</table>");
 
-        html.append("<h2>Fotos</h2>");
-        appendMediaGrid(html, media);
+        if (!media.isEmpty()) {
+            html.append("<h2>Fotos</h2>");
+            appendMediaGrid(html, media);
+        }
 
-        html.append("<h2>Anexos</h2><table class=\"data\"><tr><th>Arquivo</th><th class=\"right\">Enviado em</th></tr>");
-        for (DailyReportAttachment attachment : attachments) {
-            html.append("<tr><td>").append(escape(attachment.getOriginalName())).append("</td><td class=\"right muted\">")
-                    .append(DATETIME_FORMAT.format(attachment.getCreatedAt().atZone(ZoneOffset.UTC))).append("</td></tr>");
+        if (!attachments.isEmpty() || !importedInvoices.isEmpty()) {
+            html.append("<h2>Anexos</h2><table class=\"data\"><tr><th>Arquivo</th><th class=\"right\">Enviado em</th></tr>");
+            for (DailyReportAttachment attachment : attachments) {
+                html.append("<tr><td>").append(escape(attachment.getOriginalName())).append("</td><td class=\"right muted\">")
+                        .append(DATETIME_FORMAT.format(attachment.getCreatedAt().atZone(ZoneOffset.UTC))).append("</td></tr>");
+            }
+            for (DailyReportImportedInvoiceResponse invoice : importedInvoices) {
+                html.append("<tr><td>").append(escape(invoice.originalName()))
+                        .append(invoice.purchaseRequestName() != null
+                                ? " <span class=\"tag-link\">· Importado do " + escape(invoice.purchaseRequestName()) + "</span>"
+                                : " <span class=\"tag-note\">(Importado do Pedido de Compra)</span>")
+                        .append("</td><td class=\"right muted\">")
+                        .append(DATETIME_FORMAT.format(invoice.uploadedAt().atZone(ZoneOffset.UTC))).append("</td></tr>");
+            }
+            html.append("</table>");
         }
-        for (DailyReportImportedInvoiceResponse invoice : importedInvoices) {
-            html.append("<tr><td>").append(escape(invoice.originalName()))
-                    .append(invoice.purchaseRequestName() != null
-                            ? " <span class=\"tag-link\">· Importado do " + escape(invoice.purchaseRequestName()) + "</span>"
-                            : " <span class=\"tag-note\">(Importado do Pedido de Compra)</span>")
-                    .append("</td><td class=\"right muted\">")
-                    .append(DATETIME_FORMAT.format(invoice.uploadedAt().atZone(ZoneOffset.UTC))).append("</td></tr>");
-        }
-        html.append("</table>");
 
         html.append("<h2>Aprovações</h2><table class=\"data\"><tr><th>Etapa</th><th>Responsável</th><th class=\"right\">Decisão</th></tr>");
         for (DailyReportApprovalResponse approval : approvals) {
@@ -326,9 +358,55 @@ public class DailyReportPdfService {
                 .toList();
     }
 
+    /**
+     * Own letterhead layout (not {@link PdfBrandingService#renderHeaderHtml}) so the report
+     * number on the right — specific to this mockup, not part of Pedido de Compra's PDF — can be
+     * added without changing the shared method's signature/output for its other caller. Reuses
+     * {@link PdfBrandingService#resolve} for the actual company/site/logo data (the genuinely
+     * shared, non-visual part). Always renders a badge on the left — the company's real logo when
+     * it decoded successfully, else a plain initial-letter badge — so the letterhead never looks
+     * broken/empty when a company has no logo, or one in a format the PDF renderer's underlying
+     * image library can't decode (e.g. AVIF/WEBP — see {@code PdfBrandingService#looksLikeAvif}'s
+     * doc comment; re-uploading the logo as PNG or JPEG is the real fix for that case).
+     */
+    private String renderLetterhead(PdfBrandingService.Branding branding, DailyReport report) {
+        String badge = branding.logoDataUri() != null
+                ? "<img class=\"letterhead-logo\" src=\"" + branding.logoDataUri() + "\" />"
+                : "<span>" + escape(initial(branding.companyName())) + "</span>";
+        return "<table class=\"letterhead\"><tr>"
+                + "<td style=\"width:44px\"><div class=\"letterhead-badge\">" + badge + "</div></td>"
+                + "<td><div class=\"letterhead-company\">" + escape(branding.companyName()) + "</div>"
+                + "<div class=\"letterhead-site\">" + escape(branding.siteName()) + "</div></td>"
+                + "<td style=\"text-align:right\"><div class=\"letterhead-num-label\">RELATÓRIO Nº</div>"
+                + "<div class=\"letterhead-num\">" + String.format("%03d", report.getSequenceNo()) + "</div></td>"
+                + "</tr></table>";
+    }
+
+    private String initial(String name) {
+        if (name == null || name.isBlank()) {
+            return "?";
+        }
+        return name.strip().substring(0, 1).toUpperCase(Locale.ROOT);
+    }
+
     private void appendMetaCell(StringBuilder html, String label, String value) {
         html.append("<td><span class=\"meta-label\">").append(escape(label).toUpperCase(Locale.ROOT))
                 .append("</span><span class=\"meta-value\">").append(escape(value)).append("</span></td>");
+    }
+
+    /** Mirrors pantheon-web's pt-BR.json {@code dailyReports.core.weatherOptions} exactly. */
+    private String weatherLabel(String code) {
+        if (code == null) {
+            return null;
+        }
+        return switch (code) {
+            case "SUNNY" -> "Ensolarado";
+            case "PARTLY_CLOUDY" -> "Parcialmente nublado";
+            case "CLOUDY" -> "Nublado";
+            case "RAINY" -> "Chuvoso";
+            case "STORM" -> "Tempestade";
+            default -> code;
+        };
     }
 
     private String workHoursLabel(DailyReport report) {
@@ -345,7 +423,7 @@ public class DailyReportPdfService {
         }
         html.append("<table class=\"photo-grid\">");
         for (int i = 0; i < media.size(); i++) {
-            if (i % 4 == 0) {
+            if (i % 2 == 0) {
                 if (i > 0) {
                     html.append("</tr>");
                 }
@@ -426,11 +504,49 @@ public class DailyReportPdfService {
         };
     }
 
+    /**
+     * Embeds Manrope (static Regular/Bold/ExtraBold instances from the font's own GitHub repo,
+     * {@code github.com/googlefonts/manrope}, same family already bundled for {@code
+     * pantheon-mobile} — copied into this module's own resources since each service builds
+     * independently and can't reference another module's asset path directly) so this PDF matches
+     * {@code DailyReportPDF.dc.html}'s typography, not just its colors/layout.
+     *
+     * <p>Static, per-weight files rather than the single variable font: openhtmltopdf's {@code
+     * useFont} registers each call as one fixed glyph outline for that (family, weight) pair — it
+     * does not evaluate a variable font's weight axis per request. Registering the *same* variable
+     * file three times under weights 400/700/800 (an earlier version of this code) silently
+     * resolved every weight to the file's single default instance, so bold headers/labels rendered
+     * indistinguishable from body text. Three distinct static files fixes that.
+     *
+     * <p>{@code PdfBrandingService.STYLE}'s own doc comment flagged variable-font embedding in
+     * openhtmltopdf as fragile enough to risk breaking generation reliability — that caution was
+     * about embedding it for EVERY PDF this app generates (including Pedido de Compra's, via the
+     * shared style); scoped to just this one service, with its own independent {@code renderPdf}
+     * (mirroring {@code PurchaseRequestPdfService}'s equally-independent one — the two were never
+     * sharing this method), a failure here can't affect Pedido de Compra's PDF at all. Verified
+     * rendering correctly, bold weights included, by generating a real sample PDF and visually
+     * inspecting it before landing this. Falls back to Helvetica/Arial (via the font-family stack
+     * in {@link #EXTRA_STYLE}) if these fonts somehow fail to register, rather than failing the
+     * whole PDF generation.
+     */
     private byte[] renderPdf(String html) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfRendererBuilder builder = new PdfRendererBuilder();
         builder.useFastMode();
         builder.useSVGDrawer(new BatikSVGDrawer());
+        try {
+            builder.useFont(
+                    () -> DailyReportPdfService.class.getResourceAsStream("/fonts/Manrope-Regular.ttf"),
+                    "Manrope", 400, com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle.NORMAL, true);
+            builder.useFont(
+                    () -> DailyReportPdfService.class.getResourceAsStream("/fonts/Manrope-Bold.ttf"),
+                    "Manrope", 700, com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle.NORMAL, true);
+            builder.useFont(
+                    () -> DailyReportPdfService.class.getResourceAsStream("/fonts/Manrope-ExtraBold.ttf"),
+                    "Manrope", 800, com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle.NORMAL, true);
+        } catch (RuntimeException e) {
+            // Falls through to the Helvetica/Arial stack in EXTRA_STYLE — see this method's doc comment.
+        }
         builder.withHtmlContent(html, null);
         builder.toStream(outputStream);
         try {

@@ -288,6 +288,11 @@ export function useDailyReports() {
     return authFetch(`/api/daily-reports/${reportId}/media/${mediaId}`, { method: 'DELETE' })
   }
 
+  function getMediaThumbnailUrl(reportId: string, mediaId: string): Promise<Blob> {
+    return authFetchBlob(`/api/daily-reports/${reportId}/media/${mediaId}/thumbnail`)
+  }
+
+  /** Full-resolution original — only for the enlarged lightbox view, never the grid (see getMediaThumbnailUrl). */
   function getMediaContentUrl(reportId: string, mediaId: string): Promise<Blob> {
     return authFetchBlob(`/api/daily-reports/${reportId}/media/${mediaId}/content`)
   }
@@ -343,6 +348,7 @@ export function useDailyReports() {
     uploadMedia,
     updateMediaCaption,
     deleteMedia,
+    getMediaThumbnailUrl,
     getMediaContentUrl,
     listAttachments,
     uploadAttachment,

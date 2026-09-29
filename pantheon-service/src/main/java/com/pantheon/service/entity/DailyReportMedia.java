@@ -26,6 +26,9 @@ public class DailyReportMedia {
     @Column(name = "storage_key", nullable = false)
     private String storageKey;
 
+    @Column(name = "thumbnail_storage_key")
+    private String thumbnailStorageKey;
+
     @Column(name = "content_type", nullable = false)
     private String contentType;
 
@@ -45,6 +48,12 @@ public class DailyReportMedia {
     public DailyReportMedia(
             UUID id, UUID dailyReportId, MediaType type, String storageKey, String contentType, String caption,
             UUID uploadedBy, Instant createdAt) {
+        this(id, dailyReportId, type, storageKey, contentType, caption, uploadedBy, createdAt, null);
+    }
+
+    public DailyReportMedia(
+            UUID id, UUID dailyReportId, MediaType type, String storageKey, String contentType, String caption,
+            UUID uploadedBy, Instant createdAt, String thumbnailStorageKey) {
         this.id = id;
         this.dailyReportId = dailyReportId;
         this.type = type;
@@ -53,10 +62,16 @@ public class DailyReportMedia {
         this.caption = caption;
         this.uploadedBy = uploadedBy;
         this.createdAt = createdAt;
+        this.thumbnailStorageKey = thumbnailStorageKey;
     }
 
     public void updateCaption(String caption) {
         this.caption = caption;
+    }
+
+    /** Lazy backfill for media uploaded before thumbnails existed — see {@code DailyReportMediaService#getMediaThumbnail}. */
+    public void assignThumbnail(String thumbnailStorageKey) {
+        this.thumbnailStorageKey = thumbnailStorageKey;
     }
 
     public UUID getId() {
@@ -73,6 +88,10 @@ public class DailyReportMedia {
 
     public String getStorageKey() {
         return storageKey;
+    }
+
+    public String getThumbnailStorageKey() {
+        return thumbnailStorageKey;
     }
 
     public String getContentType() {

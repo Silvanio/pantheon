@@ -136,7 +136,31 @@ public class PdfBrandingService {
                 && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') {
             return "image/webp";
         }
+        if (looksLikeAvif(bytes)) {
+            return "image/avif";
+        }
         return "image/jpeg";
+    }
+
+    /**
+     * AVIF (an ISOBMFF/HEIF-family container) has no fixed-offset magic number like PNG/JPEG —
+     * it's identified by an "ftyp" box early in the file declaring an AVIF major/compatible
+     * brand. Detecting it correctly (rather than falling through to the "image/jpeg" default)
+     * doesn't make openhtmltopdf able to decode it — Java's built-in ImageIO has no AVIF codec,
+     * so an AVIF logo still won't render in a PDF — but it avoids mislabeling the bytes as JPEG,
+     * which is strictly worse (a corrupt-looking decode attempt instead of a clean no-render).
+     * Re-uploading the company logo as PNG or JPEG (both natively supported) is the actual fix.
+     */
+    private boolean looksLikeAvif(byte[] bytes) {
+        if (bytes.length < 12) {
+            return false;
+        }
+        boolean hasFtypBox = bytes[4] == 'f' && bytes[5] == 't' && bytes[6] == 'y' && bytes[7] == 'p';
+        if (!hasFtypBox) {
+            return false;
+        }
+        String brand = new String(bytes, 8, 4, StandardCharsets.US_ASCII);
+        return brand.equals("avif") || brand.equals("avis");
     }
 
     private boolean looksLikeSvg(byte[] bytes) {

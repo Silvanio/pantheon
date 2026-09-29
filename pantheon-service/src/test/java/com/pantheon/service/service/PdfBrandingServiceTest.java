@@ -142,6 +142,25 @@ class PdfBrandingServiceTest {
     }
 
     @Test
+    void resolveDetectsAvifFromItsRealBytesInsteadOfMislabelingItAsJpeg() {
+        // Regression: AVIF has no fixed-offset magic number (it's an ISOBMFF "ftyp" box declaring
+        // an avif/avis brand at a variable offset), so it used to fall through to the "image/jpeg"
+        // default like SVG once did — see resolveDetectsSvgFromItsRealBytes above for the same
+        // class of bug. Java's ImageIO has no built-in AVIF decoder either way, so this doesn't
+        // make an AVIF logo render — it only stops it from being mislabeled as JPEG.
+        Company company = new Company(companyId, "Nome Cadastro", UUID.randomUUID(), Instant.now());
+        company.completeProfile(null, null, null, null, "companies/" + companyId + "/logo.avif", Instant.now());
+        when(siteRepository.findById(siteId)).thenReturn(Optional.of(site()));
+        when(companyRepository.findById(companyId)).thenReturn(Optional.of(company));
+        byte[] avifBytes = {0, 0, 0, 0x1c, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f', 0, 0, 0, 0};
+        when(storageService.getObject(eq("companies/" + companyId + "/logo.avif"))).thenReturn(avifBytes);
+
+        PdfBrandingService.Branding branding = service.resolve(siteId);
+
+        assertThat(branding.logoDataUri()).startsWith("data:image/avif;base64,");
+    }
+
+    @Test
     void renderHeaderHtmlIncludesNamesAndLogoWhenPresent() {
         PdfBrandingService.Branding branding =
                 new PdfBrandingService.Branding("Empresa X", "Obra Y", "data:image/png;base64,QQ==");

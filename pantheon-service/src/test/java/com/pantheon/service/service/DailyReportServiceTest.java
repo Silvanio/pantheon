@@ -291,6 +291,22 @@ class DailyReportServiceTest {
     }
 
     @Test
+    void deleteAlsoDeletesMediaThumbnailStorageObjectWhenPresent() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportMedia media = new DailyReportMedia(
+                UUID.randomUUID(), report.getId(), MediaType.PHOTO, "media/key.jpg", "image/jpeg", null,
+                UUID.randomUUID(), Instant.now(), "media-thumbnails/key.jpg");
+        when(mediaRepository.findByDailyReportIdOrderByCreatedAtAsc(report.getId())).thenReturn(List.of(media));
+        when(attachmentRepository.findByDailyReportIdOrderByCreatedAtAsc(report.getId())).thenReturn(List.of());
+
+        service.delete(report.getId(), UUID.randomUUID());
+
+        verify(storageService).deleteObject("media/key.jpg");
+        verify(storageService).deleteObject("media-thumbnails/key.jpg");
+    }
+
+    @Test
     void listReturnsPagedResultsSortedByCreatedAtDescending() {
         DailyReport report = draftReport();
         when(dailyReportRepository.findByConstructionSiteId(eq(siteId), any(Pageable.class)))
@@ -704,6 +720,21 @@ class DailyReportServiceTest {
 
         verify(storageService).deleteObject("media/key.jpg");
         verify(mediaRepository).delete(media);
+    }
+
+    @Test
+    void deleteMediaAlsoDeletesThumbnailStorageObjectWhenPresent() {
+        DailyReport report = draftReport();
+        when(dailyReportRepository.findById(report.getId())).thenReturn(Optional.of(report));
+        DailyReportMedia media = new DailyReportMedia(
+                UUID.randomUUID(), report.getId(), MediaType.PHOTO, "media/key.jpg", "image/jpeg", null,
+                UUID.randomUUID(), Instant.now(), "media-thumbnails/key.jpg");
+        when(mediaRepository.findById(media.getId())).thenReturn(Optional.of(media));
+
+        service.deleteMedia(report.getId(), UUID.randomUUID(), media.getId());
+
+        verify(storageService).deleteObject("media/key.jpg");
+        verify(storageService).deleteObject("media-thumbnails/key.jpg");
     }
 
     @Test

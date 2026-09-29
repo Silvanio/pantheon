@@ -382,6 +382,9 @@ public class DailyReportService {
                 .filter(m -> m.getDailyReportId().equals(reportId))
                 .orElseThrow(() -> new DailyReportNotFoundException(mediaId));
         storageService.deleteObject(media.getStorageKey());
+        if (media.getThumbnailStorageKey() != null) {
+            storageService.deleteObject(media.getThumbnailStorageKey());
+        }
         mediaRepository.delete(media);
     }
 
@@ -553,6 +556,9 @@ public class DailyReportService {
         List<DailyReportMedia> media = mediaRepository.findByDailyReportIdOrderByCreatedAtAsc(reportId);
         for (DailyReportMedia item : media) {
             storageService.deleteObject(item.getStorageKey());
+            if (item.getThumbnailStorageKey() != null) {
+                storageService.deleteObject(item.getThumbnailStorageKey());
+            }
         }
         mediaRepository.deleteAll(media);
 

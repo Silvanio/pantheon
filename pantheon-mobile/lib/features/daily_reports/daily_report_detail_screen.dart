@@ -229,6 +229,7 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
   final Map<String, String> _mediaCaptionDrafts = {};
   final Map<String, String> _mediaOriginalCaptions = {};
   final Map<String, Uint8List> _mediaBytesCache = {};
+  final Map<String, Uint8List> _mediaFullBytesCache = {};
 
   bool _attachmentsInitialized = false;
   final List<ReportAttachment> _attachments = [];
@@ -607,8 +608,18 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
   Future<Uint8List> _loadMediaBytes(String mediaId) async {
     final cached = _mediaBytesCache[mediaId];
     if (cached != null) return cached;
-    final bytes = Uint8List.fromList(await ref.read(dailyReportRepositoryProvider).getMediaContent(widget.id, mediaId));
+    final bytes = Uint8List.fromList(await ref.read(dailyReportRepositoryProvider).getMediaThumbnail(widget.id, mediaId));
     _mediaBytesCache[mediaId] = bytes;
+    return bytes;
+  }
+
+  /// Full-resolution original for the enlarged detail sheet — the grid's thumbnail (_loadMediaBytes)
+  /// looks blurry stretched up to that size.
+  Future<Uint8List> _loadMediaFullBytes(String mediaId) async {
+    final cached = _mediaFullBytesCache[mediaId];
+    if (cached != null) return cached;
+    final bytes = Uint8List.fromList(await ref.read(dailyReportRepositoryProvider).getMediaContent(widget.id, mediaId));
+    _mediaFullBytesCache[mediaId] = bytes;
     return bytes;
   }
 
@@ -660,14 +671,15 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
             if (media.type == 'PHOTO')
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 180,
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.55,
                   width: double.infinity,
+                  color: AppColors.ink950,
                   child: FutureBuilder<Uint8List>(
-                    future: _loadMediaBytes(media.id),
+                    future: _loadMediaFullBytes(media.id),
                     builder: (context, snap) => snap.hasData
-                        ? Image.memory(snap.data!, fit: BoxFit.cover)
-                        : Container(color: AppColors.steel100, alignment: Alignment.center, child: const CircularProgressIndicator()),
+                        ? Image.memory(snap.data!, fit: BoxFit.contain)
+                        : const Center(child: CircularProgressIndicator(color: Colors.white)),
                   ),
                 ),
               )

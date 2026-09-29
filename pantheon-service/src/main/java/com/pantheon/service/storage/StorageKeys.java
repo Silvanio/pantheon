@@ -17,6 +17,13 @@ public final class StorageKeys {
                 .formatted(constructionSiteId, dailyReportId, mediaId, extension);
     }
 
+    /** Always {@code .jpg} regardless of the original's format — thumbnails are re-encoded as JPEG, see
+     * {@code DailyReportMediaService#generateThumbnail}. */
+    public static String mediaThumbnailKey(UUID constructionSiteId, UUID dailyReportId, UUID mediaId) {
+        return "construction-sites/%s/daily-reports/%s/media-thumbnails/%s.jpg"
+                .formatted(constructionSiteId, dailyReportId, mediaId);
+    }
+
     public static String attachmentKey(
             UUID constructionSiteId, UUID dailyReportId, UUID attachmentId, String extension) {
         return "construction-sites/%s/daily-reports/%s/attachments/%s.%s"

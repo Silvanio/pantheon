@@ -1,7 +1,6 @@
 package com.pantheon.service.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -122,13 +121,15 @@ class DailyReportPdfServiceTest {
         when(siteRepository.findById(siteId)).thenReturn(Optional.of(site));
         when(brandingService.resolve(eq(siteId)))
                 .thenReturn(new PdfBrandingService.Branding("Empresa Teste", "Obra Central", null));
-        when(brandingService.renderHeaderHtml(any()))
-                .thenReturn("<div class=\"pdf-header\">Empresa Teste — Obra Central</div>");
 
         byte[] pdf = service.generate(report.getId(), UUID.randomUUID());
 
         String text = textOf(pdf);
         assertThat(text).contains("Empresa Teste");
         assertThat(text).contains("Obra Central");
+        // The letterhead's "RELATÓRIO Nº" element (added to match DailyReportPDF.dc.html —
+        // Pedido de Compra's PDF doesn't have this, see renderLetterhead's doc comment) —
+        // zero-padded to 3 digits.
+        assertThat(text).contains("001");
     }
 }

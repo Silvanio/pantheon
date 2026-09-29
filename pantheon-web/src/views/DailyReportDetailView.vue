@@ -46,6 +46,7 @@ const {
   uploadMedia,
   updateMediaCaption,
   deleteMedia,
+  getMediaThumbnailUrl,
   getMediaContentUrl,
   listAttachments,
   uploadAttachment,
@@ -497,6 +498,32 @@ const mediaError = ref('')
 const mediaCaptionDrafts = ref<Record<string, string>>({})
 const mediaPreviewUrls = ref<Record<string, string>>({})
 const isDraggingMedia = ref(false)
+const mediaLightbox = ref<ReportMedia | null>(null)
+const mediaLightboxUrl = ref('')
+const mediaLightboxLoading = ref(false)
+const mediaLightboxError = ref('')
+
+async function openMediaLightbox(item: ReportMedia) {
+  if (item.type !== 'PHOTO') return
+  mediaLightbox.value = item
+  mediaLightboxLoading.value = true
+  mediaLightboxError.value = ''
+  try {
+    const blob = await getMediaContentUrl(reportId, item.id)
+    mediaLightboxUrl.value = URL.createObjectURL(blob)
+  } catch {
+    mediaLightboxError.value = t('dailyReports.media.previewError')
+  } finally {
+    mediaLightboxLoading.value = false
+  }
+}
+
+function closeMediaLightbox() {
+  if (mediaLightboxUrl.value) URL.revokeObjectURL(mediaLightboxUrl.value)
+  mediaLightbox.value = null
+  mediaLightboxUrl.value = ''
+  mediaLightboxError.value = ''
+}
 
 function isCaptionDirty(item: ReportMedia): boolean {
   return (mediaCaptionDrafts.value[item.id] ?? '') !== (item.caption ?? '')
@@ -511,7 +538,7 @@ async function uploadMediaFiles(files: File[]) {
       media.value.push(uploaded)
       mediaCaptionDrafts.value[uploaded.id] = ''
       if (uploaded.type === 'PHOTO') {
-        const blob = await getMediaContentUrl(reportId, uploaded.id)
+        const blob = await getMediaThumbnailUrl(reportId, uploaded.id)
         mediaPreviewUrls.value[uploaded.id] = URL.createObjectURL(blob)
       }
     } catch {
@@ -725,8 +752,9 @@ async function onDownloadPdf() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.target = '_blank'
-    link.rel = 'noopener'
+    link.download = detail.value
+      ? `diario-obra-${detail.value.report.sequenceNo}-${detail.value.report.reportDate}.pdf`
+      : `diario-obra-${reportId}.pdf`
     link.click()
     URL.revokeObjectURL(url)
   } catch {
@@ -813,14 +841,17 @@ async function onGlobalSave() {
           }),
         )
       } else {
+        // Add the replacement before deleting the old row — if the add fails, the original
+        // entry is left intact instead of being lost (a delete-then-add order would silently
+        // drop this row on any add failure, since the old one is already gone by then).
         const entryId = row.id
         tasks.push(async () => {
-          await deleteWorkforceEntry(reportId, entryId)
           await addWorkforceEntry(reportId, {
             membershipId: row.membershipId,
             roleDescription: row.membershipId ? null : row.roleDescription,
             headcount: row.headcount,
           })
+          await deleteWorkforceEntry(reportId, entryId)
         })
       }
     }
@@ -839,14 +870,15 @@ async function onGlobalSave() {
           }),
         )
       } else {
+        // Same add-before-delete safety as workforce, above.
         const usageId = row.id
         tasks.push(async () => {
-          await deleteEquipmentUsage(reportId, usageId)
           await addEquipmentUsage(reportId, {
             equipmentId: row.equipmentId,
             customName: row.equipmentId ? null : row.customName.trim(),
             statusNote: row.statusNote.trim() || null,
           })
+          await deleteEquipmentUsage(reportId, usageId)
         })
       }
     }
@@ -865,14 +897,15 @@ async function onGlobalSave() {
           }),
         )
       } else {
+        // Same add-before-delete safety as workforce/equipment, above.
         const activityId = row.id
         tasks.push(async () => {
-          await deleteActivity(reportId, activityId)
           await addActivity(reportId, {
             description: row.description.trim(),
             progressNote: activityProgressNoteFor(row.status),
             status: row.status,
           })
+          await deleteActivity(reportId, activityId)
         })
       }
     }
@@ -1023,7 +1056,7 @@ async function load() {
       mediaList
         .filter((m) => m.type === 'PHOTO')
         .map(async (m) => {
-          const blob = await getMediaContentUrl(reportId, m.id)
+          const blob = await getMediaThumbnailUrl(reportId, m.id)
           mediaPreviewUrls.value[m.id] = URL.createObjectURL(blob)
         }),
     )
@@ -1037,6 +1070,7 @@ async function load() {
 onMounted(load)
 onBeforeUnmount(() => {
   for (const url of Object.values(mediaPreviewUrls.value)) URL.revokeObjectURL(url)
+  if (mediaLightboxUrl.value) URL.revokeObjectURL(mediaLightboxUrl.value)
 })
 </script>
 
@@ -1055,61 +1089,139 @@ onBeforeUnmount(() => {
         </template>
       </AppHeader>
 
-      <main v-if="detail" class="app-container space-y-5 py-8">
-        <!-- Header: status + date + global actions -->
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-3">
-              <h1 class="text-2xl font-extrabold tracking-tight text-steel-800 dark:text-steel-50">
-                {{ t('dailyReports.history.reportLabel') }} #{{ detail.report.sequenceNo }}
-              </h1>
-              <StatusBadge kind="dailyReport" :status="detail.report.status" />
-              <span class="text-sm text-steel-400 dark:text-steel-600">·</span>
-              <span class="text-sm text-steel-500 dark:text-steel-400">{{ formatFullDate(detail.report.reportDate) }}</span>
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center gap-2.5">
-            <div
-              class="mr-1 flex items-center gap-1.5 text-xs font-semibold"
-              :class="saving ? 'text-steel-500 dark:text-steel-400' : isDirty ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'"
-            >
-              <span
-                class="h-1.5 w-1.5 rounded-full"
-                :class="saving ? 'bg-steel-400' : isDirty ? 'bg-amber-500' : 'bg-emerald-500'"
-              ></span>
-              {{ saving ? t('dailyReports.detail.saving') : isDirty ? t('dailyReports.detail.unsaved') : t('dailyReports.detail.allSaved') }}
-            </div>
-            <button v-if="canSubmit" type="button" :disabled="submitting" class="btn-secondary" @click="onSubmitReport">
-              {{ t('dailyReports.detail.submitButton') }}
-            </button>
-            <div v-if="isDraft" class="relative">
-              <button type="button" :disabled="deleting" class="btn-danger" @click="confirmingDelete = !confirmingDelete">
-                {{ t('dailyReports.detail.deleteButton') }}
-              </button>
-              <div v-if="confirmingDelete" class="modal-panel absolute right-0 top-full z-10 mt-2 w-72 p-3 shadow-lg" @click.stop>
-                <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('dailyReports.detail.deleteConfirm') }}</p>
-                <div class="flex justify-end gap-2">
-                  <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDelete = false">{{ t('dailyReports.detail.deleteCancel') }}</button>
-                  <button type="button" :disabled="deleting" class="btn-danger py-1 text-xs" @click="onDelete">{{ t('dailyReports.detail.deleteButton') }}</button>
-                </div>
-              </div>
-            </div>
-            <button type="button" :disabled="downloadingPdf" class="btn-secondary" @click="onDownloadPdf">
-              {{ t('dailyReports.pdf.downloadButton') }}
-            </button>
-            <button v-if="isDraft" type="button" :disabled="saving || !isDirty" class="btn-primary" @click="onGlobalSave">
-              {{ saving ? t('dailyReports.detail.saving') : t('dailyReports.detail.saveButton') }}
-            </button>
-          </div>
-        </div>
-
+      <div v-if="detail" class="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-6 xl:px-8">
+        <!-- Full-width, above the aside+main split — not confined to main's narrower column,
+             so it lines up with the aside above it instead of stopping short. -->
         <p v-if="!isDraft" class="rounded-md bg-blueprint-50 px-4 py-2 text-sm text-blueprint-700 dark:bg-blueprint-900/40 dark:text-blueprint-300">
           {{ t('dailyReports.detail.submittedNotice') }}
         </p>
-        <p v-if="submitError" class="text-sm text-safety-600 dark:text-safety-500">{{ submitError }}</p>
-        <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
-        <p v-if="pdfError" class="text-sm text-safety-600 dark:text-safety-500">{{ pdfError }}</p>
-        <p v-if="saveError" class="text-sm text-safety-600 dark:text-safety-500">{{ saveError }}</p>
+
+        <div class="flex flex-col gap-5 lg:flex-row lg:gap-6">
+          <!-- Report name/status/date + global actions — a side panel on wide screens (test:
+               frees the main column's full width for content instead of a centered sticky bar),
+               stacked above the content on narrow ones where a fixed side column doesn't fit.
+               lg:top-20 = AppHeader's h-16 plus a 16px gap, same spacing rule as the bar it replaces. -->
+          <aside class="lg:order-2 lg:w-[300px] lg:shrink-0">
+          <div class="card card-pad flex flex-col gap-4 lg:sticky lg:top-20">
+            <div class="flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-2xl font-extrabold tracking-tight text-steel-800 dark:text-steel-50">
+                  {{ t('dailyReports.history.reportLabel') }} #{{ detail.report.sequenceNo }}
+                </h1>
+                <StatusBadge kind="dailyReport" :status="detail.report.status" />
+              </div>
+              <span class="text-sm text-steel-500 dark:text-steel-400">{{ formatFullDate(detail.report.reportDate) }}</span>
+            </div>
+
+            <div class="h-px bg-steel-100 dark:bg-steel-800 lg:block"></div>
+
+            <div class="flex flex-wrap items-center gap-2.5 lg:flex-col lg:items-stretch lg:gap-2">
+              <div
+                class="flex items-center gap-1.5 text-xs font-semibold lg:mb-1"
+                :class="saving ? 'text-steel-500 dark:text-steel-400' : isDirty ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'"
+              >
+                <span
+                  class="h-1.5 w-1.5 rounded-full"
+                  :class="saving ? 'bg-steel-400' : isDirty ? 'bg-amber-500' : 'bg-emerald-500'"
+                ></span>
+                {{ saving ? t('dailyReports.detail.saving') : isDirty ? t('dailyReports.detail.unsaved') : t('dailyReports.detail.allSaved') }}
+              </div>
+              <button v-if="isDraft" type="button" :disabled="saving || !isDirty" class="btn-primary lg:w-full" @click="onGlobalSave">
+                {{ saving ? t('dailyReports.detail.saving') : t('dailyReports.detail.saveButton') }}
+              </button>
+              <button v-if="canSubmit" type="button" :disabled="submitting" class="btn-secondary lg:w-full" @click="onSubmitReport">
+                {{ t('dailyReports.detail.submitButton') }}
+              </button>
+              <button type="button" :disabled="downloadingPdf" class="btn-secondary lg:w-full" @click="onDownloadPdf">
+                {{ t('dailyReports.pdf.downloadButton') }}
+              </button>
+              <div v-if="isDraft" class="relative lg:mt-2">
+                <button type="button" :disabled="deleting" class="btn-danger lg:w-full" @click="confirmingDelete = !confirmingDelete">
+                  {{ t('dailyReports.detail.deleteButton') }}
+                </button>
+                <div v-if="confirmingDelete" class="modal-panel absolute right-0 top-full z-10 mt-2 w-72 p-3 shadow-lg" @click.stop>
+                  <p class="mb-3 text-xs text-steel-600 dark:text-steel-300">{{ t('dailyReports.detail.deleteConfirm') }}</p>
+                  <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-secondary py-1 text-xs" @click="confirmingDelete = false">{{ t('dailyReports.detail.deleteCancel') }}</button>
+                    <button type="button" :disabled="deleting" class="btn-danger py-1 text-xs" @click="onDelete">{{ t('dailyReports.detail.deleteButton') }}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <template v-if="detail.approvals.length > 0">
+              <div class="h-px bg-steel-100 dark:bg-steel-800"></div>
+              <div>
+                <div class="mb-4 flex items-center gap-2.5">
+                  <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blueprint-50 text-blueprint-600 dark:bg-blueprint-500/10 dark:text-blueprint-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-[18px] w-[18px]">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 class="text-base font-bold text-steel-800 dark:text-steel-50">{{ t('dailyReports.approvalHistoryTitle') }}</h2>
+                </div>
+
+                <ol class="flex flex-col">
+                  <li v-for="(approval, idx) in currentCycleApprovals" :key="approval.id" class="flex gap-3.5" :class="idx < currentCycleApprovals.length - 1 ? 'pb-4' : ''">
+                    <div class="flex flex-col items-center">
+                      <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold" :class="approvalStepBadgeClass(approval)">
+                        <svg v-if="approval.status === 'APPROVED'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3.5 w-3.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5" />
+                        </svg>
+                        <svg v-else-if="approval.status === 'REJECTED'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3.5 w-3.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" />
+                        </svg>
+                        <template v-else>{{ approval.stepOrder }}</template>
+                      </div>
+                      <div v-if="idx < currentCycleApprovals.length - 1" class="mt-1 w-0.5 flex-1" :class="approval.status === 'APPROVED' ? 'bg-emerald-200 dark:bg-emerald-900' : 'bg-steel-200 dark:bg-steel-700'"></div>
+                    </div>
+                    <div class="min-w-0 flex-1 pb-1 pt-0.5">
+                      <p class="text-sm font-bold text-steel-800 dark:text-steel-50">{{ t(`dailyReports.approverFunction.${approval.approverFunction}`) }}</p>
+                      <p v-if="approval.status === 'PENDING'" class="text-xs text-steel-500 dark:text-steel-400">{{ t('dailyReports.pendingStepSubtitle') }}</p>
+                      <p v-else class="text-xs text-steel-500 dark:text-steel-400">
+                        {{ t(approval.status === 'APPROVED' ? 'dailyReports.decidedByApproved' : 'dailyReports.decidedByRejected', { name: approval.decidedByName ?? '—', datetime: formatDateTime(approval.decidedAt) }) }}
+                        <template v-if="approval.status === 'REJECTED' && approval.comment"> · {{ approval.comment }}</template>
+                      </p>
+                      <template v-if="approval.status === 'PENDING' && currentPendingApproval && approval.id === currentPendingApproval.id && canActOnApproval">
+                        <div class="mt-2.5 flex flex-wrap items-center gap-2">
+                          <button type="button" class="btn-success px-4 py-1.5 text-xs" @click="onApproveStep">{{ t('dailyReports.approveStepButton') }}</button>
+                          <button type="button" class="btn-danger px-4 py-1.5 text-xs" @click="showRejectForm = !showRejectForm">{{ t('dailyReports.rejectStepButton') }}</button>
+                        </div>
+                        <form v-if="showRejectForm" class="mt-2.5 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
+                          <input v-model="rejectReason" type="text" required :placeholder="t('dailyReports.rejectReasonPlaceholder')" class="field-input flex-1 text-sm" />
+                          <button type="submit" class="btn-danger px-3 py-1.5 text-xs">{{ t('dailyReports.confirmReject') }}</button>
+                        </form>
+                      </template>
+                    </div>
+                  </li>
+                </ol>
+                <p v-if="approvalActionError" class="mt-3 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
+
+                <div v-if="priorCycles.length > 0" class="mt-6 border-t border-steel-100 pt-4 dark:border-steel-800">
+                  <p class="mb-2 text-xs font-bold uppercase tracking-wide text-steel-400 dark:text-steel-500">{{ t('dailyReports.priorCyclesTitle') }}</p>
+                  <div v-for="cycle in priorCycles" :key="cycle.cycleNumber" class="mb-3 last:mb-0">
+                    <p class="mb-1 text-xs font-semibold text-steel-500 dark:text-steel-400">{{ t('dailyReports.cycleLabel') }} {{ cycle.cycleNumber }}</p>
+                    <ul class="space-y-1 border-l-2 border-steel-200 pl-3 dark:border-steel-700">
+                      <li v-for="approval in cycle.approvals" :key="approval.id" class="flex items-center justify-between text-xs">
+                        <span class="text-steel-600 dark:text-steel-300">
+                          {{ t('dailyReports.stepLabel') }} {{ approval.stepOrder }} — {{ t(`dailyReports.approverFunction.${approval.approverFunction}`) }}
+                          <template v-if="approval.decidedByName"> · {{ approval.decidedByName }}</template>
+                        </span>
+                        <StatusBadge kind="approval" :status="approval.status" />
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </aside>
+
+        <main class="min-w-0 flex-1 space-y-5 lg:order-1">
+          <p v-if="submitError" class="text-sm text-safety-600 dark:text-safety-500">{{ submitError }}</p>
+          <p v-if="deleteError" class="text-sm text-safety-600 dark:text-safety-500">{{ deleteError }}</p>
+          <p v-if="pdfError" class="text-sm text-safety-600 dark:text-safety-500">{{ pdfError }}</p>
+          <p v-if="saveError" class="text-sm text-safety-600 dark:text-safety-500">{{ saveError }}</p>
 
         <!-- Clima & Expediente -->
         <section class="card card-pad">
@@ -1574,7 +1686,12 @@ onBeforeUnmount(() => {
           <div v-if="media.length > 0" class="mb-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
             <div v-for="item in media" :key="item.id">
               <div class="relative h-28 overflow-hidden rounded-xl border border-steel-200 dark:border-steel-700">
-                <img v-if="item.type === 'PHOTO' && mediaPreviewUrls[item.id]" :src="mediaPreviewUrls[item.id]" class="h-full w-full object-cover" />
+                <img
+                  v-if="item.type === 'PHOTO' && mediaPreviewUrls[item.id]"
+                  :src="mediaPreviewUrls[item.id]"
+                  class="h-full w-full cursor-pointer object-cover"
+                  @click="openMediaLightbox(item)"
+                />
                 <div v-else class="flex h-full w-full items-center justify-center bg-steel-100 text-steel-400 dark:bg-steel-800 dark:text-steel-500">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-7 w-7">
                     <rect x="3" y="5" width="14" height="14" rx="2" />
@@ -1649,73 +1766,25 @@ onBeforeUnmount(() => {
           </div>
           <p v-if="attachmentError" class="mt-2 text-sm text-safety-600 dark:text-safety-500">{{ attachmentError }}</p>
         </section>
-
-        <!-- Aprovação -->
-        <section v-if="detail.approvals.length > 0" class="card card-pad">
-          <div class="mb-4 flex items-center gap-2.5">
-            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blueprint-50 text-blueprint-600 dark:bg-blueprint-500/10 dark:text-blueprint-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-[18px] w-[18px]">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 class="text-base font-bold text-steel-800 dark:text-steel-50">{{ t('dailyReports.approvalHistoryTitle') }}</h2>
-          </div>
-
-          <ol class="flex flex-col">
-            <li v-for="(approval, idx) in currentCycleApprovals" :key="approval.id" class="flex gap-3.5" :class="idx < currentCycleApprovals.length - 1 ? 'pb-4' : ''">
-              <div class="flex flex-col items-center">
-                <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold" :class="approvalStepBadgeClass(approval)">
-                  <svg v-if="approval.status === 'APPROVED'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3.5 w-3.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5" />
-                  </svg>
-                  <svg v-else-if="approval.status === 'REJECTED'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3.5 w-3.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                  <template v-else>{{ approval.stepOrder }}</template>
-                </div>
-                <div v-if="idx < currentCycleApprovals.length - 1" class="mt-1 w-0.5 flex-1" :class="approval.status === 'APPROVED' ? 'bg-emerald-200 dark:bg-emerald-900' : 'bg-steel-200 dark:bg-steel-700'"></div>
-              </div>
-              <div class="min-w-0 flex-1 pb-1 pt-0.5">
-                <p class="text-sm font-bold text-steel-800 dark:text-steel-50">{{ t(`dailyReports.approverFunction.${approval.approverFunction}`) }}</p>
-                <p v-if="approval.status === 'PENDING'" class="text-xs text-steel-500 dark:text-steel-400">{{ t('dailyReports.pendingStepSubtitle') }}</p>
-                <p v-else class="text-xs text-steel-500 dark:text-steel-400">
-                  {{ t(approval.status === 'APPROVED' ? 'dailyReports.decidedByApproved' : 'dailyReports.decidedByRejected', { name: approval.decidedByName ?? '—', datetime: formatDateTime(approval.decidedAt) }) }}
-                  <template v-if="approval.status === 'REJECTED' && approval.comment"> · {{ approval.comment }}</template>
-                </p>
-                <template v-if="approval.status === 'PENDING' && currentPendingApproval && approval.id === currentPendingApproval.id && canActOnApproval">
-                  <div class="mt-2.5 flex flex-wrap items-center gap-2">
-                    <button type="button" class="btn-success px-4 py-1.5 text-xs" @click="onApproveStep">{{ t('dailyReports.approveStepButton') }}</button>
-                    <button type="button" class="btn-danger px-4 py-1.5 text-xs" @click="showRejectForm = !showRejectForm">{{ t('dailyReports.rejectStepButton') }}</button>
-                  </div>
-                  <form v-if="showRejectForm" class="mt-2.5 flex flex-wrap items-center gap-2" @submit.prevent="onRejectStep">
-                    <input v-model="rejectReason" type="text" required :placeholder="t('dailyReports.rejectReasonPlaceholder')" class="field-input flex-1 text-sm" />
-                    <button type="submit" class="btn-danger px-3 py-1.5 text-xs">{{ t('dailyReports.confirmReject') }}</button>
-                  </form>
-                </template>
-              </div>
-            </li>
-          </ol>
-          <p v-if="approvalActionError" class="mt-3 text-sm text-safety-600 dark:text-safety-500">{{ approvalActionError }}</p>
-
-          <div v-if="priorCycles.length > 0" class="mt-6 border-t border-steel-100 pt-4 dark:border-steel-800">
-            <p class="mb-2 text-xs font-bold uppercase tracking-wide text-steel-400 dark:text-steel-500">{{ t('dailyReports.priorCyclesTitle') }}</p>
-            <div v-for="cycle in priorCycles" :key="cycle.cycleNumber" class="mb-3 last:mb-0">
-              <p class="mb-1 text-xs font-semibold text-steel-500 dark:text-steel-400">{{ t('dailyReports.cycleLabel') }} {{ cycle.cycleNumber }}</p>
-              <ul class="space-y-1 border-l-2 border-steel-200 pl-3 dark:border-steel-700">
-                <li v-for="approval in cycle.approvals" :key="approval.id" class="flex items-center justify-between text-xs">
-                  <span class="text-steel-600 dark:text-steel-300">
-                    {{ t('dailyReports.stepLabel') }} {{ approval.stepOrder }} — {{ t(`dailyReports.approverFunction.${approval.approverFunction}`) }}
-                    <template v-if="approval.decidedByName"> · {{ approval.decidedByName }}</template>
-                  </span>
-                  <StatusBadge kind="approval" :status="approval.status" />
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
-      </main>
+        </main>
+        </div>
+      </div>
 
       <p v-else-if="loadError" class="app-container py-8 text-sm text-safety-600 dark:text-safety-500">{{ loadError }}</p>
+    </div>
+
+    <div v-if="mediaLightbox" class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" @click.self="closeMediaLightbox">
+      <div class="modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden">
+        <div class="flex shrink-0 items-center justify-between gap-3 border-b border-steel-200 px-4 py-3 dark:border-steel-700">
+          <p class="min-w-0 flex-1 truncate text-sm font-medium text-steel-800 dark:text-steel-50">{{ mediaLightbox.caption || t('dailyReports.media.title') }}</p>
+          <button type="button" class="btn-ghost px-2 py-1 text-xs" @click="closeMediaLightbox">{{ t('dailyReports.media.close') }}</button>
+        </div>
+        <div class="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          <p v-if="mediaLightboxLoading" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.media.loading') }}</p>
+          <p v-else-if="mediaLightboxError" class="text-sm text-safety-600 dark:text-safety-500">{{ mediaLightboxError }}</p>
+          <img v-else :src="mediaLightboxUrl" :alt="mediaLightbox.caption ?? ''" class="max-h-[80vh] max-w-full object-contain" />
+        </div>
+      </div>
     </div>
   </div>
 </template>

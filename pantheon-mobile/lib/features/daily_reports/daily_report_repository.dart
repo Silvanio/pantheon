@@ -170,6 +170,10 @@ class DailyReportRepository {
   Future<void> deleteMedia(String reportId, String mediaId) =>
       _client.delete<dynamic>('/api/daily-reports/$reportId/media/$mediaId');
 
+  Future<List<int>> getMediaThumbnail(String reportId, String mediaId) =>
+      _client.getBytes('/api/daily-reports/$reportId/media/$mediaId/thumbnail');
+
+  /// Full-resolution original — only for the enlarged detail view, never the grid (see getMediaThumbnail).
   Future<List<int>> getMediaContent(String reportId, String mediaId) =>
       _client.getBytes('/api/daily-reports/$reportId/media/$mediaId/content');
 

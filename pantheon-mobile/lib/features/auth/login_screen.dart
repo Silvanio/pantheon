@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_provider.dart';
+import '../../core/widgets/pantheon_mark.dart';
 import '../../theme/app_colors.dart';
 import '../notifications/push_notification_service.dart';
 
@@ -103,7 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [BoxShadow(color: AppColors.blueprint900.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 8))],
                               ),
-                              child: const Icon(Icons.apartment, color: Colors.white, size: 30),
+                              child: const PantheonMark(size: 28),
                             ),
                             const SizedBox(height: 14),
                             const Text(

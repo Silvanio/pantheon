@@ -31,8 +31,8 @@ function onLogout() {
       :title="t('appSidebar.home')"
       @click="router.push('/')"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+        <path d="M6 4H8.3V20H6z M8.3 4H15.2C16.99 4 18.4 5.46 18.4 7.3C18.4 9.14 16.99 10.6 15.2 10.6H8.3V4Z" />
       </svg>
     </button>
 

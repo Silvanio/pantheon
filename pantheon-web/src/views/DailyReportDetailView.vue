@@ -503,11 +503,18 @@ const mediaLightboxUrl = ref('')
 const mediaLightboxLoading = ref(false)
 const mediaLightboxError = ref('')
 
-async function openMediaLightbox(item: ReportMedia) {
-  if (item.type !== 'PHOTO') return
+// Only PHOTO items are viewable in the lightbox — this is the navigable order for next/prev.
+const lightboxPhotos = computed(() => media.value.filter((m) => m.type === 'PHOTO'))
+const mediaLightboxIndex = computed(() => (mediaLightbox.value ? lightboxPhotos.value.findIndex((m) => m.id === mediaLightbox.value!.id) : -1))
+const hasPrevMedia = computed(() => mediaLightboxIndex.value > 0)
+const hasNextMedia = computed(() => mediaLightboxIndex.value !== -1 && mediaLightboxIndex.value < lightboxPhotos.value.length - 1)
+
+async function showLightboxItem(item: ReportMedia) {
   mediaLightbox.value = item
   mediaLightboxLoading.value = true
   mediaLightboxError.value = ''
+  if (mediaLightboxUrl.value) URL.revokeObjectURL(mediaLightboxUrl.value)
+  mediaLightboxUrl.value = ''
   try {
     const blob = await getMediaContentUrl(reportId, item.id)
     mediaLightboxUrl.value = URL.createObjectURL(blob)
@@ -518,11 +525,31 @@ async function openMediaLightbox(item: ReportMedia) {
   }
 }
 
+function openMediaLightbox(item: ReportMedia) {
+  if (item.type !== 'PHOTO') return
+  showLightboxItem(item)
+}
+
+function showPrevMedia() {
+  if (hasPrevMedia.value) showLightboxItem(lightboxPhotos.value[mediaLightboxIndex.value - 1])
+}
+
+function showNextMedia() {
+  if (hasNextMedia.value) showLightboxItem(lightboxPhotos.value[mediaLightboxIndex.value + 1])
+}
+
 function closeMediaLightbox() {
   if (mediaLightboxUrl.value) URL.revokeObjectURL(mediaLightboxUrl.value)
   mediaLightbox.value = null
   mediaLightboxUrl.value = ''
   mediaLightboxError.value = ''
+}
+
+function onLightboxKeydown(event: KeyboardEvent) {
+  if (!mediaLightbox.value) return
+  if (event.key === 'ArrowLeft') showPrevMedia()
+  else if (event.key === 'ArrowRight') showNextMedia()
+  else if (event.key === 'Escape') closeMediaLightbox()
 }
 
 function isCaptionDirty(item: ReportMedia): boolean {
@@ -1067,8 +1094,12 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('keydown', onLightboxKeydown)
+})
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onLightboxKeydown)
   for (const url of Object.values(mediaPreviewUrls.value)) URL.revokeObjectURL(url)
   if (mediaLightboxUrl.value) URL.revokeObjectURL(mediaLightboxUrl.value)
 })
@@ -1778,12 +1809,35 @@ onBeforeUnmount(() => {
       <div class="modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden">
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-steel-200 px-4 py-3 dark:border-steel-700">
           <p class="min-w-0 flex-1 truncate text-sm font-medium text-steel-800 dark:text-steel-50">{{ mediaLightbox.caption || t('dailyReports.media.title') }}</p>
+          <span v-if="lightboxPhotos.length > 1" class="shrink-0 text-xs font-medium text-steel-500 dark:text-steel-400">{{ mediaLightboxIndex + 1 }} / {{ lightboxPhotos.length }}</span>
           <button type="button" class="btn-ghost px-2 py-1 text-xs" @click="closeMediaLightbox">{{ t('dailyReports.media.close') }}</button>
         </div>
-        <div class="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+        <div class="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          <button
+            v-if="hasPrevMedia"
+            type="button"
+            :aria-label="t('dailyReports.media.previous')"
+            class="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/70"
+            @click="showPrevMedia"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
           <p v-if="mediaLightboxLoading" class="text-sm text-steel-500 dark:text-steel-400">{{ t('dailyReports.media.loading') }}</p>
           <p v-else-if="mediaLightboxError" class="text-sm text-safety-600 dark:text-safety-500">{{ mediaLightboxError }}</p>
           <img v-else :src="mediaLightboxUrl" :alt="mediaLightbox.caption ?? ''" class="max-h-[80vh] max-w-full object-contain" />
+          <button
+            v-if="hasNextMedia"
+            type="button"
+            :aria-label="t('dailyReports.media.next')"
+            class="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/70"
+            @click="showNextMedia"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>

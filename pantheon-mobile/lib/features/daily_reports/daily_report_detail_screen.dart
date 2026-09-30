@@ -676,65 +676,21 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
     }
   }
 
+  /// Photos open in a swipeable gallery positioned at the tapped item — see `_MediaDetailSheet`.
+  /// Videos have no full-res viewer yet, so they still open alone, non-navigable.
   Future<void> _showMediaDetailSheet(ReportMedia media) async {
-    final captionController = TextEditingController(text: _mediaCaptionDrafts[media.id] ?? '');
+    final photos = _media.where((m) => m.type == 'PHOTO').toList();
+    final items = media.type == 'PHOTO' ? photos : [media];
+    final initialIndex = media.type == 'PHOTO' ? photos.indexWhere((m) => m.id == media.id) : 0;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20 + MediaQuery.of(context).viewInsets.bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (media.type == 'PHOTO')
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: MediaQuery.of(context).size.height * 0.55,
-                  width: double.infinity,
-                  color: AppColors.ink950,
-                  child: FutureBuilder<Uint8List>(
-                    future: _loadMediaFullBytes(media.id),
-                    builder: (context, snap) => snap.hasData
-                        ? Image.memory(snap.data!, fit: BoxFit.contain)
-                        : const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  ),
-                ),
-              )
-            else
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(color: AppColors.steel100, borderRadius: BorderRadius.circular(12)),
-                alignment: Alignment.center,
-                child: const Icon(Icons.videocam_outlined, size: 36, color: AppColors.steel400),
-              ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: captionController,
-              decoration: const InputDecoration(labelText: 'Legenda'),
-              onChanged: (v) => _mediaCaptionDrafts[media.id] = v,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar'))),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DangerButton(
-                    label: 'Remover',
-                    icon: Icons.delete_outline,
-                    onPressed: () {
-                      setState(() => _media.removeWhere((m) => m.id == media.id));
-                      Navigator.pop(context);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+      builder: (context) => _MediaDetailSheet(
+        items: items,
+        initialIndex: initialIndex < 0 ? 0 : initialIndex,
+        captionDrafts: _mediaCaptionDrafts,
+        loadFullBytes: _loadMediaFullBytes,
+        onRemove: (item) => setState(() => _media.removeWhere((m) => m.id == item.id)),
       ),
     );
     setState(() {});
@@ -917,7 +873,7 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
           attachments.whenData(_initAttachmentsIfNeeded);
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 32 + MediaQuery.of(context).padding.bottom),
             children: [
               if (d.approvals.isNotEmpty) ...[
                 Consumer(
@@ -1739,6 +1695,169 @@ class _DeliveredMaterialRow extends StatelessWidget {
           else
             StatusBadge(kind: StatusBadgeKind.material, status: material.status),
         ],
+      ),
+    );
+  }
+}
+
+class _MediaDetailSheet extends StatefulWidget {
+  const _MediaDetailSheet({
+    required this.items,
+    required this.initialIndex,
+    required this.captionDrafts,
+    required this.loadFullBytes,
+    required this.onRemove,
+  });
+
+  final List<ReportMedia> items;
+  final int initialIndex;
+  final Map<String, String> captionDrafts;
+  final Future<Uint8List> Function(String) loadFullBytes;
+  final void Function(ReportMedia) onRemove;
+
+  @override
+  State<_MediaDetailSheet> createState() => _MediaDetailSheetState();
+}
+
+class _MediaDetailSheetState extends State<_MediaDetailSheet> {
+  late final PageController _pageController;
+  late int _index;
+  late final TextEditingController _captionController;
+
+  ReportMedia get _current => widget.items[_index];
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex;
+    _pageController = PageController(initialPage: _index);
+    _captionController = TextEditingController(text: widget.captionDrafts[_current.id] ?? '');
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _captionController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int i) {
+    setState(() {
+      _index = i;
+      _captionController.text = widget.captionDrafts[_current.id] ?? '';
+    });
+  }
+
+  void _goTo(int i) {
+    _pageController.animateToPage(i, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = _current;
+    return Padding(
+      padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (media.type == 'PHOTO')
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.55,
+                width: double.infinity,
+                child: Container(
+                  color: AppColors.ink950,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      PageView.builder(
+                        controller: _pageController,
+                        itemCount: widget.items.length,
+                        onPageChanged: _onPageChanged,
+                        itemBuilder: (context, i) => FutureBuilder<Uint8List>(
+                          future: widget.loadFullBytes(widget.items[i].id),
+                          builder: (context, snap) => snap.hasData
+                              ? Image.memory(snap.data!, fit: BoxFit.contain)
+                              : const Center(child: CircularProgressIndicator(color: Colors.white)),
+                        ),
+                      ),
+                      if (_index > 0)
+                        Positioned(left: 4, child: _MediaNavArrow(icon: Icons.chevron_left, onTap: () => _goTo(_index - 1))),
+                      if (_index < widget.items.length - 1)
+                        Positioned(right: 4, child: _MediaNavArrow(icon: Icons.chevron_right, onTap: () => _goTo(_index + 1))),
+                      if (widget.items.length > 1)
+                        Positioned(
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(999)),
+                            child: Text(
+                              '${_index + 1} / ${widget.items.length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(color: AppColors.steel100, borderRadius: BorderRadius.circular(12)),
+              alignment: Alignment.center,
+              child: const Icon(Icons.videocam_outlined, size: 36, color: AppColors.steel400),
+            ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _captionController,
+            decoration: const InputDecoration(labelText: 'Legenda'),
+            onChanged: (v) => widget.captionDrafts[media.id] = v,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar'))),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DangerButton(
+                  label: 'Remover',
+                  icon: Icons.delete_outline,
+                  onPressed: () {
+                    widget.onRemove(media);
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaNavArrow extends StatelessWidget {
+  const _MediaNavArrow({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black45,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, color: Colors.white, size: 26),
+        ),
       ),
     );
   }

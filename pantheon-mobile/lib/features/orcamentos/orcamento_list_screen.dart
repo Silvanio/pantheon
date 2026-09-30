@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import 'orcamento_repository.dart';
 
-final _listProvider = FutureProvider.family((ref, String siteId) => ref.watch(orcamentoRepositoryProvider).list(siteId, size: 50));
+final _listProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(orcamentoRepositoryProvider).list(siteId, size: 50);
+});
 
 class OrcamentoListScreen extends ConsumerWidget {
   const OrcamentoListScreen({super.key, required this.siteId});

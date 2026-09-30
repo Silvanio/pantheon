@@ -3,24 +3,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/offline_dialogs.dart';
+import '../../core/widgets/refresh_on_return.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import '../site/site_repository.dart';
 import 'purchase_request_models.dart';
 import 'purchase_request_repository.dart';
 
-/// Public (not `daily_report_list_screen.dart`-private) because the detail screen invalidates it
-/// after a delete, so the list reflects the removal on the way back.
-final purchaseRequestListProvider =
-    FutureProvider.family((ref, String siteId) => ref.watch(purchaseRequestRepositoryProvider).list(siteId, size: 50));
+/// Public (not `daily_report_list_screen.dart`-private): the detail screen also invalidates it
+/// directly after a delete (since a delete pops the detail screen itself, which this screen's own
+/// `RefreshOnReturn` also catches — kept as defense-in-depth, doesn't hurt to invalidate twice).
+final purchaseRequestListProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(purchaseRequestRepositoryProvider).list(siteId, size: 50);
+});
 
 /// Mirrors `pantheon-web`'s `PurchaseRequestPanel.vue` `canManage` prop
 /// (`myPermissions?.PURCHASE_REQUEST === 'MANAGE'`), which gates the "Novo pedido" button.
-final _canManageProvider = FutureProvider.family(
-  (ref, String siteId) => ref.watch(siteRepositoryProvider).getMyPermissions(siteId).then((p) => p['PURCHASE_REQUEST'] == 'MANAGE'),
-);
+final _canManageProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).getMyPermissions(siteId).then((p) => p['PURCHASE_REQUEST'] == 'MANAGE');
+});
 
 final _dateFormat = DateFormat('dd/MM/yyyy');
 
@@ -50,9 +56,19 @@ IconData _stageIcon(PurchaseRequest pr) {
   }
 }
 
-class PurchaseRequestListScreen extends ConsumerWidget {
+class PurchaseRequestListScreen extends ConsumerStatefulWidget {
   const PurchaseRequestListScreen({super.key, required this.siteId});
   final String siteId;
+
+  @override
+  ConsumerState<PurchaseRequestListScreen> createState() => _PurchaseRequestListScreenState();
+}
+
+class _PurchaseRequestListScreenState extends ConsumerState<PurchaseRequestListScreen> with RouteAware, RefreshOnReturn {
+  String get siteId => widget.siteId;
+
+  @override
+  void onReturnVisible() => ref.invalidate(purchaseRequestListProvider(siteId));
 
   Future<void> _openCreateSheet(BuildContext context, WidgetRef ref) async {
     // null = the sheet was dismissed without creating anything; true/false (created, either sent
@@ -70,7 +86,7 @@ class PurchaseRequestListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final page = ref.watch(purchaseRequestListProvider(siteId));
     final canManage = ref.watch(_canManageProvider(siteId));
     return Scaffold(

@@ -22,6 +22,7 @@ import '../../features/site/team_screen.dart';
 import '../../features/sync/sync_screen.dart';
 import '../../features/tasks/task_board_screen.dart';
 import '../auth/auth_provider.dart';
+import '../widgets/refresh_on_return.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -31,7 +32,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     // path/query parameters only — never `extra`, which go_router doesn't forward into
     // RouteSettings.arguments in the first place). A no-op when Sentry isn't initialized
     // (SENTRY_DSN unset), same as every other Sentry call site in this app.
-    observers: [SentryNavigatorObserver()],
+    observers: [SentryNavigatorObserver(), routeObserver],
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final loggingIn = state.matchedLocation == '/login';

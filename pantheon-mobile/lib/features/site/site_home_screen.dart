@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/refresh_on_return.dart';
 import '../../core/widgets/site_photo.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
@@ -10,15 +12,22 @@ import '../dashboard/dashboard_repository.dart';
 import 'site_repository.dart';
 import 'site_summary_section.dart';
 
-final _siteProvider = FutureProvider.family((ref, String siteId) => ref.watch(dashboardRepositoryProvider).getSite(siteId));
-final _myPermissionsProvider =
-    FutureProvider.family((ref, String siteId) => ref.watch(siteRepositoryProvider).getMyPermissions(siteId));
+final _siteProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dashboardRepositoryProvider).getSite(siteId);
+});
+final _myPermissionsProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).getMyPermissions(siteId);
+});
 
 /// Mirrors `pantheon-web`'s `SiteDetailView.vue` `listMyCompanies()` call, used the same way
 /// there: to compute `isCompanyAdmin` and gate the Permissões tab, which — unlike every other
 /// tab — is gated by company-admin role, not a `PermissionCapability`.
-final _myCompanyMembershipsProvider =
-    FutureProvider((ref) => ref.watch(dashboardRepositoryProvider).getOnboardingStatus().then((s) => s.companies));
+final _myCompanyMembershipsProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dashboardRepositoryProvider).getOnboardingStatus().then((s) => s.companies);
+});
 
 class _Entry {
   const _Entry(this.label, this.icon, this.color, this.route, {this.capability, this.adminOnly = false});
@@ -54,9 +63,26 @@ String _permissionsRoute(String id) => '/sites/$id/permissions';
 
 const _statusOptions = ['PLANNING', 'IN_PROGRESS', 'PAUSED', 'COMPLETED'];
 
-class SiteHomeScreen extends ConsumerWidget {
+class SiteHomeScreen extends ConsumerStatefulWidget {
   const SiteHomeScreen({super.key, required this.siteId});
   final String siteId;
+
+  @override
+  ConsumerState<SiteHomeScreen> createState() => _SiteHomeScreenState();
+}
+
+class _SiteHomeScreenState extends ConsumerState<SiteHomeScreen> with RouteAware, RefreshOnReturn {
+  String get siteId => widget.siteId;
+
+  // Returning from any pushed entry (Diário de Obra, Pedido de Compra, ...) may have changed this
+  // site's stats/status — refresh the whole home, not just whichever entry was visited, since a
+  // stale FAB here is just as visible as a stale list.
+  @override
+  void onReturnVisible() {
+    ref.invalidate(_siteProvider(siteId));
+    ref.invalidate(_myPermissionsProvider(siteId));
+    ref.invalidate(siteSummaryProvider(siteId));
+  }
 
   Future<void> _openStatusSheet(BuildContext context, WidgetRef ref, String currentStatus) async {
     final selected = await showModalBottomSheet<String>(
@@ -94,7 +120,7 @@ class SiteHomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final site = ref.watch(_siteProvider(siteId));
     final permissions = ref.watch(_myPermissionsProvider(siteId));
 

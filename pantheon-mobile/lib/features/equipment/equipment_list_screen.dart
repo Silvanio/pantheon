@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../theme/app_colors.dart';
 import 'equipment_repository.dart';
@@ -24,7 +25,8 @@ class _EquipmentFilter {
 
 final _filterProvider = StateProvider.family<_EquipmentFilter, String>((ref, siteId) => const _EquipmentFilter());
 
-final _listProvider = FutureProvider.family((ref, String siteId) {
+final _listProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
   final filter = ref.watch(_filterProvider(siteId));
   return ref.watch(equipmentRepositoryProvider).list(siteId, name: filter.name, status: filter.status, type: filter.type);
 });

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../theme/app_colors.dart';
 import 'site_repository.dart';
 
-final _membersProvider = FutureProvider.family((ref, String siteId) => ref.watch(siteRepositoryProvider).listMembers(siteId));
+final _membersProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).listMembers(siteId);
+});
 
 const _functionLabels = {
   'ADMIN': 'Administrador',

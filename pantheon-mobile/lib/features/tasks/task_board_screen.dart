@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/offline_dialogs.dart';
 import '../../theme/app_colors.dart';
 import 'task_models.dart';
 import 'task_repository.dart';
 
-final _boardProvider = FutureProvider.family((ref, String siteId) => ref.watch(taskRepositoryProvider).getBoard(siteId));
+final _boardProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(taskRepositoryProvider).getBoard(siteId);
+});
 
 class TaskBoardScreen extends ConsumerStatefulWidget {
   const TaskBoardScreen({super.key, required this.siteId});

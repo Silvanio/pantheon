@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../theme/app_colors.dart';
 import 'project_repository.dart';
 
-final _contentsProvider = FutureProvider.family<FolderContents, (String, String?)>(
-  (ref, args) => ref.watch(projectRepositoryProvider).listContents(args.$1, args.$2),
-);
+final _contentsProvider = FutureProvider.autoDispose.family<FolderContents, (String, String?)>((ref, args) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(projectRepositoryProvider).listContents(args.$1, args.$2);
+});
 
 /// Read-only folder browser — creating folders/uploading files stays web-only in this pass
 /// (see design.md).

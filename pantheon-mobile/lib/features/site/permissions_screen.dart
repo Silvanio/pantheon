@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../theme/app_colors.dart';
 import 'site_repository.dart';
 
-final _overridesProvider =
-    FutureProvider.family((ref, String siteId) => ref.watch(siteRepositoryProvider).listPermissionOverrides(siteId));
+final _overridesProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).listPermissionOverrides(siteId);
+});
 
 const _capabilityLabels = {
   'DOCUMENT_PROJECTS': 'Projetos',

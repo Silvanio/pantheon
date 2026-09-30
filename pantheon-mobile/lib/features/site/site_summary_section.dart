@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../theme/app_colors.dart';
 import 'site_repository.dart';
 import 'site_summary_models.dart';
 
-final siteSummaryProvider =
-    FutureProvider.family((ref, String siteId) => ref.watch(siteRepositoryProvider).getSummary(siteId));
+final siteSummaryProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).getSummary(siteId);
+});
 
 /// The obra summary — shown first on entering an obra, above the existing entry-card grid.
 /// Horizontally-scrollable stat cards rather than a dense grid, sized for a phone screen.

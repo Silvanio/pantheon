@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../orcamentos/orcamento_repository.dart';
 import '../purchase_requests/purchase_request_repository.dart';
 import 'company_models.dart';
@@ -36,7 +37,8 @@ class DashboardData {
 
 /// Mirrors `pantheon-web`'s `DashboardView.vue` `loadSites`/`loadStats`: a site-only member
 /// (no company) sees obras gathered across all their memberships instead of one company's list.
-final dashboardDataProvider = FutureProvider<DashboardData>((ref) async {
+final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
+  ref.watch(sessionEpochProvider);
   final dashboardRepo = ref.watch(dashboardRepositoryProvider);
   final prRepo = ref.watch(purchaseRequestRepositoryProvider);
   final orcRepo = ref.watch(orcamentoRepositoryProvider);

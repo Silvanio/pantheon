@@ -9,6 +9,14 @@ import '../storage/token_storage.dart';
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
 
+/// Bumped on every transition to/from an authenticated session (login, restoring a session on
+/// cold start, logout, forced logout). Screen-data providers `ref.watch` this so they're forced
+/// to recompute at that moment, regardless of whatever navigation/widget-tree timing happens to
+/// keep a watcher alive across the transition — `.autoDispose` alone only guarantees freshness
+/// when a provider's watcher count actually reaches zero, which isn't guaranteed at the exact
+/// instant auth state changes. See fix-mobile-stale-data-and-outbox-coverage's design.md.
+final sessionEpochProvider = StateProvider<int>((ref) => 0);
+
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthState {
@@ -52,6 +60,7 @@ class AuthController extends StateNotifier<AuthState> {
         state = state.copyWith(status: AuthStatus.unauthenticated);
       } else {
         state = AuthState(status: AuthStatus.authenticated, email: _decodeEmail(token));
+        _bumpSessionEpoch();
       }
     } catch (_) {
       // Secure storage being unreadable (first launch on some platforms, a widget test host
@@ -69,6 +78,7 @@ class AuthController extends StateNotifier<AuthState> {
     final token = response.data!['token'] as String;
     await _tokenStorage.write(token);
     state = AuthState(status: AuthStatus.authenticated, email: _decodeEmail(token));
+    _bumpSessionEpoch();
   }
 
   Future<void> logout() async {
@@ -79,6 +89,7 @@ class AuthController extends StateNotifier<AuthState> {
     }
     await _tokenStorage.clear();
     state = state.copyWith(status: AuthStatus.unauthenticated, email: null);
+    _bumpSessionEpoch();
   }
 
   /// Called by [ApiClient] when any request comes back 401 — the stored token is no longer
@@ -86,6 +97,11 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> forceLogout() async {
     await _tokenStorage.clear();
     state = AuthState(status: AuthStatus.unauthenticated);
+    _bumpSessionEpoch();
+  }
+
+  void _bumpSessionEpoch() {
+    _ref.read(sessionEpochProvider.notifier).state++;
   }
 }
 

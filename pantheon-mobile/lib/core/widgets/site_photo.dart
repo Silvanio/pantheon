@@ -10,7 +10,8 @@ import '../auth/auth_provider.dart';
 /// which fetches the photo as an authenticated blob rather than an unauthenticated `<img src>`
 /// since the endpoint requires a token. `CachedNetworkImage` supports this directly via
 /// `httpHeaders`, so there's no need to manually fetch+decode bytes like the web version does.
-final _authHeaderProvider = FutureProvider<Map<String, String>>((ref) async {
+final _authHeaderProvider = FutureProvider.autoDispose<Map<String, String>>((ref) async {
+  ref.watch(sessionEpochProvider);
   final token = await ref.watch(tokenStorageProvider).read();
   return token != null ? {'Authorization': 'Bearer $token'} : const {};
 });

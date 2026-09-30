@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/offline_dialogs.dart';
 import '../../core/widgets/photo_staging_sheet.dart';
@@ -11,13 +12,17 @@ import '../site/site_repository.dart';
 import 'material_models.dart';
 import 'material_repository.dart';
 
-final _materialsProvider = FutureProvider.family((ref, String siteId) => ref.watch(materialRepositoryProvider).list(siteId));
+final _materialsProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(materialRepositoryProvider).list(siteId);
+});
 
 /// Mirrors `pantheon-web`'s `MaterialsPanel` `canManage` prop
 /// (`myPermissions?.ORCAMENTO_MANAGE === 'MANAGE'`), which gates the delivery-tracking actions.
-final _canManageProvider = FutureProvider.family(
-  (ref, String siteId) => ref.watch(siteRepositoryProvider).getMyPermissions(siteId).then((p) => p['ORCAMENTO_MANAGE'] == 'MANAGE'),
-);
+final _canManageProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).getMyPermissions(siteId).then((p) => p['ORCAMENTO_MANAGE'] == 'MANAGE');
+});
 
 /// Delivery tracking for materials generated from concluded Pedidos de Compra — mirrors
 /// `pantheon-web`'s `MaterialsPanel.vue`. Reachable from the obra home's entry grid.

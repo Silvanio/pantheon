@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/offline_dialogs.dart';
@@ -12,10 +13,14 @@ import 'purchase_request_list_screen.dart' show purchaseRequestListProvider;
 import 'purchase_request_models.dart';
 import 'purchase_request_repository.dart';
 
-final _detailProvider =
-    FutureProvider.family((ref, String id) => ref.watch(purchaseRequestRepositoryProvider).getDetail(id));
-final _comparisonProvider =
-    FutureProvider.family((ref, String id) => ref.watch(purchaseRequestRepositoryProvider).getComparison(id));
+final _detailProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(purchaseRequestRepositoryProvider).getDetail(id);
+});
+final _comparisonProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(purchaseRequestRepositoryProvider).getComparison(id);
+});
 
 final _dateFormat = DateFormat('dd/MM/yyyy');
 
@@ -40,7 +45,8 @@ class _Authority {
   }
 }
 
-final _authorityProvider = FutureProvider.family((ref, String siteId) async {
+final _authorityProvider = FutureProvider.autoDispose.family((ref, String siteId) async {
+  ref.watch(sessionEpochProvider);
   final repo = ref.watch(siteRepositoryProvider);
   final results = await Future.wait([repo.getMyFunction(siteId), repo.getMyPermissions(siteId)]);
   final myFunction = results[0] as String?;

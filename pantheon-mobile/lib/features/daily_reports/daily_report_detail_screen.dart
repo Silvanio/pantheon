@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/offline_dialogs.dart';
@@ -22,21 +23,34 @@ import 'daily_report_list_screen.dart' show dailyReportListProvider;
 import 'daily_report_models.dart';
 import 'daily_report_repository.dart';
 
-final _detailProvider = FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).getDetail(id));
-final _mediaProvider = FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).listMedia(id));
-final _attachmentsProvider =
-    FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).listAttachments(id));
-final _importedInvoicesProvider =
-    FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).listImportedInvoices(id));
-final _deliveredMaterialsProvider =
-    FutureProvider.family((ref, String id) => ref.watch(dailyReportRepositoryProvider).listDeliveredMaterials(id));
+final _detailProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dailyReportRepositoryProvider).getDetail(id);
+});
+final _mediaProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dailyReportRepositoryProvider).listMedia(id);
+});
+final _attachmentsProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dailyReportRepositoryProvider).listAttachments(id);
+});
+final _importedInvoicesProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dailyReportRepositoryProvider).listImportedInvoices(id);
+});
+final _deliveredMaterialsProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dailyReportRepositoryProvider).listDeliveredMaterials(id);
+});
 
 /// Full site roster for the "Adicionar mão de obra" member picker — filtered client-side to
 /// active/non-invited members (an `INVITED` membership confers no access yet, so it shouldn't be
 /// loggable as having worked a shift) since `SiteMemberResponse`'s dedicated `invited` boolean
 /// (used for this same filter on `pantheon-web`) isn't mirrored on mobile's slimmer `SiteMember`
 /// model — see `redesign-daily-report-experience` design.md's "reuse what the app already has".
-final _siteMembersProvider = FutureProvider.family((ref, String siteId) async {
+final _siteMembersProvider = FutureProvider.autoDispose.family((ref, String siteId) async {
+  ref.watch(sessionEpochProvider);
   final members = await ref.watch(siteRepositoryProvider).listMembers(siteId);
   return members.where((m) => m.status != 'INVITED').toList();
 });
@@ -46,11 +60,15 @@ final _siteMembersProvider = FutureProvider.family((ref, String siteId) async {
 /// sized page" precedent (already used by the Equipamentos tab). The *search* box below wires the
 /// user's query into this same repository's `name` filter instead of ever depending only on this
 /// unfiltered page (see design.md's "reuse the registry's filter, not size=200 unfiltered").
-final _equipmentCatalogProvider = FutureProvider.family((ref, String siteId) => ref.watch(equipmentRepositoryProvider).list(siteId));
+final _equipmentCatalogProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(equipmentRepositoryProvider).list(siteId);
+});
 
-final _canManageMaterialsProvider = FutureProvider.family(
-  (ref, String siteId) => ref.watch(siteRepositoryProvider).getMyPermissions(siteId).then((p) => p['ORCAMENTO_MANAGE'] == 'MANAGE'),
-);
+final _canManageMaterialsProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(siteRepositoryProvider).getMyPermissions(siteId).then((p) => p['ORCAMENTO_MANAGE'] == 'MANAGE');
+});
 
 /// Mirrors `purchase_request_detail_screen.dart`'s `_Authority`/`canActOn`: same function-match /
 /// company-staff-with-no-site-role mechanism, reused verbatim for `DAILY_REPORT` per
@@ -72,7 +90,8 @@ class _Authority {
   }
 }
 
-final _authorityProvider = FutureProvider.family((ref, String siteId) async {
+final _authorityProvider = FutureProvider.autoDispose.family((ref, String siteId) async {
+  ref.watch(sessionEpochProvider);
   final repo = ref.watch(siteRepositoryProvider);
   final results = await Future.wait([repo.getMyFunction(siteId), repo.getMyPermissions(siteId)]);
   final myFunction = results[0] as String?;
@@ -1254,7 +1273,7 @@ class _DailyReportDetailScreenState extends ConsumerState<DailyReportDetailScree
                       ),
                       child: _saving
                           ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Salvar alterações', style: TextStyle(fontWeight: FontWeight.w800)),
+                          : const Text('Salvar', style: TextStyle(fontWeight: FontWeight.w800)),
                     ),
                   ),
                 ),

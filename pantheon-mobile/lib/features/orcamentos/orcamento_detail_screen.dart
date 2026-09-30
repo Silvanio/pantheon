@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import 'orcamento_repository.dart';
 
-final _detailProvider = FutureProvider.family((ref, String id) => ref.watch(orcamentoRepositoryProvider).getDetail(id));
+final _detailProvider = FutureProvider.autoDispose.family((ref, String id) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(orcamentoRepositoryProvider).getDetail(id);
+});
 
 const _paymentLabels = {'CARTAO': 'Cartão', 'BOLETO': 'Boleto', 'PIX': 'Pix', 'DINHEIRO': 'Dinheiro'};
 

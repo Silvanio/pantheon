@@ -2,18 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/auth_provider.dart';
 import '../../core/widgets/async_value_view.dart';
 import '../../core/widgets/offline_dialogs.dart';
+import '../../core/widgets/refresh_on_return.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../theme/app_colors.dart';
 import 'daily_report_repository.dart';
 
-final dailyReportListProvider =
-    FutureProvider.family((ref, String siteId) => ref.watch(dailyReportRepositoryProvider).list(siteId));
+final dailyReportListProvider = FutureProvider.autoDispose.family((ref, String siteId) {
+  ref.watch(sessionEpochProvider);
+  return ref.watch(dailyReportRepositoryProvider).list(siteId);
+});
 
-class DailyReportListScreen extends ConsumerWidget {
+class DailyReportListScreen extends ConsumerStatefulWidget {
   const DailyReportListScreen({super.key, required this.siteId});
   final String siteId;
+
+  @override
+  ConsumerState<DailyReportListScreen> createState() => _DailyReportListScreenState();
+}
+
+class _DailyReportListScreenState extends ConsumerState<DailyReportListScreen> with RouteAware, RefreshOnReturn {
+  String get siteId => widget.siteId;
+
+  @override
+  void onReturnVisible() => ref.invalidate(dailyReportListProvider(siteId));
 
   Future<void> _createReport(BuildContext context, WidgetRef ref) async {
     final date = await showDatePicker(
@@ -41,7 +55,7 @@ class DailyReportListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final reports = ref.watch(dailyReportListProvider(siteId));
     return Scaffold(
       backgroundColor: AppColors.steel50,

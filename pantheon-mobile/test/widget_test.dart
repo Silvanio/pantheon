@@ -27,12 +27,12 @@ void main() {
         child: const PantheonApp(),
       ),
     );
-    // A few pumps let the auth controller's session-restore Future (now resolved immediately
-    // by the fake storage) settle, and go_router's `refreshListenable`-triggered redirect
-    // re-evaluate, before asserting on the resulting screen.
-    for (var i = 0; i < 5; i++) {
-      await tester.pump();
-    }
+    // The splash screen enforces a minimum display duration (AuthController._minSplashDuration)
+    // even though the fake storage resolves instantly — advance past it so the redirect to
+    // /login actually fires. A fixed-duration pump, not pumpAndSettle: the splash's glow/dots
+    // animations repeat forever and would never "settle".
+    await tester.pump(const Duration(milliseconds: 4900));
+    await tester.pump();
 
     expect(find.text('Bem-vindo de volta'), findsOneWidget);
   });

@@ -66,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ClipRRect(
                 borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
                 child: Container(
-                  height: 220,
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   decoration: const BoxDecoration(
                     gradient: RadialGradient(
                       center: Alignment(-0.6, -1),
@@ -113,9 +113,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Todas as suas obras, sem perder o fio da meada.',
+                              'Gestão de obras, do orçamento à entrega.',
                               textAlign: TextAlign.center,
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12.5),
+                            ),
+                            const SizedBox(height: 18),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 28),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: const [
+                                  _BenefitRow(text: 'Pedidos de compra e orçamentos em um só lugar'),
+                                  SizedBox(height: 9),
+                                  _BenefitRow(text: 'Aprovações por etapa, com o histórico de cada decisão'),
+                                  SizedBox(height: 9),
+                                  _BenefitRow(text: 'Diário de obra, tarefas e equipe sempre à mão'),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -199,6 +213,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A benefit line in the login hero — mirrors `pantheon-web`'s `AuthShell.vue` left-panel
+/// checklist (same copy, same green-check treatment).
+class _BenefitRow extends StatelessWidget {
+  const _BenefitRow({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 1),
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF4ADE80).withValues(alpha: 0.2)),
+          child: const Icon(Icons.check, size: 11, color: Color(0xFF4ADE80)),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(text, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 12, height: 1.35)),
+        ),
+      ],
     );
   }
 }

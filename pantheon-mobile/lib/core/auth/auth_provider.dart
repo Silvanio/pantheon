@@ -53,9 +53,18 @@ class AuthController extends StateNotifier<AuthState> {
   final Ref _ref;
   final TokenStorage _tokenStorage;
 
+  // The secure-storage read below is a local, near-instant operation — without this floor the
+  // splash screen (see features/auth/splash_screen.dart) would get redirected away mid-animation
+  // on most launches, so its entrance (icon pop, wordmark, tagline) is never actually seen.
+  // `Future.delayed` starts counting the moment it's created, so creating it before the read and
+  // awaiting it after waits only for whichever of the two takes longer, never both in sequence.
+  static const _minSplashDuration = Duration(milliseconds: 4800);
+
   Future<void> _restore() async {
+    final minSplash = Future<void>.delayed(_minSplashDuration);
     try {
       final token = await _tokenStorage.read();
+      await minSplash;
       if (token == null) {
         state = state.copyWith(status: AuthStatus.unauthenticated);
       } else {
@@ -65,6 +74,7 @@ class AuthController extends StateNotifier<AuthState> {
     } catch (_) {
       // Secure storage being unreadable (first launch on some platforms, a widget test host
       // with no platform channel, ...) should fall back to logged-out, not hang forever.
+      await minSplash;
       state = state.copyWith(status: AuthStatus.unauthenticated);
     }
   }

@@ -54,6 +54,21 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+  # Generates the native (OS-level) launch screen for iOS/Android from the config below —
+  # `dart run flutter_native_splash:create` regenerates it after an icon/color change.
+  flutter_native_splash: ^2.4.4
+
+# Native launch screen shown before Flutter's first frame — necessarily static (no OS supports
+# animating it), so it only carries the background color + centered icon. The animated,
+# copy-carrying splash (logo entrance, tagline) is a real Flutter screen instead — see
+# lib/features/auth/splash_screen.dart, shown immediately after via the /splash route.
+flutter_native_splash:
+  color: "#0B0F1F"
+  image: assets/images/splash_icon.png
+  android_12:
+    color: "#0B0F1F"
+    image: assets/images/splash_icon_android12.png
+
 flutter:
   uses-material-design: true
 

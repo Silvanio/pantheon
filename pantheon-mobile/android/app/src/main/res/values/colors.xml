@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- blueprint-600 — matches the app icon's background in pantheon-icon.svg / the brand's
+         primary accent color everywhere else (pantheon-web's blueprint-600 token). -->
+    <color name="ic_launcher_background">#2F53F0</color>
+</resources>

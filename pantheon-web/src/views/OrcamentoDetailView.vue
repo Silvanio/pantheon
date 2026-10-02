@@ -412,7 +412,7 @@ onMounted(load)
           <button type="button" class="btn-danger px-3 py-1.5" :disabled="savingPrices" @click="onCancelPrices">
             {{ t('orcamento.form.cancel') }}
           </button>
-          <button type="button" class="btn-primary px-3 py-1.5" :disabled="savingPrices" @click="onSavePrices">
+          <button type="button" class="btn-primary px-3 py-1.5" :disabled="savingPrices || !hasUnsavedPriceChanges" @click="onSavePrices">
             {{ savingPrices ? t('orcamento.savingPrices') : t('orcamento.savePricesButton') }}
           </button>
         </div>

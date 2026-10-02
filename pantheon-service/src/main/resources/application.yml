@@ -22,6 +22,7 @@ spring:
     port: ${SPRING_RABBITMQ_PORT:5672}
     username: ${SPRING_RABBITMQ_USERNAME:pantheon}
     password: ${SPRING_RABBITMQ_PASSWORD:pantheon}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
 
 management:
   endpoints:
